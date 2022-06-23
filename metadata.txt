@@ -27,7 +27,7 @@ tags=python, IFC, CityGML, ADE Energy, BIM, 3D, building model
 
 homepage=https://github.com/NickNick1210/ifc_to_citygml
 category=Plugins
-icon=icon.png
+icon=icons/logo.png
 # experimental flag
 experimental=True
 

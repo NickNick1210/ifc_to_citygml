@@ -5,12 +5,12 @@
 [general]
 name=IFC-to-CityGML
 qgisMinimumVersion=3.0
-description=Das Plugin konvertiert Gebäudemodelle aus IFC zu CityGML.
+description=Konvertierung von Gebäudemodellen aus IFC zu CityGML.
 version=0.1
 author=Nicklas Meyer (Jade Hochschule Oldenburg)
 email=nicklas.meyer@student.jade-hs.de
 
-about=Dieses Plugin konvertiert 3D-Gebäudemodelle aus dem IFC-Format in das CityGML-Format, in Abstufung verschiedener Level of Detail (LoD). Auch die Nutzung der ADE Energy für thermisch-energetische Gebäudesimulationen ist möglich.
+about=Dieses Plugin konvertiert 3D-Gebäudemodelle aus dem BIM-Format Industry Foundation Classes (IFC) in das GIS-Format CityGML (City Geography Markup Language). Dabei ist das Level of Detail (LoD) sowie die Nutzung der Energy ADE (Application Domain Extension) wählbar. Zweiteres ermöglicht die Unterstützung von thermisch-energetischen Gebäudesimulationen (SIM).
 
 tracker=https://github.com/NickNick1210/ifc_to_citygml/issues
 repository=https://github.com/NickNick1210/ifc_to_citygml

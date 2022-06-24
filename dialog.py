@@ -10,7 +10,6 @@
 
 #####
 
-
 # Standard-Bibliotheken
 import os
 

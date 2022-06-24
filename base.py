@@ -12,6 +12,8 @@
 
 # Standard-Bibliotheken
 import os.path
+import pathlib
+import sys
 
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
@@ -56,6 +58,36 @@ class Base:
 
         self.first_start = None
 
+        try:
+            import ifcopenshell
+        except:
+            self.install()
+
+
+    def install(self):
+        plugin_dir = os.path.dirname(os.path.realpath(__file__))
+
+        try:
+            import pip
+        except ImportError:
+            exec(
+                open(str(pathlib.Path(plugin_dir, 'scripts', 'get_pip.py'))).read()
+            )
+            import pip
+            # just in case the included version is old
+            pip.main(['install', '--upgrade', 'pip'])
+
+        sys.path.append(plugin_dir)
+
+        with open(os.path.join(plugin_dir, 'requirements.txt'), "r") as requirements:
+            for dep in requirements.readlines():
+                dep = dep.strip().split("==")[0]
+                try:
+                    __import__(dep)
+                except ImportError as e:
+                    print("{} not available, installing".format(dep))
+                    pip.main(['install', dep])
+
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -69,6 +101,7 @@ class Base:
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('IFC-to-CityGML', message)
+
 
 
     def add_action(self, icon_path, text, callback, enabled_flag=True, add_to_menu=True, add_to_toolbar=True,

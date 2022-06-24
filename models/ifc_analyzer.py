@@ -13,11 +13,25 @@
 # Standard-Bibliotheken
 import os
 
+# IFC-Bibliotheken
+import ifcopenshell
+
 class IfcAnalyzer():
     def __init__(self, parent, path):
         """Constructor."""
         self.parent = parent
-        self.ifcPath = path
+        ifc = self.readIFC(path)
+        self.analyzeIFC(ifc)
+
+    def readIFC(self, path):
+        ifc = ifcopenshell.open(path)
+        return ifc
+
+    def analyzeIFC(self, ifc):
+        self.parent.dlg.log("Schema: " + ifc.schema)
+        self.parent.dlg.log("Schema: " + ifc.schema)
+        self.parent.dlg.log("Schema: " + ifc.schema)
+        self.parent.dlg.log("Schema: " + ifc.schema)
 
 
 

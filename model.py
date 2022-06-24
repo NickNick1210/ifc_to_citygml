@@ -23,6 +23,7 @@ class Model():
         """Constructor."""
         self.inputPath = ""
         self.outputPath = ""
+        self.valid = False
 
 
     def setVM(self, Dialog_VM, GIS_VM):
@@ -32,11 +33,16 @@ class Model():
 
     def ifcFileChanged(self):
         self.inputPath = self.dlg.getInputPath()
-        self.checkEnable()
+        self.valid = False
+
+        self.dlg.setIfcInfo("")
+        self.dlg.setIfcMsg("")
         if(self.inputPath != ""):
             self.fileName = self.inputPath[self.inputPath.rindex("\\")+1:-4]
-            self.dlg.log("IFC-Datei '" + self.fileName + "' wird analysiert")
             self.ifcAnalyzer = IfcAnalyzer(self, self.inputPath)
+            self.dlg.log("IFC-Datei '" + self.fileName + "' wird analysiert")
+        else:
+            self.checkEnable()
 
 
     def cgmlFileChanged(self):
@@ -45,7 +51,7 @@ class Model():
 
 
     def checkEnable(self):
-        if(self.inputPath != "" and self.outputPath != ""):
+        if(self.inputPath != "" and self.outputPath != "" and self.valid == True):
             self.dlg.enableRun(True)
         else:
             self.dlg.enableRun(False)

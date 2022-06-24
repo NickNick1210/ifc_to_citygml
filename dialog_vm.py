@@ -70,6 +70,12 @@ class Dialog_VM(QtWidgets.QDialog, FORM_CLASS):
         else:
             return -1
 
+    def setIfcInfo(self, text):
+        self.label_ifc_info.setText(text)
+
+    def setIfcMsg(self, msg):
+        self.label_ifc_msg.setText(msg)
+
     def log(self, msg):
         currTime = datetime.now().strftime("%H:%M:%S")
         self.textBrowser_log.append(currTime + "   " + msg)
@@ -86,3 +92,5 @@ class Dialog_VM(QtWidgets.QDialog, FORM_CLASS):
     def enableDef(self, enable):
         self.groupBox_ifc.setEnabled(enable)
         self.groupBox_cgml.setEnabled(enable)
+        txt = self.label_ifc_msg.text()[self.label_ifc_msg.text().index(">")+1:-4]
+        self.label_ifc_msg.setText("<p style='color:dimgrey'>" + txt + "</p>")

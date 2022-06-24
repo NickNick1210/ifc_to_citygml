@@ -176,9 +176,7 @@ class Base:
         self.model = Model()
 
         # GUI starten
-        if self.first_start == True:
-            self.first_start = False
-            self.dlg = Dialog_VM(self, self.model)
+        self.dlg = Dialog_VM(self, self.model)
         self.dlg.show()
 
         # GIS verbinden

@@ -17,6 +17,7 @@ import os
 from .dialog_vm import Dialog_VM
 from .gis_vm import GIS_VM
 from .models.ifc_analyzer import IfcAnalyzer
+from .models.converter import Converter
 
 class Model():
     def __init__(self, parent=None):
@@ -40,6 +41,7 @@ class Model():
         if(self.inputPath != ""):
             self.fileName = self.inputPath[self.inputPath.rindex("\\")+1:-4]
             self.ifcAnalyzer = IfcAnalyzer(self, self.inputPath)
+            self.ifcAnalyzer.run()
             self.dlg.log("IFC-Datei '" + self.fileName + "' wird analysiert")
         else:
             self.checkEnable()
@@ -60,7 +62,16 @@ class Model():
     def run(self):
         self.dlg.enableRun(False)
         self.dlg.enableDef(False)
+        self.dlg.enableProgress(True)
         self.dlg.log("Konvertierung gestartet")
+
+        self.converter = Converter(self, self.inputPath, self.outputPath)
+
+        lod = self.dlg.getLod()
+        eade = self.dlg.getOptionEade()
+        integr = self.dlg.getOptionIntegr()
+        self.dlg.log("Eingabe: " + self.inputPath[self.inputPath.rindex("\\")+1:] + ", Ausgabe: " + self.outputPath[self.outputPath.rindex("\\")+1:] + ", LoD: " + str(lod) + ", EnergyADE: " + str(eade) + ", QGIS-Integration: " + str(integr))
+        self.converter.run(lod, eade, integr)
 
 
 

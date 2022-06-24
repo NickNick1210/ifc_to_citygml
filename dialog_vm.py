@@ -61,11 +61,11 @@ class Dialog_VM(QtWidgets.QDialog, FORM_CLASS):
             return 0
         elif self.radioButton_lod1.isChecked():
             return 1
-        elif self.radioButton_lod1.isChecked():
+        elif self.radioButton_lod2.isChecked():
             return 2
-        elif self.radioButton_lod1.isChecked():
+        elif self.radioButton_lod3.isChecked():
             return 3
-        elif self.radioButton_lod1.isChecked():
+        elif self.radioButton_lod4.isChecked():
             return 4
         else:
             return -1

@@ -24,12 +24,17 @@ class IfcAnalyzer():
         """Constructor."""
         self.parent = parent
         self.ifc = self.read(path)
+
+
+    def run(self):
         self.printInfo(self.ifc)
         self.check(self.ifc)
+
 
     def read(self, path):
         ifc = ifcopenshell.open(path)
         return ifc
+
 
     def printInfo(self, ifc):
         schema = "Schema: " + ifc.schema

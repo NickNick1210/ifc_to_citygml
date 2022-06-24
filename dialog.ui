@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
+ <author>Nicklas Meyer</author>
  <class>IFC2CityGMLDialogBase</class>
  <widget class="QDialog" name="IFC2CityGMLDialogBase">
   <property name="geometry">
@@ -14,12 +15,15 @@
    <string>IFC-to-CityGML</string>
   </property>
   <widget class="QDialogButtonBox" name="button_box">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="geometry">
     <rect>
-     <x>320</x>
+     <x>410</x>
      <y>360</y>
-     <width>171</width>
-     <height>32</height>
+     <width>81</width>
+     <height>31</height>
     </rect>
    </property>
    <property name="locale">
@@ -29,216 +33,48 @@
     <enum>Qt::Horizontal</enum>
    </property>
    <property name="standardButtons">
-    <set>QDialogButtonBox::Apply|QDialogButtonBox::Close</set>
-   </property>
-  </widget>
-  <widget class="QRadioButton" name="radioButton_lod1">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>160</y>
-     <width>82</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>LoD 1</string>
-   </property>
-   <property name="checked">
-    <bool>false</bool>
-   </property>
-  </widget>
-  <widget class="QRadioButton" name="radioButton_lod2">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>180</y>
-     <width>82</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>LoD 2</string>
-   </property>
-  </widget>
-  <widget class="QRadioButton" name="radioButton_lod3">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>200</y>
-     <width>82</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>LoD 3</string>
-   </property>
-  </widget>
-  <widget class="QRadioButton" name="radioButton_lod4">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>220</y>
-     <width>82</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>LoD 4</string>
-   </property>
-  </widget>
-  <widget class="QRadioButton" name="radioButton_lod0">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>140</y>
-     <width>82</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>LoD 0</string>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-  </widget>
-  <widget class="QCheckBox" name="checkBox_eade">
-   <property name="geometry">
-    <rect>
-     <x>370</x>
-     <y>120</y>
-     <width>111</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>EnergyADE</string>
-   </property>
-  </widget>
-  <widget class="QCheckBox" name="checkBox_integration">
-   <property name="geometry">
-    <rect>
-     <x>370</x>
-     <y>140</y>
-     <width>121</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Integration in QGIS</string>
+    <set>QDialogButtonBox::Close</set>
    </property>
   </widget>
   <widget class="QProgressBar" name="progressBar">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>360</y>
-     <width>301</width>
+     <y>364</y>
+     <width>311</width>
      <height>23</height>
     </rect>
    </property>
    <property name="value">
-    <number>24</number>
+    <number>0</number>
+   </property>
+   <property name="textVisible">
+    <bool>true</bool>
+   </property>
+   <property name="invertedAppearance">
+    <bool>false</bool>
    </property>
   </widget>
   <widget class="QTextBrowser" name="textBrowser_log">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>250</y>
+     <y>240</y>
      <width>481</width>
-     <height>101</height>
+     <height>111</height>
     </rect>
    </property>
-  </widget>
-  <widget class="QgsFileWidget" name="fileWidget_ifc">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>90</y>
-     <width>221</width>
-     <height>27</height>
-    </rect>
+   <property name="verticalScrollBarPolicy">
+    <enum>Qt::ScrollBarAsNeeded</enum>
    </property>
-  </widget>
-  <widget class="QgsFileWidget" name="fileWidget_citygml">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>90</y>
-     <width>221</width>
-     <height>27</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_lod">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>120</y>
-     <width>111</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Level of Detail:</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_ifc_header">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>40</y>
-     <width>101</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <weight>75</weight>
-     <bold>true</bold>
-     <underline>true</underline>
-    </font>
-   </property>
-   <property name="text">
-    <string>Eingabe: IFC</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_citygml_header">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>40</y>
-     <width>101</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <weight>75</weight>
-     <bold>true</bold>
-     <underline>true</underline>
-    </font>
-   </property>
-   <property name="text">
-    <string>Ausgabe: CityGML</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_ifc_file">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>70</y>
-     <width>101</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="locale">
-    <locale language="German" country="Germany"/>
-   </property>
-   <property name="text">
-    <string>Eingabe-Datei:</string>
+   <property name="horizontalScrollBarPolicy">
+    <enum>Qt::ScrollBarAlwaysOff</enum>
    </property>
   </widget>
   <widget class="QLabel" name="label_header">
@@ -247,7 +83,7 @@
      <x>0</x>
      <y>0</y>
      <width>501</width>
-     <height>41</height>
+     <height>51</height>
     </rect>
    </property>
    <property name="font">
@@ -264,34 +100,244 @@
     <set>Qt::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_citygml_file">
+  <widget class="QPushButton" name="button_run">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="geometry">
     <rect>
-     <x>270</x>
-     <y>70</y>
-     <width>101</width>
-     <height>16</height>
+     <x>330</x>
+     <y>364</y>
+     <width>75</width>
+     <height>23</height>
     </rect>
    </property>
-   <property name="locale">
-    <locale language="German" country="Germany"/>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>16777215</width>
+     <height>16777215</height>
+    </size>
+   </property>
+   <property name="sizeIncrement">
+    <size>
+     <width>0</width>
+     <height>0</height>
+    </size>
+   </property>
+   <property name="baseSize">
+    <size>
+     <width>0</width>
+     <height>0</height>
+    </size>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
    </property>
    <property name="text">
-    <string>Ausgabe-Datei:</string>
+    <string>Ausführen</string>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>16</width>
+     <height>16</height>
+    </size>
+   </property>
+   <property name="autoDefault">
+    <bool>true</bool>
+   </property>
+   <property name="default">
+    <bool>false</bool>
+   </property>
+   <property name="flat">
+    <bool>false</bool>
    </property>
   </widget>
-  <widget class="QLabel" name="label_ifc_info">
+  <widget class="QGroupBox" name="groupBox_ifc">
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>120</y>
-     <width>221</width>
-     <height>121</height>
+     <y>50</y>
+     <width>231</width>
+     <height>181</height>
     </rect>
    </property>
-   <property name="text">
-    <string/>
+   <property name="title">
+    <string>Eingabe: IFC</string>
    </property>
+   <widget class="QgsFileWidget" name="fileWidget_ifc">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>211</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="useLink">
+     <bool>false</bool>
+    </property>
+    <property name="fullUrl">
+     <bool>false</bool>
+    </property>
+    <property name="filter">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_ifc_info">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>50</y>
+      <width>211</width>
+      <height>121</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QGroupBox" name="groupBox_cgml">
+   <property name="geometry">
+    <rect>
+     <x>260</x>
+     <y>50</y>
+     <width>231</width>
+     <height>181</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Ausgabe: CityGML</string>
+   </property>
+   <widget class="QgsFileWidget" name="fileWidget_cgml">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>20</y>
+      <width>221</width>
+      <height>27</height>
+     </rect>
+    </property>
+    <property name="storageMode">
+     <enum>QgsFileWidget::SaveFile</enum>
+    </property>
+   </widget>
+   <widget class="QGroupBox" name="groupBox_lod">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>50</y>
+      <width>91</width>
+      <height>121</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Level of Detail</string>
+    </property>
+    <widget class="QRadioButton" name="radioButton_lod0">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>82</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>LoD 0</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radioButton_lod1">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>40</y>
+       <width>82</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>LoD 1</string>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radioButton_lod2">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>60</y>
+       <width>82</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>LoD 2</string>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radioButton_lod4">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>100</y>
+       <width>82</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>LoD 4</string>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radioButton_lod3">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>80</y>
+       <width>82</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>LoD 3</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QCheckBox" name="checkBox_integr">
+    <property name="geometry">
+     <rect>
+      <x>110</x>
+      <y>70</y>
+      <width>121</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Integration in QGIS</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="checkBox_eade">
+    <property name="geometry">
+     <rect>
+      <x>110</x>
+      <y>50</y>
+      <width>111</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>EnergyADE</string>
+    </property>
+   </widget>
   </widget>
  </widget>
  <customwidgets>

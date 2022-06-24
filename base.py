@@ -20,7 +20,9 @@ from qgis.PyQt.QtWidgets import QAction
 
 # IFC-to-CityGML
 from .resources import *
-from .dialog import Dialog
+from .dialog_vm import Dialog_VM
+from .model import Model
+from .gis_vm import GIS_VM
 
 #####
 
@@ -137,18 +139,21 @@ class Base:
     def run(self):
         """Run-Methode, die die Arbeit startet"""
 
-        # Create the dialog with elements (after translation) and keep reference
-        # Only create GUI ONCE in callback, so that it will only load when the plugin is started
+        # Model starten
+        self.model = Model()
+
+        # GUI starten
         if self.first_start == True:
             self.first_start = False
-            self.dlg = Dialog()
-
-        # show the dialog
+            self.dlg = Dialog_VM(self, self.model)
         self.dlg.show()
-        # Run the dialog event loop
-        result = self.dlg.exec_()
-        # See if OK was pressed
-        if result:
-            # Do something useful here - delete the line containing pass and
-            # substitute with your code.
-            pass
+
+        # GIS verbinden
+        self.gis = GIS_VM(self, self.model)
+
+        self.model.setVM(self.dlg, self.gis)
+
+
+
+
+

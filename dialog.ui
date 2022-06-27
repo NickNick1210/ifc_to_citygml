@@ -8,7 +8,7 @@
     <x>0</x>
     <y>0</y>
     <width>600</width>
-    <height>500</height>
+    <height>450</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -21,7 +21,7 @@
    <property name="geometry">
     <rect>
      <x>510</x>
-     <y>466</y>
+     <y>416</y>
      <width>81</width>
      <height>31</height>
     </rect>
@@ -43,7 +43,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>470</y>
+     <y>420</y>
      <width>411</width>
      <height>23</height>
     </rect>
@@ -67,7 +67,7 @@
      <x>10</x>
      <y>240</y>
      <width>581</width>
-     <height>221</height>
+     <height>171</height>
     </rect>
    </property>
    <property name="verticalScrollBarPolicy">
@@ -110,7 +110,7 @@
    <property name="geometry">
     <rect>
      <x>430</x>
-     <y>470</y>
+     <y>420</y>
      <width>75</width>
      <height>23</height>
     </rect>

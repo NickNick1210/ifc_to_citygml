@@ -22,7 +22,6 @@ Geoinformation Gesundheitstechnologie (BGG) der
 - Notwendige Bibliotheken: [IfcOpenShell](https://pypi.org/project/python-ifcopenshell/)
 
 
----
 ### Bedienung
 
 Nach Start des Plugins über eine Schaltfläche in QGIS kann eine lokale IFC-Datei gewählt werden.
@@ -37,12 +36,10 @@ und gegebenenfalls in QGIS integriert. Ist dies geschehen wird eine Meldung abge
 kann geschlossen werden. Das Plugin kann jedoch auch jederzeit geschlossen und die bisherigen
 Schritte damit abgebrochen werden.
 
----
 ### Hinweise
 
 Das Plugin ist derzeit noch in Arbeit.
 
----
 ---
 
 ## English
@@ -67,7 +64,6 @@ Wilhelmshaven/Oldenburg/Elsfleth](https://www.jade-hs.de/en/) in Oldenburg, Germ
 - Needed libaries: [IfcOpenShell](https://pypi.org/project/python-ifcopenshell/)
 
 
----
 ### Operation
 
 After starting the plugin via a button in QGIS, a local IFC file can be selected. This is then
@@ -81,7 +77,6 @@ this is done, a message is issued and the plugin can be closed. However, the plu
 closed at any time and the previous steps thus aborted.
 
 
----
 ### Notice
 
 This plugin is currently still under development.

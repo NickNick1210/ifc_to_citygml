@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <author>Nicklas Meyer</author>
- <class>IFC2CityGMLDialogBase</class>
- <widget class="QDialog" name="IFC2CityGMLDialogBase">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -13,6 +13,9 @@
   </property>
   <property name="windowTitle">
    <string>IFC-to-CityGML</string>
+  </property>
+  <property name="locale">
+   <locale language="English" country="UnitedStates"/>
   </property>
   <widget class="QDialogButtonBox" name="button_box">
    <property name="enabled">
@@ -143,7 +146,7 @@
     <enum>Qt::NoFocus</enum>
    </property>
    <property name="text">
-    <string>Ausführen</string>
+    <string>Run</string>
    </property>
    <property name="iconSize">
     <size>
@@ -170,8 +173,11 @@
      <height>181</height>
     </rect>
    </property>
+   <property name="locale">
+    <locale language="English" country="UnitedStates"/>
+   </property>
    <property name="title">
-    <string>Eingabe: IFC</string>
+    <string>Input: IFC</string>
    </property>
    <widget class="QgsFileWidget" name="fileWidget_ifc">
     <property name="geometry">
@@ -241,7 +247,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>Validierung</string>
+     <string>Validation</string>
     </property>
     <property name="checked">
      <bool>false</bool>
@@ -258,7 +264,7 @@
     </rect>
    </property>
    <property name="title">
-    <string>Ausgabe: CityGML</string>
+    <string>Output: CityGML</string>
    </property>
    <widget class="QgsFileWidget" name="fileWidget_cgml">
     <property name="enabled">
@@ -412,7 +418,7 @@
   <connection>
    <sender>button_box</sender>
    <signal>accepted()</signal>
-   <receiver>IFC2CityGMLDialogBase</receiver>
+   <receiver>Dialog</receiver>
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
@@ -428,7 +434,7 @@
   <connection>
    <sender>button_box</sender>
    <signal>rejected()</signal>
-   <receiver>IFC2CityGMLDialogBase</receiver>
+   <receiver>Dialog</receiver>
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">

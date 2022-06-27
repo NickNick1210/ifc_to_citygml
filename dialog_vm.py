@@ -17,6 +17,7 @@ from datetime import datetime
 # QGIS-Bibliotheken
 from qgis.PyQt import uic
 from qgis.PyQt import QtWidgets
+from qgis.PyQt.QtCore import QCoreApplication
 
 # Laden der GUI-Datei, sodass PyQt das Plugin mit den Elementen des Qt-Designer bestücken kann
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
@@ -27,6 +28,7 @@ class Dialog_VM(QtWidgets.QDialog, FORM_CLASS):
     def __init__(self, parent, model):
         """Constructor."""
         super(Dialog_VM, self).__init__(None)
+        self.parent = parent
         self.model = model
 
         # GUI aufbauen
@@ -43,7 +45,7 @@ class Dialog_VM(QtWidgets.QDialog, FORM_CLASS):
         self.fileWidget_ifc.fileChanged.connect(model.ifcFileChanged)
         self.fileWidget_cgml.fileChanged.connect(model.cgmlFileChanged)
 
-        self.log("Tool gestartet")
+        self.log(QCoreApplication.translate('IFC-to-CityGML', u'Tool started'))
 
 
     def getInputPath(self):

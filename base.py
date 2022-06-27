@@ -46,7 +46,7 @@ class Base:
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
-            'base_{}.qm'.format(locale))
+            'ifc_to_citygml_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()

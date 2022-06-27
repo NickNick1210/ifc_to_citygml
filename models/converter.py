@@ -15,6 +15,7 @@ import os
 
 # IFC-Bibliotheken
 import ifcopenshell
+from qgis.PyQt.QtCore import QCoreApplication
 
 
 class Converter():

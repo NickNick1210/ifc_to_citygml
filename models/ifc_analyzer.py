@@ -17,6 +17,7 @@ import os
 import ifcopenshell
 import ifcopenshell.validate
 from qgis._core import QgsTask, QgsApplication
+from qgis.PyQt.QtCore import QCoreApplication
 
 
 class IfcAnalyzer():
@@ -38,14 +39,14 @@ class IfcAnalyzer():
 
 
     def printInfo(self, ifc):
-        self.parent.dlg.log("IFC-Datei '" + self.fileName + "' wird analysiert")
-        schema = "Schema: " + ifc.schema
-        name = "Name: " + ifc.by_type("IfcProject")[0].Name
+        self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'IFC file') + " '" + self.fileName + "' " + QCoreApplication.translate('IFC-to-CityGML', u'is analyzed'))
+        schema = QCoreApplication.translate('IFC-to-CityGML', u'Schema') + ": " + ifc.schema
+        name = QCoreApplication.translate('IFC-to-CityGML', u'Name') + ": " + ifc.by_type("IfcProject")[0].Name
         if(ifc.by_type("IfcProject")[0].Description is not None):
-            descr = "Beschreibung: " + ifc.by_type("IfcProject")[0].Description
+            descr = QCoreApplication.translate('IFC-to-CityGML', u'Description') + ": " + ifc.by_type("IfcProject")[0].Description
         else:
-            descr = "Beschreibung: -"
-        anzBldg = "Anz. Gebäude: " + str(len(ifc.by_type("IfcBuilding")))
+            descr = QCoreApplication.translate('IFC-to-CityGML', u'Description') + ": -"
+        anzBldg = QCoreApplication.translate('IFC-to-CityGML', u'No. of Buildings') + ": " + str(len(ifc.by_type("IfcBuilding")))
 
         self.parent.dlg.setIfcInfo(schema + "<br>" + name + "<br>" + descr + "<br>" + anzBldg)
 
@@ -56,13 +57,13 @@ class IfcAnalyzer():
         if len(ifc.by_type("IfcBuilding")) == 0:
             self.parent.valid = False
             self.parent.checkEnable()
-            self.parent.dlg.setIfcMsg("<p style='color:red'>nicht valide</p>")
-            self.parent.dlg.log("In der IFC-Datei sind keine Gebäude vorhanden!")
+            self.parent.dlg.setIfcMsg("<p style='color:red'>" + QCoreApplication.translate('IFC-to-CityGML', u'not valid') + "</p>")
+            self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'There are no buildings in the IFC file!'))
             return
 
         if val:
-            self.parent.dlg.log("IFC-Datei '" + self.fileName + "' wird validiert")
-            self.valTask = QgsTask.fromFunction("Validierung der IFC-Datei", self.validate,
+            self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'IFC file') + " '" + self.fileName + "' " + QCoreApplication.translate('IFC-to-CityGML', u'is validated'))
+            self.valTask = QgsTask.fromFunction(QCoreApplication.translate('IFC-to-CityGML', u'Validation of IFC file'), self.validate,
                                                 on_finished=self.valCompleted)
             QgsApplication.taskManager().addTask(self.valTask)
         else:
@@ -82,16 +83,16 @@ class IfcAnalyzer():
 
     def valCompleted(self, exception, result=None):
         if len(result.statements) != 0:
-            self.parent.dlg.log(str(len(result.statements)) + " Fehler gefunden")
-            self.parent.dlg.setIfcMsg("<p style='color:orange'>bedingt valide</p>")
+            self.parent.dlg.log(str(len(result.statements)) + " " + QCoreApplication.translate('IFC-to-CityGML', u'errors found'))
+            self.parent.dlg.setIfcMsg("<p style='color:orange'>" + QCoreApplication.translate('IFC-to-CityGML', u'conditionally valid') + "</p>")
             stmtList = []
             for stmt in result.statements:
                 if stmt["message"] not in stmtList:
                     stmtList.append(str(stmt["message"]))
             for stmt in stmtList:
-                self.parent.dlg.log("Fehler: " + stmt)
+                self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'Error') + ": " + stmt)
         else:
-            self.parent.dlg.setIfcMsg("valide")
+            self.parent.dlg.setIfcMsg(QCoreApplication.translate('IFC-to-CityGML', u'valid'))
         self.parent.valid = True
         self.parent.checkEnable()
 

@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/ifc_to_citygml/resources" >
+        <file>logo.png</file>
+    </qresource>
+</RCC>

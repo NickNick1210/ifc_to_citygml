@@ -17,16 +17,17 @@ import sys
 
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication
-from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QIcon
 
-# IFC-to-CityGML
-from .resources import *
-from .dialog_vm import Dialog_VM
+# Plugin
+from .resources import resources
 from .model import Model
-from .gis_vm import GIS_VM
+from .dialog_vm import DialogVM
+from .gis_vm import GisVM
 
 #####
+
 
 class Base:
     """ Starter-Klasse des Plugins. """
@@ -38,69 +39,61 @@ class Base:
             iface: Eine Interface-Instanz, an die sich das Plugin bindet
         """
 
+        # Initialisierung von Attributen
+        self.model = None
+        self.dlg = None
+        self.gis = None
+
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
 
-        # locale
+        # Übersetzungen, falls vorhanden
         locale = QSettings().value('locale/userLocale')[0:2]
-        locale_path = os.path.join(
-            self.plugin_dir,
-            'i18n',
-            'ifc_to_citygml_{}.qm'.format(locale))
-
+        locale_path = os.path.join(self.plugin_dir, 'i18n', 'ifc_to_citygml_{}.qm'.format(locale))
         if os.path.exists(locale_path):
             self.translator = QTranslator()
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
         self.actions = []
-        self.menu = self.tr(u'&IFC-to-CityGML')
+        self.menu = 'IFC-to-CityGML'
 
-        self.first_start = None
-
+        # Überprüfung, ob IfcOpenShell installiert ist
+        # noinspection PyBroadException
         try:
             import ifcopenshell
-        except:
+        except Exception:
             self.install()
 
-
+    # noinspection PyMethodMayBeStatic
     def install(self):
-        plugin_dir = os.path.dirname(os.path.realpath(__file__))
+        """ Installation von IfcOpenShell """
 
+        # Überprüfung, ob pip installiert ist. Ansonsten über Skript installieren
         try:
             import pip
         except ImportError:
-            exec(open(str(pathlib.Path(plugin_dir, 'scripts', 'get_pip.py'))).read())
+            exec(open(str(pathlib.Path(self.plugin_dir, 'scripts', 'get_pip.py'))).read())
+            import pip
 
-        sys.path.append(plugin_dir)
-
-        with open(os.path.join(plugin_dir, 'requirements.txt'), "r") as requirements:
+        # Requirements öffnen und installieren
+        sys.path.append(self.plugin_dir)
+        with open(os.path.join(self.plugin_dir, 'requirements.txt'), "r") as requirements:
             for dep in requirements.readlines():
                 dep = dep.strip().split("==")[0]
                 try:
                     __import__(dep)
-                except ImportError as e:
+                except ImportError:
                     print("{} not available, installing".format(dep))
                     pip.main(['install', dep])
 
-
-    # noinspection PyMethodMayBeStatic
-    def tr(self, message):
-        """ Übersetzung bekommen
-
-        Args:
-            message: String zum Übersetzen.
-
-        Returns:
-            Übersetzte Version des Strings
-        """
-        # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('IFC-to-CityGML', message)
-
-
+    def initGui(self):
+        """ Erstellt die Menü-Einträge und Tools in der QGIS-GUI. """
+        icon_path = ':/plugins/ifc_to_citygml/resources/logo.png'
+        self.add_action(icon_path, text='IFC-to-CityGML', callback=self.run, parent=self.iface.mainWindow())
 
     def add_action(self, icon_path, text, callback, enabled_flag=True, add_to_menu=True, add_to_toolbar=True,
-        status_tip=None, whats_this=None, parent=None):
+                   status_tip=None, whats_this=None, parent=None):
         """ Fügt ein neues Tool zur Toolbar hinzu.
 
         Args:
@@ -124,62 +117,45 @@ class Base:
             Das Tool, das erstellt wurde, als QAction. Wird zusätzlich zur self.actions-Liste hinzugefügt
         """
 
+        # Erstellen
         icon = QIcon(icon_path)
         action = QAction(icon, text, parent)
+
+        # Einstellungen
         action.triggered.connect(callback)
         action.setEnabled(enabled_flag)
-
         if status_tip is not None:
             action.setStatusTip(status_tip)
-
         if whats_this is not None:
             action.setWhatsThis(whats_this)
 
+        # Hinzufügen
         if add_to_toolbar:
             self.iface.addToolBarIcon(action)
-
         if add_to_menu:
             self.iface.addPluginToMenu(
                 self.menu,
                 action)
-
         self.actions.append(action)
 
         return action
 
-
-    def initGui(self):
-        """ Erstellt die Menü-Einträge und Tools in der QGIS-GUI. """
-        icon_path = ':/plugins/ifc_to_citygml/icons/logo.png'
-        self.add_action(icon_path, text=self.tr(u'IFC-to-CityGML'), callback=self.run, parent=self.iface.mainWindow())
-        self.first_start = True
-
-
     def unload(self):
-        """ Entfernt die Menü-Einträge und Tools von der QGIS-GUI. """
+        """ Entfernt die Menü-Einträge und Tools von der QGIS-GUI """
         for action in self.actions:
             self.iface.removePluginMenu(
-                self.tr(u'&IFC-to-CityGML'),
+                'IFC-to-CityGML',
                 action)
             self.iface.removeToolBarIcon(action)
 
-
     def run(self):
-        """Run-Methode, die die Arbeit startet"""
+        """ Run-Methode, die den Ablauf startet """
 
         # Model starten
         self.model = Model()
 
-        # GUI starten
-        self.dlg = Dialog_VM(self, self.model)
+        # Views und Viewmodels starten
+        self.dlg = DialogVM(self, self.model)
         self.dlg.show()
-
-        # GIS verbinden
-        self.gis = GIS_VM(self, self.model)
-
+        self.gis = GisVM(self, self.model)
         self.model.setVM(self.dlg, self.gis)
-
-
-
-
-

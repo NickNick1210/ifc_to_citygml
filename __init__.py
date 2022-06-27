@@ -8,10 +8,8 @@
  ***************************************************************************/
 """
 
-""" Dieses Skript initialisiert das Plugin und meldet es in QGIS an. """
 
-# noinspection PyPep8Naming
-def classFactory(iface):  # pylint: disable=invalid-name
+def classFactory(iface):
     """Lädt Base-Klasse von der Datei base.
 
     Args:

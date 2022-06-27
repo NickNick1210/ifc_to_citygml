@@ -8,13 +8,13 @@
  ***************************************************************************/
 """
 
-#####
 
-# Standard-Bibliotheken
-import os
+class GisVM:
+    """ ViewModel der GIS-View """
 
-class GIS_VM():
     def __init__(self, parent, model):
         """Constructor."""
+        self.parent = parent
         self.model = model
 
+        # TODO: QGIS-Integration

@@ -24,11 +24,12 @@ class IfcAnalyzer():
         """Constructor."""
         self.parent = parent
         self.ifc = self.read(path)
+        self.fileName = path[path.rindex("\\") + 1:-4]
 
 
-    def run(self):
+    def run(self, val):
         self.printInfo(self.ifc)
-        self.check(self.ifc)
+        self.check(self.ifc, val)
 
 
     def read(self, path):
@@ -37,6 +38,7 @@ class IfcAnalyzer():
 
 
     def printInfo(self, ifc):
+        self.parent.dlg.log("IFC-Datei '" + self.fileName + "' wird analysiert")
         schema = "Schema: " + ifc.schema
         name = "Name: " + ifc.by_type("IfcProject")[0].Name
         if(ifc.by_type("IfcProject")[0].Description is not None):
@@ -48,16 +50,24 @@ class IfcAnalyzer():
         self.parent.dlg.setIfcInfo(schema + "<br>" + name + "<br>" + descr + "<br>" + anzBldg)
 
 
-    def check(self, ifc):
+    def check(self, ifc, val):
 
         # Prüfung, ob Gebäude vorhanden
         if len(ifc.by_type("IfcBuilding")) == 0:
+            self.parent.valid = False
+            self.parent.checkEnable()
             self.parent.dlg.setIfcMsg("<p style='color:red'>nicht valide</p>")
             self.parent.dlg.log("In der IFC-Datei sind keine Gebäude vorhanden!")
             return
 
-        self.valTask = QgsTask.fromFunction("Validierung der IFC-Datei", self.validate, on_finished=self.valCompleted)
-        QgsApplication.taskManager().addTask(self.valTask)
+        if val:
+            self.parent.dlg.log("IFC-Datei '" + self.fileName + "' wird validiert")
+            self.valTask = QgsTask.fromFunction("Validierung der IFC-Datei", self.validate,
+                                                on_finished=self.valCompleted)
+            QgsApplication.taskManager().addTask(self.valTask)
+        else:
+            self.parent.valid = True
+            self.parent.checkEnable()
 
 
     def validate(self, task):
@@ -68,7 +78,6 @@ class IfcAnalyzer():
             pass
         finally:
             return json_logger
-
 
 
     def valCompleted(self, exception, result=None):

@@ -32,9 +32,11 @@ class Dialog_VM(QtWidgets.QDialog, FORM_CLASS):
         # GUI aufbauen
         self.setupUi(self)
 
-        # Datei-Format-Filter für die Dateiauswahlen setzen
+        # Datei-Format-Filter für die Dateiauswahlen und ReadOnly für die Textfelder setzen
         self.fileWidget_ifc.setFilter("Industry Foundation Classes (*.ifc)")
+        self.fileWidget_ifc.lineEdit().setReadOnly(True)
         self.fileWidget_cgml.setFilter("Geography Markup Language (*.gml)")
+        self.fileWidget_cgml.lineEdit().setReadOnly(True)
 
         # EventListener für den Startknopf
         self.button_run.clicked.connect(model.run)
@@ -49,6 +51,9 @@ class Dialog_VM(QtWidgets.QDialog, FORM_CLASS):
 
     def getOutputPath(self):
         return self.fileWidget_cgml.filePath()
+
+    def getOptionVal(self):
+        return self.checkBox_val.isChecked()
 
     def getOptionEade(self):
         return self.checkBox_eade.isChecked()

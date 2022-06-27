@@ -7,8 +7,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>500</width>
-    <height>400</height>
+    <width>600</width>
+    <height>500</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,8 +20,8 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>410</x>
-     <y>360</y>
+     <x>510</x>
+     <y>466</y>
      <width>81</width>
      <height>31</height>
     </rect>
@@ -43,8 +43,8 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>364</y>
-     <width>311</width>
+     <y>470</y>
+     <width>411</width>
      <height>23</height>
     </rect>
    </property>
@@ -66,8 +66,8 @@
     <rect>
      <x>10</x>
      <y>240</y>
-     <width>481</width>
-     <height>111</height>
+     <width>581</width>
+     <height>221</height>
     </rect>
    </property>
    <property name="verticalScrollBarPolicy">
@@ -85,7 +85,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>501</width>
+     <width>601</width>
      <height>51</height>
     </rect>
    </property>
@@ -109,8 +109,8 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>330</x>
-     <y>364</y>
+     <x>430</x>
+     <y>470</y>
      <width>75</width>
      <height>23</height>
     </rect>
@@ -166,7 +166,7 @@
     <rect>
      <x>10</x>
      <y>50</y>
-     <width>231</width>
+     <width>281</width>
      <height>181</height>
     </rect>
    </property>
@@ -178,7 +178,7 @@
      <rect>
       <x>10</x>
       <y>20</y>
-      <width>211</width>
+      <width>261</width>
       <height>27</height>
      </rect>
     </property>
@@ -197,7 +197,7 @@
      <rect>
       <x>10</x>
       <y>50</y>
-      <width>211</width>
+      <width>261</width>
       <height>91</height>
      </rect>
     </property>
@@ -211,10 +211,10 @@
    <widget class="QLabel" name="label_ifc_msg">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>140</y>
-      <width>211</width>
-      <height>31</height>
+      <x>100</x>
+      <y>150</y>
+      <width>171</width>
+      <height>21</height>
      </rect>
     </property>
     <property name="font">
@@ -231,13 +231,29 @@
      <set>Qt::AlignHCenter|Qt::AlignTop</set>
     </property>
    </widget>
+   <widget class="QCheckBox" name="checkBox_val">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>150</y>
+      <width>111</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Validierung</string>
+    </property>
+    <property name="checked">
+     <bool>false</bool>
+    </property>
+   </widget>
   </widget>
   <widget class="QGroupBox" name="groupBox_cgml">
    <property name="geometry">
     <rect>
-     <x>260</x>
+     <x>310</x>
      <y>50</y>
-     <width>231</width>
+     <width>281</width>
      <height>181</height>
     </rect>
    </property>
@@ -245,13 +261,28 @@
     <string>Ausgabe: CityGML</string>
    </property>
    <widget class="QgsFileWidget" name="fileWidget_cgml">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>20</y>
-      <width>221</width>
+      <width>261</width>
       <height>27</height>
      </rect>
+    </property>
+    <property name="acceptDrops">
+     <bool>false</bool>
+    </property>
+    <property name="fileWidgetButtonVisible">
+     <bool>true</bool>
+    </property>
+    <property name="useLink">
+     <bool>false</bool>
+    </property>
+    <property name="fullUrl">
+     <bool>false</bool>
     </property>
     <property name="storageMode">
      <enum>QgsFileWidget::SaveFile</enum>
@@ -262,7 +293,7 @@
      <rect>
       <x>10</x>
       <y>50</y>
-      <width>91</width>
+      <width>101</width>
       <height>121</height>
      </rect>
     </property>
@@ -344,7 +375,7 @@
    <widget class="QCheckBox" name="checkBox_integr">
     <property name="geometry">
      <rect>
-      <x>110</x>
+      <x>130</x>
       <y>70</y>
       <width>121</width>
       <height>21</height>
@@ -357,7 +388,7 @@
    <widget class="QCheckBox" name="checkBox_eade">
     <property name="geometry">
      <rect>
-      <x>110</x>
+      <x>130</x>
       <y>50</y>
       <width>111</width>
       <height>20</height>

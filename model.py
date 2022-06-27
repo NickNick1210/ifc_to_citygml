@@ -39,10 +39,8 @@ class Model():
         self.dlg.setIfcInfo("")
         self.dlg.setIfcMsg("")
         if(self.inputPath != ""):
-            self.fileName = self.inputPath[self.inputPath.rindex("\\")+1:-4]
             self.ifcAnalyzer = IfcAnalyzer(self, self.inputPath)
-            self.ifcAnalyzer.run()
-            self.dlg.log("IFC-Datei '" + self.fileName + "' wird analysiert")
+            self.ifcAnalyzer.run(self.dlg.getOptionVal())
         else:
             self.checkEnable()
 

@@ -70,12 +70,7 @@ class Base:
         try:
             import pip
         except ImportError:
-            exec(
-                open(str(pathlib.Path(plugin_dir, 'scripts', 'get_pip.py'))).read()
-            )
-            import pip
-            # just in case the included version is old
-            pip.main(['install', '--upgrade', 'pip'])
+            exec(open(str(pathlib.Path(plugin_dir, 'scripts', 'get_pip.py'))).read())
 
         sys.path.append(plugin_dir)
 

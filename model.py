@@ -74,4 +74,6 @@ class Model():
         self.converter.run(lod, eade, integr)
 
 
+    def completed(self):
+        self.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'Conversion completed'))
 

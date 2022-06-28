@@ -11,6 +11,7 @@
 #####
 
 # Standard-Bibliotheken
+import sys
 import uuid
 import numpy as np
 from datetime import datetime
@@ -111,7 +112,7 @@ class Converter:
             XML-Element
         """
         return etree.Element(QName(XmlNs.core, "CityModel"),
-                             nsmap={'core': XmlNs.core, 'xmlns': XmlNs.xmlns, 'bdlg': XmlNs.bldg, 'gen': XmlNs.gen,
+                             nsmap={'core': XmlNs.core, None: XmlNs.xmlns, 'bldg': XmlNs.bldg, 'gen': XmlNs.gen,
                                     'grp': XmlNs.grp, 'app': XmlNs.app, 'gml': XmlNs.gml, 'xAL': XmlNs.xAL,
                                     'xlink': XmlNs.xlink, 'xsi': XmlNs.xsi})
 
@@ -194,7 +195,7 @@ class Converter:
         return result
 
     def convertLoD0(self, ifc, root, eade):
-        root.set("name", "")
+        chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
 
         # BoundedBy
         chBound = etree.SubElement(root, QName(XmlNs.core, "boundedBy"))
@@ -253,23 +254,28 @@ class Converter:
 
         # Building
         chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
-        chBldgClass.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
+        chBldgClass.set("codeSpace",
+                        "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
         chBldgClass.text = ifcBuilding.ObjectType
 
         chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
-        chBldgFunc.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
+        chBldgFunc.set("codeSpace",
+                       "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
         chBldgFunc.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
 
         chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
-        chBldgUsage.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
+        chBldgUsage.set("codeSpace",
+                        "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
         chBldgUsage.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
         # TODO: Mapping zwischen IFC-Freitext und CityGML-Code
 
         chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
-        chBldgYearConstr.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["YearOfConstruction"]
+        chBldgYearConstr.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"][
+            "YearOfConstruction"]
 
         chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
-        chBldgRoofType.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_roofType.xml")
+        chBldgRoofType.set("codeSpace",
+                           "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_roofType.xml")
         chBldgRoofType.text = ""
 
         chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
@@ -278,7 +284,8 @@ class Converter:
             chBldgHeight.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
 
         chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
-        chBldgStoreysAG.text = str(ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
+        chBldgStoreysAG.text = str(
+            ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
 
         chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
         chBldgStoreysBG.text = ""
@@ -292,22 +299,41 @@ class Converter:
 
         # FootPrint
         chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
+        chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
+        chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
         # TODO: FootPrint-Geometrie
 
-        print(ifc.get_inverse(ifcBuilding))
+        ifcSlab = self.findElement(ifc, ifcBuilding, "IfcSlab", type="BASESLAB")[0]
+        settings = ifcopenshell.geom.settings()
+        shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
+        verts = shape.geometry.verts
+        grVerts = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
+        print(grVerts)
+        maxHeight = -sys.maxsize
+        for grVert in grVerts:
+            if grVert[2] > maxHeight:
+                maxHeight = grVert[2]
+        print(str(maxHeight))
 
+        grVertsNew = []
+        for grVert in grVerts:
+            grVert[2] = maxHeight
+            if grVert not in grVertsNew:
+                grVertsNew.append(grVert)
+        print(grVertsNew)
 
+        ring = ogr.Geometry(ogr.wkbLinearRing)
+        for grVert in grVertsNew:
+            ring.AddPoint(grVert[0], grVert[1], grVert[2])
+        geom1 = ogr.Geometry(ogr.wkbPolygon)
+        geom1.AddGeometry(ring)
+        cgml = geom1.ExportToGML()
+        print(cgml)
 
-        ifcSlabs = ifc.by_type("IfcSlab")
-        for ifcSlab in ifcSlabs:
-            if ifcSlab.PredefinedType == "BASESLAB":
-                print(ifcSlab)
-                settings = ifcopenshell.geom.settings()
-                shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
-                print(shape.geometry.verts)
+        cgml = cgml[0:cgml.find(">")] + " xmlns:gml='http://www.opengis.net/gml'" + cgml[cgml.find(">"):]
 
-        print("GEFUNDEN:")
-        print(self.findElement(ifc, ifcBuilding, "IfcSlab"))
+        geomXML = etree.XML(cgml)
+        chBldgFootPrintSM.append(geomXML)
 
 
 
@@ -358,12 +384,12 @@ class Converter:
         address = ifcAddress.AddressLines[0]
         if address[0].isdigit():
             sep = address.find(" ")
-            street = address[sep+1:]
+            street = address[sep + 1:]
             nr = address[0:sep]
         elif address[len(address) - 1].isdigit():
             sep = address.rfind(" ")
             street = address[0:sep]
-            nr = address[sep+1:]
+            nr = address[sep + 1:]
         else:
             street = address
             nr = ""
@@ -371,7 +397,6 @@ class Converter:
         chBldgAdrLocThNr.text = nr
         chBldgAdrLocPCNr.text = ifcAddress.PostalCode
         chBldgAdrLocName.text = ifcAddress.Town
-
 
     @staticmethod
     def findPset(ifc, ifcElement, psetName):
@@ -381,32 +406,34 @@ class Converter:
         else:
             return None
 
-    def findElements(self, ifc, inElement, findElements):
-        pass
-
-    def findElement(self, ifc, inElement, findElement):
-        print("Neuer Durchgang: " + str(inElement))
+    def findElement(self, ifc, inElement, outElement, result=[], type=None):
         rels = ifc.get_inverse(inElement)
         for rel in rels:
             if rel.is_a('IfcRelAggregates'):
                 if rel.RelatingObject == inElement:
-                    print("   IfcRelAggregates")
                     for obj in rel.RelatedObjects:
-                        print("      Objekt: " + str(obj))
-                        if obj.is_a(findElement):
-                            return obj
+                        if obj.is_a(outElement):
+                            if type is not None:
+                                if obj.PredefinedType == type:
+                                    if obj not in result:
+                                        result.append(obj)
+                            else:
+                                if obj not in result:
+                                    result.append(obj)
                         else:
-                            res = self.findElement(ifc, obj, findElement)
-                            if res is not None:
-                                return res
+                            self.findElement(ifc, obj, outElement, result, type)
             elif rel.is_a("IfcRelSpaceBoundary"):
                 if rel.RelatingSpace == inElement:
-                    print("   IfcRelSpaceBoundary")
                     obj = rel.RelatedBuildingElement
-                    print("      Objekt: " + str(obj))
-                    if obj.is_a(findElement):
-                        return obj
-                    else:
-                        res = self.findElement(ifc, obj, findElement)
-                        if res is not None:
-                            return res
+                    if obj is not None:
+                        if obj.is_a(outElement):
+                            if type is not None:
+                                if obj.PredefinedType == type:
+                                    if obj not in result:
+                                        result.append(obj)
+                            else:
+                                if obj not in result:
+                                    result.append(obj)
+                        else:
+                            self.findElement(ifc, obj, outElement, result, type)
+        return result

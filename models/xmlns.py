@@ -11,7 +11,8 @@
 
 class XmlNs:
     """ Klasse zum Speichern von Namespaces """
-
+    schemaLocation = "http://www.opengis.net/citygml/2.0 http://schemas.opengis.net/citygml/2.0/cityGMLBase.xsd  http://www.opengis.net/citygml/appearance/2.0 http://schemas.opengis.net/citygml/appearance/2.0/appearance.xsd http://www.opengis.net/citygml/building/2.0 http://schemas.opengis.net/citygml/building/2.0/building.xsd http://www.opengis.net/citygml/generics/2.0 http://schemas.opengis.net/citygml/generics/2.0/generics.xsd"
+    xmlns = "http://www.opengis.net/citygml/profiles/base/2.0"
     core = "http://www.opengis.net/citygml/2.0"
     xmlns = "http://www.opengis.net/citygml/profiles/base/2.0"
     bldg = "http://www.opengis.net/citygml/building/2.0"

@@ -253,29 +253,32 @@ class Converter:
 
         # Building
         chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
-        chBldgClass.text = ""
+        chBldgClass.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
+        chBldgClass.text = ifcBuilding.ObjectType
 
         chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
-        chBldgFunc.text = ""
+        chBldgFunc.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
+        chBldgFunc.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
 
         chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
-        chBldgUsage.text = ""
+        chBldgUsage.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
+        chBldgUsage.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+        # TODO: Mapping zwischen IFC-Freitext und CityGML-Code
 
         chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
-
-        chBldgYearConstr.text = self.findAttribute(ifc, ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction")
-
-        chBldgYearDem = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfDemolition"))
-        chBldgYearDem.text = ""
+        chBldgYearConstr.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["YearOfConstruction"]
 
         chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
+        chBldgRoofType.set("codeSpace", "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_roofType.xml")
         chBldgRoofType.text = ""
 
         chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
-        chBldgHeight.text = ""
+        chBldgHeight.set("uom", "m")
+        if self.findPset(ifc, ifcBuilding, "Qto_BuildingBaseQuantities") is not None:
+            chBldgHeight.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
 
         chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
-        chBldgStoreysAG.text = ""
+        chBldgStoreysAG.text = str(ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
 
         chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
         chBldgStoreysBG.text = ""
@@ -290,6 +293,23 @@ class Converter:
         # FootPrint
         chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
         # TODO: FootPrint-Geometrie
+
+        print(ifc.get_inverse(ifcBuilding))
+
+
+
+        ifcSlabs = ifc.by_type("IfcSlab")
+        for ifcSlab in ifcSlabs:
+            if ifcSlab.PredefinedType == "BASESLAB":
+                print(ifcSlab)
+                settings = ifcopenshell.geom.settings()
+                shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
+                print(shape.geometry.verts)
+
+        print("GEFUNDEN:")
+        print(self.findElement(ifc, ifcBuilding, "IfcSlab"))
+
+
 
         # RoofEdge
         chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
@@ -354,16 +374,39 @@ class Converter:
 
 
     @staticmethod
-    def findAttribute(ifc, ifcElement, psetName, attrName=None):
-        for element in ifc.get_inverse(ifcElement):
-            if element.is_a("IfcRelDefinesByProperties"):
-                pset = element.RelatingPropertyDefinition
-                if pset.Name == psetName:
-                    if attrName is None:
-                        return pset
+    def findPset(ifc, ifcElement, psetName):
+        psets = ifcopenshell.util.element.get_psets(ifcElement)
+        if psetName in psets:
+            return psets[psetName]
+        else:
+            return None
+
+    def findElements(self, ifc, inElement, findElements):
+        pass
+
+    def findElement(self, ifc, inElement, findElement):
+        print("Neuer Durchgang: " + str(inElement))
+        rels = ifc.get_inverse(inElement)
+        for rel in rels:
+            if rel.is_a('IfcRelAggregates'):
+                if rel.RelatingObject == inElement:
+                    print("   IfcRelAggregates")
+                    for obj in rel.RelatedObjects:
+                        print("      Objekt: " + str(obj))
+                        if obj.is_a(findElement):
+                            return obj
+                        else:
+                            res = self.findElement(ifc, obj, findElement)
+                            if res is not None:
+                                return res
+            elif rel.is_a("IfcRelSpaceBoundary"):
+                if rel.RelatingSpace == inElement:
+                    print("   IfcRelSpaceBoundary")
+                    obj = rel.RelatedBuildingElement
+                    print("      Objekt: " + str(obj))
+                    if obj.is_a(findElement):
+                        return obj
                     else:
-                        ps = pset.HasProperties
-                        for p in ps:
-                            if p.Name == attrName:
-                                return str(p.NominalValue.wrappedValue)
-        return None
+                        res = self.findElement(ifc, obj, findElement)
+                        if res is not None:
+                            return res

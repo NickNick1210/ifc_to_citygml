@@ -262,7 +262,8 @@ class Converter:
         chBldgUsage.text = ""
 
         chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
-        chBldgYearConstr.text = ""
+
+        chBldgYearConstr.text = self.findAttribute(ifc, ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction")
 
         chBldgYearDem = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfDemolition"))
         chBldgYearDem.text = ""
@@ -306,65 +307,63 @@ class Converter:
 
     def convertAddress(self, ifc, ifcBuilding, ifcSite, chBldg):
         # Prüfen, wo Addresse vorhanden
-        ifcAddress = None
-
-        # Als Gebäudeattribut
         if ifcBuilding.BuildingAddress is not None:
             ifcAddress = ifcBuilding.BuildingAddress
-        else:
-
-            # Als Gebäude-Pset
-            for element in ifc.get_inverse(ifcBuilding):
-                if element.is_a('IfcPropertySet'):
-                    if element.Name == "Pset_Address":
-                        ifcAddress = element
-            if ifcAddress is None:
-
-                # Als Grundstücksattribut
-                if ifcSite.SiteAddress is not None:
-                    ifcAddress = ifcSite.SiteAddress
-                else:
-
-                    # Als Grundstücks-Pset
-                    for element in ifc.get_inverse(ifcSite):
-                        if element.is_a('IfcPropertySet'):
-                            if element.Name == "Pset_Address":
-                                ifcAddress = element
-
-        if ifcAddress is not None:
-            # XML-Struktur
-            chBldgAdr = etree.SubElement(chBldg, QName(XmlNs.bldg, "address"))
-            chBldgAdrObj = etree.SubElement(chBldgAdr, QName(XmlNs.core, "Address"))
-            chBldgAdrXal = etree.SubElement(chBldgAdrObj, QName(XmlNs.core, "xalAddress"))
-            chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
-            chBldgAdrLoc = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "Locality"))
-            chBldgAdrLoc.set("Type", "Town")
-            chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
-            chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
-            chBldgAdrLocTh.set("Type", "Street")
-            chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
-            chBldgAdrLocThName = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareName"))
-            chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
-            chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
-
-            # Eintragen der Adresse
-            address = ifcAddress.AddressLines[0]
-            if address[0].isdigit():
-                sep = address.find(" ")
-                street = address[sep+1:]
-                nr = address[0:sep]
-            elif address[len(address) - 1].isdigit():
-                sep = address.rfind(" ")
-                street = address[0:sep]
-                nr = address[sep+1:]
-            else:
-                street = address
-                nr = ""
-            chBldgAdrLocThName.text = street
-            chBldgAdrLocThNr.text = nr
-            chBldgAdrLocPCNr.text = ifcAddress.PostalCode
-            chBldgAdrLocName.text = ifcAddress.Town
-
-        # Addresse nicht vorhanden
+        elif self.findAttribute(ifc, ifcBuilding, "Pset_Address") is not None:
+            ifcAddress = self.findAttribute(ifc, ifcBuilding, "Pset_Address")
+        elif ifcSite.SiteAddress is not None:
+            ifcAddress = ifcSite.SiteAddress
+        elif self.findAttribute(ifc, ifcSite, "Pset_Address") is not None:
+            ifcAddress = self.findAttribute(ifc, ifcSite, "Pset_Address")
         else:
             self.parent.dlg.log(u'No address details existing')
+            return
+
+        # XML-Struktur
+        chBldgAdr = etree.SubElement(chBldg, QName(XmlNs.bldg, "address"))
+        chBldgAdrObj = etree.SubElement(chBldgAdr, QName(XmlNs.core, "Address"))
+        chBldgAdrXal = etree.SubElement(chBldgAdrObj, QName(XmlNs.core, "xalAddress"))
+        chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
+        chBldgAdrLoc = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "Locality"))
+        chBldgAdrLoc.set("Type", "Town")
+        chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
+        chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
+        chBldgAdrLocTh.set("Type", "Street")
+        chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
+        chBldgAdrLocThName = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareName"))
+        chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
+        chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
+
+        # Eintragen der Adresse
+        address = ifcAddress.AddressLines[0]
+        if address[0].isdigit():
+            sep = address.find(" ")
+            street = address[sep+1:]
+            nr = address[0:sep]
+        elif address[len(address) - 1].isdigit():
+            sep = address.rfind(" ")
+            street = address[0:sep]
+            nr = address[sep+1:]
+        else:
+            street = address
+            nr = ""
+        chBldgAdrLocThName.text = street
+        chBldgAdrLocThNr.text = nr
+        chBldgAdrLocPCNr.text = ifcAddress.PostalCode
+        chBldgAdrLocName.text = ifcAddress.Town
+
+
+    @staticmethod
+    def findAttribute(ifc, ifcElement, psetName, attrName=None):
+        for element in ifc.get_inverse(ifcElement):
+            if element.is_a("IfcRelDefinesByProperties"):
+                pset = element.RelatingPropertyDefinition
+                if pset.Name == psetName:
+                    if attrName is None:
+                        return pset
+                    else:
+                        ps = pset.HasProperties
+                        for p in ps:
+                            if p.Name == attrName:
+                                return str(p.NominalValue.wrappedValue)
+        return None

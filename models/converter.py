@@ -13,7 +13,6 @@
 # Standard-Bibliotheken
 import sys
 import uuid
-import numpy as np
 from datetime import datetime
 
 # IFC-Bibliotheken
@@ -21,6 +20,7 @@ import ifcopenshell
 from ifcopenshell import geom
 from ifcopenshell import util
 import ifcopenshell.util.pset
+from ifcopenshell.util import element
 
 # XML-Bibliotheken
 from lxml import etree
@@ -28,12 +28,12 @@ from lxml import etree
 from lxml.etree import QName
 
 # QGIS-Bibliotheken
-import osgeo.osr as osr
 from osgeo import ogr
 
 # Plugin
 from .xmlns import XmlNs
 from .transformer import Transformer
+from .utilities import Utilities
 
 
 class Converter:
@@ -52,6 +52,10 @@ class Converter:
         self.parent = parent
         self.inPath = inPath
         self.outPath = outPath
+        self.ifc = None
+        self.epsg = None
+        self.originShift = None
+        self.trans = None
 
     def run(self, lod, eade, integr):
         """ Ausführen der Konvertierung
@@ -63,12 +67,12 @@ class Converter:
         """
 
         # Initialisieren von IFC und CityGML
-        ifc = self.readIfc(self.inPath)
+        self.ifc = self.readIfc(self.inPath)
         root = self.createSchema()
 
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
         if lod == 0:
-            root = self.convertLoD0(ifc, root, eade)
+            root = self.convertLoD0(root, eade)
         elif lod == 1:
             # TODO
             pass
@@ -125,23 +129,29 @@ class Converter:
         """
         etree.ElementTree(root).write(self.outPath, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
-    def convertLoD0(self, ifc, root, eade):
+    def convertLoD0(self, root, eade):
+        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 0
+
+        Args:
+            root: Das vorbereitete XML-Schema
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+        """
         chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
         chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
 
-        ifcProject = ifc.by_type("IfcProject")[0]
-        ifcSite = ifc.by_type("IfcSite")[0]
-        ifcBuilding = ifc.by_type("IfcBuilding")[0]
+        ifcProject = self.ifc.by_type("IfcProject")[0]
+        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcBuilding = self.ifc.by_type("IfcBuilding")[0]
 
-        epsg = Transformer.getCRS(ifcSite)
-        self.originShift = Transformer.getOriginShift(ifcSite, epsg)
+        self.epsg = Transformer.getCRS(ifcSite)
+        self.originShift = Transformer.getOriginShift(ifcSite, self.epsg)
         self.trans = Transformer.getTransformMatrix(ifcProject)
 
         # BoundedBy
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
         chBoundEnv = etree.SubElement(chBound, QName(XmlNs.gml, "Envelope"))
         chBoundEnv.set("srsDimension", "3")
-        chBoundEnv.set("srsName", "EPSG:" + str(epsg))
+        chBoundEnv.set("srsName", "EPSG:" + str(self.epsg))
         chBoundEnvLC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "lowerCorner"))
         chBoundEnvLC.set("srsDimension", "3")
         chBoundEnvUC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "upperCorner"))
@@ -179,16 +189,16 @@ class Converter:
         chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
         chBldgFunc.set("codeSpace",
                        "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
-        chBldgFunc.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+        chBldgFunc.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
 
         chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
         chBldgUsage.set("codeSpace",
                         "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
-        chBldgUsage.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+        chBldgUsage.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
         # TODO: Mapping zwischen IFC-Freitext und CityGML-Code
 
         chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
-        chBldgYearConstr.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"][
+        chBldgYearConstr.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"][
             "YearOfConstruction"]
 
         chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
@@ -198,12 +208,11 @@ class Converter:
 
         chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
         chBldgHeight.set("uom", "m")
-        if self.findPset(ifc, ifcBuilding, "Qto_BuildingBaseQuantities") is not None:
-            chBldgHeight.text = ifcopenshell.util.element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
+        if Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities") is not None:
+            chBldgHeight.text = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
 
         chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
-        chBldgStoreysAG.text = str(
-            ifcopenshell.util.element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
+        chBldgStoreysAG.text = str(element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
 
         chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
         chBldgStoreysBG.text = ""
@@ -220,7 +229,7 @@ class Converter:
         chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
         chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
 
-        ifcSlab = self.findElement(ifc, ifcBuilding, "IfcSlab", type="BASESLAB")[0]
+        ifcSlab = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", type="BASESLAB")[0]
         settings = ifcopenshell.geom.settings()
         shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
         verts = shape.geometry.verts
@@ -254,7 +263,7 @@ class Converter:
         # TODO: RoofEdge-Geometrie
 
         # Adresse
-        self.convertAddress(ifc, ifcBuilding, ifcSite, chBldg)
+        self.convertAddress(self.ifc, ifcBuilding, ifcSite, chBldg)
 
         # EnergyADE
         if eade:
@@ -264,15 +273,23 @@ class Converter:
         return root
 
     def convertAddress(self, ifc, ifcBuilding, ifcSite, chBldg):
+        """ Konvertieren der Adresse von IFC zu CityGML
+
+        Args:
+            ifc: Das IFC-Objekt
+            ifcBuilding: Das Gebäude, aus dem die Adresse entnommen werden soll
+            ifcSite: Das Grundstück, auf dem das Gebäude steht
+            chBldg: XML-Element an dem die Adresse angefügt werden soll
+        """
         # Prüfen, wo Addresse vorhanden
         if ifcBuilding.BuildingAddress is not None:
             ifcAddress = ifcBuilding.BuildingAddress
-        elif self.findAttribute(ifc, ifcBuilding, "Pset_Address") is not None:
-            ifcAddress = self.findAttribute(ifc, ifcBuilding, "Pset_Address")
+        elif Utilities.findPset(ifc, ifcBuilding, "Pset_Address") is not None:
+            ifcAddress = Utilities.findPset(ifc, ifcBuilding, "Pset_Address")
         elif ifcSite.SiteAddress is not None:
             ifcAddress = ifcSite.SiteAddress
-        elif self.findAttribute(ifc, ifcSite, "Pset_Address") is not None:
-            ifcAddress = self.findAttribute(ifc, ifcSite, "Pset_Address")
+        elif Utilities.findPset(ifc, ifcSite, "Pset_Address") is not None:
+            ifcAddress = Utilities.findPset(ifc, ifcSite, "Pset_Address")
         else:
             self.parent.dlg.log(u'No address details existing')
             return
@@ -309,43 +326,3 @@ class Converter:
         chBldgAdrLocThNr.text = nr
         chBldgAdrLocPCNr.text = ifcAddress.PostalCode
         chBldgAdrLocName.text = ifcAddress.Town
-
-    @staticmethod
-    def findPset(ifc, ifcElement, psetName):
-        psets = ifcopenshell.util.element.get_psets(ifcElement)
-        if psetName in psets:
-            return psets[psetName]
-        else:
-            return None
-
-    def findElement(self, ifc, inElement, outElement, result=[], type=None):
-        rels = ifc.get_inverse(inElement)
-        for rel in rels:
-            if rel.is_a('IfcRelAggregates'):
-                if rel.RelatingObject == inElement:
-                    for obj in rel.RelatedObjects:
-                        if obj.is_a(outElement):
-                            if type is not None:
-                                if obj.PredefinedType == type:
-                                    if obj not in result:
-                                        result.append(obj)
-                            else:
-                                if obj not in result:
-                                    result.append(obj)
-                        else:
-                            self.findElement(ifc, obj, outElement, result, type)
-            elif rel.is_a("IfcRelSpaceBoundary"):
-                if rel.RelatingSpace == inElement:
-                    obj = rel.RelatedBuildingElement
-                    if obj is not None:
-                        if obj.is_a(outElement):
-                            if type is not None:
-                                if obj.PredefinedType == type:
-                                    if obj not in result:
-                                        result.append(obj)
-                            else:
-                                if obj not in result:
-                                    result.append(obj)
-                        else:
-                            self.findElement(ifc, obj, outElement, result, type)
-        return result

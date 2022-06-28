@@ -75,6 +75,7 @@ class Transformer:
             epsg = 32632
         else:
             epsg = -1
+        # TODO: weitere Zonen
 
         return epsg
 

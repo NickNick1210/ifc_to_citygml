@@ -33,6 +33,7 @@ from osgeo import ogr
 
 # Plugin
 from .xmlns import XmlNs
+from .transformer import Transformer
 
 
 class Converter:
@@ -124,111 +125,28 @@ class Converter:
         """
         etree.ElementTree(root).write(self.outPath, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
-    @staticmethod
-    def createGeom():
-        # Test
-        ring = ogr.Geometry(ogr.wkbLinearRing)
-        ring.AddPoint(1179091.1646903288, 712782.8838459781)
-        ring.AddPoint(1161053.0218226474, 667456.2684348812)
-        ring.AddPoint(1214704.933941905, 641092.8288590391)
-        ring.AddPoint(1228580.428455506, 682719.3123998424)
-        ring.AddPoint(1218405.0658121984, 721108.1805541387)
-        ring.AddPoint(1179091.1646903288, 712782.8838459781)
-        geom1 = ogr.Geometry(ogr.wkbPolygon)
-        geom1.AddGeometry(ring)
-        cgml = geom1.ExportToGML()
-        print(cgml)
-
-    @staticmethod
-    def getTransformMatrix(project):
-        def getModelContext(proj):
-            for context in proj.RepresentationContexts:
-                if context.ContextType == "Model":
-                    return context
-            print("No context for model was found in this project")
-
-        contextForModel = getModelContext(project)
-        a, b = contextForModel.TrueNorth.DirectionRatios
-        transformMatrix = [[b, -a, 0], [a, b, 0], [0, 0, 1]]
-        transformMatrix = np.mat(transformMatrix).I
-        return transformMatrix
-
-    @staticmethod
-    def getOriginShift(site):
-        def mergeDegrees(Degrees):
-            if len(Degrees) == 4:
-                degree = Degrees[0] + Degrees[1] / 60.0 + (Degrees[2] + Degrees[3] / 1000000.0) / 3600.0
-            elif len(Degrees) == 3:
-                degree = Degrees[0] + Degrees[1] / 60.0 + Degrees[2] / 3600.0
-            else:
-                print("Wrong input of degrees")
-                degree = None
-            return degree
-
-        Lat, Lon = site.RefLatitude, site.RefLongitude
-        a, b = mergeDegrees(Lat), mergeDegrees(Lon)
-
-        source = osr.SpatialReference()
-        source.ImportFromEPSG(4326)
-        # Berechnung des EPSG-Codes des Zielkoordinatensystems
-        # Die WGS84-Grenzen für die UTM-Zone 32N (EPSG-Code 32632) liegen
-        # zwischen 6° und 12°
-        # Die WGS84-Grenzen für die UTM-Zone 33N (EPSG-Code 32633) liegen
-        # zwischen 12° und 18°
-        if 18 > b >= 12:
-            EPSG = 32633
-        elif 6 <= b < 12:
-            EPSG = 32632
-        else:
-            EPSG = -1
-        target = osr.SpatialReference()
-        target.ImportFromEPSG(EPSG)
-        transform = osr.CoordinateTransformation(source, target)
-        x, y, z = transform.TransformPoint(a, b)
-        c = site.RefElevation
-        return [x, y, c]
-
-    @staticmethod
-    def georeferencingPoint(transMatrix, originShift, inX, inY):
-        a = [inX, inY, 0]
-        result = np.mat(a) * np.mat(transMatrix) + np.mat(originShift)
-        return result
-
     def convertLoD0(self, ifc, root, eade):
         chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
-
-        # BoundedBy
-        chBound = etree.SubElement(root, QName(XmlNs.core, "boundedBy"))
-        chBoundEnv = etree.SubElement(chBound, QName(XmlNs.gml, "Envelope"))
-        chBoundEnv.set("srsDimension", "3")
-        chBoundEnv.set("srsName", "TODO!!!")
-        chBoundEnvLC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "lowerCorner"))
-        chBoundEnvLC.set("srsDimension", "3")
-        chBoundEnvUC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "upperCorner"))
-        chBoundEnvUC.set("srsDimension", "3")
+        chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
 
         ifcProject = ifc.by_type("IfcProject")[0]
         ifcSite = ifc.by_type("IfcSite")[0]
         ifcBuilding = ifc.by_type("IfcBuilding")[0]
 
-        originShift = self.getOriginShift(ifcSite)
-        trans = self.getTransformMatrix(ifcProject)
+        epsg = Transformer.getCRS(ifcSite)
+        self.originShift = Transformer.getOriginShift(ifcSite, epsg)
+        self.trans = Transformer.getTransformMatrix(ifcProject)
 
-        if ifcBuilding.Representation is not None:
-            settings = geom.settings()
-            settings.set(settings.INCLUDE_CURVES, True)
-            settings.set(settings.USE_WORLD_COORDS, True)
-            bldgShape = geom.create_shape(settings, ifcBuilding)
-            verts = bldgShape.geometry.verts
-            print(str(verts))
-
-            grouped_verts = []
-            for i in range(0, len(verts), 3):
-                result = self.georeferencingPoint(trans, originShift, verts[i], verts[i + 1])
-                array = np.array(result)
-                grouped_verts.append((array[0][0], array[0][1]))
-            print(str(grouped_verts))
-        # TODO: BoundedBy
+        # BoundedBy
+        chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
+        chBoundEnv = etree.SubElement(chBound, QName(XmlNs.gml, "Envelope"))
+        chBoundEnv.set("srsDimension", "3")
+        chBoundEnv.set("srsName", "EPSG:" + str(epsg))
+        chBoundEnvLC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "lowerCorner"))
+        chBoundEnvLC.set("srsDimension", "3")
+        chBoundEnvUC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "upperCorner"))
+        chBoundEnvUC.set("srsDimension", "3")
+        # TODO: Envelope
 
         # Building
         chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
@@ -301,41 +219,35 @@ class Converter:
         chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
         chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
         chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
-        # TODO: FootPrint-Geometrie
 
         ifcSlab = self.findElement(ifc, ifcBuilding, "IfcSlab", type="BASESLAB")[0]
         settings = ifcopenshell.geom.settings()
         shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
         verts = shape.geometry.verts
         grVerts = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
-        print(grVerts)
         maxHeight = -sys.maxsize
         for grVert in grVerts:
             if grVert[2] > maxHeight:
                 maxHeight = grVert[2]
-        print(str(maxHeight))
 
         grVertsNew = []
         for grVert in grVerts:
             grVert[2] = maxHeight
             if grVert not in grVertsNew:
                 grVertsNew.append(grVert)
-        print(grVertsNew)
 
         ring = ogr.Geometry(ogr.wkbLinearRing)
         for grVert in grVertsNew:
-            ring.AddPoint(grVert[0], grVert[1], grVert[2])
+            grVertTr = Transformer.georeferencePoint(self.trans, self.originShift, grVert)
+            ring.AddPoint(grVertTr[0], grVertTr[1], grVertTr[2])
         geom1 = ogr.Geometry(ogr.wkbPolygon)
         geom1.AddGeometry(ring)
         cgml = geom1.ExportToGML()
-        print(cgml)
 
         cgml = cgml[0:cgml.find(">")] + " xmlns:gml='http://www.opengis.net/gml'" + cgml[cgml.find(">"):]
 
         geomXML = etree.XML(cgml)
         chBldgFootPrintSM.append(geomXML)
-
-
 
         # RoofEdge
         chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))

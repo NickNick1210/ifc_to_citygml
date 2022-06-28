@@ -11,35 +11,57 @@
 #####
 
 # Standard-Bibliotheken
-import os, sys
-import numpy as np
-import osgeo.osr as osr
-import osgeo.ogr as ogr
 import uuid
+import numpy as np
 
 # IFC-Bibliotheken
 import ifcopenshell
 from ifcopenshell import geom
-from ifcopenshell.util import element
-from qgis.PyQt.QtCore import QCoreApplication
-from osgeo import ogr
-from lxml import etree
-from lxml.etree import Element, SubElement, QName, tounicode
 
+# XML-Bibliotheken
+from lxml import etree
+# noinspection PyUnresolvedReferences
+from lxml.etree import QName
+
+# QGIS-Bibliotheken
+import osgeo.osr as osr
+from osgeo import ogr
+
+# Plugin
 from .xmlns import XmlNs
 
 
-class Converter():
+class Converter:
+    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+
     def __init__(self, parent, inPath, outPath):
-        """Constructor."""
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+
+        Args:
+            parent: Die zugrunde liegende zentrale Model-Klasse
+            inPath: Pfad zur IFC-Datei
+            outPath: Pfad zur CityGML-Datei
+        """
+
+        # Initialisierung von Attributen
         self.parent = parent
         self.inPath = inPath
         self.outPath = outPath
 
     def run(self, lod, eade, integr):
+        """ Ausführen der Konvertierung
+
+        Args:
+            lod: Gewähltes Level of Detail (LoD) als Integer
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+            integr: Ob die QGIS-Integration gewählt wurde als Boolean
+        """
+
+        # Initialisieren von IFC und CityGML
         ifc = self.readIfc(self.inPath)
         root = self.createSchema()
 
+        # Eigentliche Konvertierung: Unterscheidung nach den LoD
         if lod == 0:
             root = self.convertLoD0(ifc, root, eade)
         elif lod == 1:
@@ -55,25 +77,51 @@ class Converter():
             # TODO
             pass
 
+        # Schreiben der CityGML in eine Datei
         self.writeCGML(root)
+
+        # Integration der CityGML in QGIS
         if integr:
             # TODO
             pass
 
+        # Fertigstellung
         self.parent.completed()
 
-    def readIfc(self, path):
-        ifc = ifcopenshell.open(path)
-        return ifc
+    @staticmethod
+    def readIfc(path):
+        """ Einlesen einer IFC-Datei
 
-    def createSchema(self):
-        root = etree.Element(QName(XmlNs.core, "CityModel"),
+        Args:
+            path: Pfad zur IFC-Datei
+
+        Returns:
+            Eingelesene IFC-Datei
+        """
+        return ifcopenshell.open(path)
+
+    @staticmethod
+    def createSchema():
+        """ Vorbereiten der CityGML-Struktur
+
+        Returns:
+            XML-Element
+        """
+        return etree.Element(QName(XmlNs.core, "CityModel"),
                              nsmap={'schemaLocation': XmlNs.schemaLocation, 'core': XmlNs.core, 'xmlns': XmlNs.xmlns,
                                     'bdlg': XmlNs.bldg, 'gen': XmlNs.gen, 'grp': XmlNs.grp, 'app': XmlNs.app,
                                     'gml': XmlNs.gml, 'xAL': XmlNs.xAL, 'xlink': XmlNs.xlink, 'xsi': XmlNs.xsi})
-        return root
 
-    def createGeom(self):
+    def writeCGML(self, root):
+        """ Schreiben der XML-Struktur in eine GML-Datei
+
+        Args:
+            root: XML-Element
+        """
+        etree.ElementTree(root).write(self.outPath, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+
+    @staticmethod
+    def createGeom():
         # Test
         ring = ogr.Geometry(ogr.wkbLinearRing)
         ring.AddPoint(1179091.1646903288, 712782.8838459781)
@@ -82,24 +130,18 @@ class Converter():
         ring.AddPoint(1228580.428455506, 682719.3123998424)
         ring.AddPoint(1218405.0658121984, 721108.1805541387)
         ring.AddPoint(1179091.1646903288, 712782.8838459781)
-        geom = ogr.Geometry(ogr.wkbPolygon)
-        geom.AddGeometry(ring)
-        cgml = geom.ExportToGML()
+        geom1 = ogr.Geometry(ogr.wkbPolygon)
+        geom1.AddGeometry(ring)
+        cgml = geom1.ExportToGML()
         print(cgml)
 
-    def writeCGML(self, root):
-        et = etree.ElementTree(root)
-        et.write(self.outPath, xml_declaration=True, encoding="UTF-8", pretty_print=True)
-
-    def getTransformMatrix(self, project):
-        def getModelContext(project):
-            flag = False
-            for context in project.RepresentationContexts:
+    @staticmethod
+    def getTransformMatrix(project):
+        def getModelContext(proj):
+            for context in proj.RepresentationContexts:
                 if context.ContextType == "Model":
-                    flag = True
                     return context
-            if flag == False:
-                print("No context for model was found in this project")
+            print("No context for model was found in this project")
 
         contextForModel = getModelContext(project)
         a, b = contextForModel.TrueNorth.DirectionRatios
@@ -107,7 +149,8 @@ class Converter():
         transformMatrix = np.mat(transformMatrix).I
         return transformMatrix
 
-    def getOriginShift(self, site):
+    @staticmethod
+    def getOriginShift(site):
         def mergeDegrees(Degrees):
             if len(Degrees) == 4:
                 degree = Degrees[0] + Degrees[1] / 60.0 + (Degrees[2] + Degrees[3] / 1000000.0) / 3600.0
@@ -115,6 +158,7 @@ class Converter():
                 degree = Degrees[0] + Degrees[1] / 60.0 + Degrees[2] / 3600.0
             else:
                 print("Wrong input of degrees")
+                degree = None
             return degree
 
         Lat, Lon = site.RefLatitude, site.RefLongitude
@@ -131,6 +175,8 @@ class Converter():
             EPSG = 32633
         elif 6 <= b < 12:
             EPSG = 32632
+        else:
+            EPSG = -1
         target = osr.SpatialReference()
         target.ImportFromEPSG(EPSG)
         transform = osr.CoordinateTransformation(source, target)
@@ -138,7 +184,8 @@ class Converter():
         c = site.RefElevation
         return [x, y, c]
 
-    def georeferencingPoint(self, transMatrix, originShift, inX, inY):
+    @staticmethod
+    def georeferencingPoint(transMatrix, originShift, inX, inY):
         a = [inX, inY, 0]
         result = np.mat(a) * np.mat(transMatrix) + np.mat(originShift)
         return result
@@ -163,7 +210,7 @@ class Converter():
         originShift = self.getOriginShift(ifcSite)
         trans = self.getTransformMatrix(ifcProject)
 
-        if ifcBuilding.Representation != None:
+        if ifcBuilding.Representation is not None:
             settings = geom.settings()
             settings.set(settings.INCLUDE_CURVES, True)
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -203,5 +250,9 @@ class Converter():
         chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
         chBldgAdrLocality = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "AddressDetails"))
         # TODO: Addresse
+
+        if eade:
+            # TODO: EnergyADE
+            pass
 
         return root

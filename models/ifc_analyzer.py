@@ -10,90 +10,152 @@
 
 #####
 
-# Standard-Bibliotheken
-import os
-
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.validate
-from qgis._core import QgsTask, QgsApplication
-from qgis.PyQt.QtCore import QCoreApplication
+
+# QGIS-Bibliotheken
+from qgis.core import QgsTask, QgsApplication
+
+#####
 
 
-class IfcAnalyzer():
+class IfcAnalyzer:
+    """ Model-Klasse zum Analysieren von IFC-Dateien """
+
     def __init__(self, parent, path):
-        """Constructor."""
+        """ Konstruktor der Model-Klasse zum Analysieren von IFC-Dateien
+
+        Args:
+            parent: Die zugrunde liegende zentrale Model-Klasse
+            path: Pfad zur IFC-Datei
+        """
+
+        # Initialisierung von Attributen
         self.parent = parent
+        self.valTask = None
+
+        # IFC-Datei
         self.ifc = self.read(path)
         self.fileName = path[path.rindex("\\") + 1:-4]
 
-
     def run(self, val):
+        """ Ausführen der Analyse
+
+        Args:
+            val: Angabe, ob eine Validierung durchgeführt werden soll
+        """
         self.printInfo(self.ifc)
         self.check(self.ifc, val)
 
+    @staticmethod
+    def read(path):
+        """ Einlesen einer IFC-Datei
 
-    def read(self, path):
-        ifc = ifcopenshell.open(path)
-        return ifc
+        Args:
+            path: Pfad zur IFC-Datei
 
+        Returns:
+            Eingelesene IFC-Datei
+        """
+        return ifcopenshell.open(path)
 
     def printInfo(self, ifc):
-        self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'IFC file') + " '" + self.fileName + "' " + QCoreApplication.translate('IFC-to-CityGML', u'is analyzed'))
-        schema = QCoreApplication.translate('IFC-to-CityGML', u'Schema') + ": " + ifc.schema
-        name = QCoreApplication.translate('IFC-to-CityGML', u'Name') + ": " + ifc.by_type("IfcProject")[0].Name
-        if(ifc.by_type("IfcProject")[0].Description is not None):
-            descr = QCoreApplication.translate('IFC-to-CityGML', u'Description') + ": " + ifc.by_type("IfcProject")[0].Description
+        """ Einlesen einer IFC-Datei
+
+        Args:
+            ifc: Auszulesende IFC-Datei
+        """
+        self.parent.dlg.log(self.parent.tr(u'IFC file') + " '" + self.fileName + "' " + self.parent.tr(u'is analyzed'))
+
+        # Eigenschaften
+        schema = self.parent.tr(u'Schema') + ": " + ifc.schema
+        name = self.parent.tr(u'Name') + ": " + ifc.by_type("IfcProject")[0].Name
+        if ifc.by_type("IfcProject")[0].Description is not None:
+            descr = self.parent.tr(u'Description') + ": " + ifc.by_type("IfcProject")[0].Description
         else:
-            descr = QCoreApplication.translate('IFC-to-CityGML', u'Description') + ": -"
-        anzBldg = QCoreApplication.translate('IFC-to-CityGML', u'No. of Buildings') + ": " + str(len(ifc.by_type("IfcBuilding")))
+            descr = self.parent.tr(u'Description') + ": -"
+        anzBldg = self.parent.tr(u'No. of Buildings') + ": " + str(len(ifc.by_type("IfcBuilding")))
 
         self.parent.dlg.setIfcInfo(schema + "<br>" + name + "<br>" + descr + "<br>" + anzBldg)
 
-
     def check(self, ifc, val):
+        """ Überprüfung der IFC-Datei
 
+        Args:
+            ifc: Zu überprüfende IFC-Datei
+            val: Angabe, ob eine Validierung durchgeführt werden soll
+        """
         # Prüfung, ob Gebäude vorhanden
         if len(ifc.by_type("IfcBuilding")) == 0:
             self.parent.valid = False
             self.parent.checkEnable()
-            self.parent.dlg.setIfcMsg("<p style='color:red'>" + QCoreApplication.translate('IFC-to-CityGML', u'not valid') + "</p>")
-            self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'There are no buildings in the IFC file!'))
+            self.parent.dlg.setIfcMsg("<p style='color:red'>" + self.parent.tr(u'not valid') + "</p>")
+            self.parent.dlg.log(self.parent.tr(u'There are no buildings in the IFC file!'))
             return
 
+        # Validierung über einen QgsTask, der asynchron ausgeführt wird
+        # Wichtig, da sonst die QGIS-Oberfläche einfriert
         if val:
-            self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'IFC file') + " '" + self.fileName + "' " + QCoreApplication.translate('IFC-to-CityGML', u'is validated'))
-            self.valTask = QgsTask.fromFunction(QCoreApplication.translate('IFC-to-CityGML', u'Validation of IFC file'), self.validate,
+            self.parent.dlg.log(
+                self.parent.tr(u'IFC file') + " '" + self.fileName + "' " + self.parent.tr(u'is validated'))
+            # Muss über Klassenmethode geschehen, da der Task sonst 'vergessen' und deswegen nicht ausgeführt wird
+            self.valTask = QgsTask.fromFunction(self.parent.tr(u'Validation of IFC file'), self.validate,
                                                 on_finished=self.valCompleted)
             QgsApplication.taskManager().addTask(self.valTask)
         else:
-            self.parent.valid = True
-            self.parent.checkEnable()
+            self.valCompleted()
 
-
+    # noinspection PyUnusedLocal
     def validate(self, task):
+        """ Validierung der IFC-Datei
+
+        Args:
+            task: QgsTask-Objekt
+
+        Returns:
+            Validierungsergebnisse als JSON-Logger
+        """
+        # Wenn die Validierung einen Fehler wirft, kann das ebenfalls an der IFC-Datei liegen. Deswegen wird abgefangen
+        json_logger = None
+        # noinspection PyBroadException
         try:
             json_logger = ifcopenshell.validate.json_logger()
             ifcopenshell.validate.validate(self.ifc, json_logger)
-        except:
+        except Exception:
             pass
         finally:
             return json_logger
 
+    # noinspection PyUnusedLocal
+    def valCompleted(self, ex=None, result=None):
+        """ EventListener, wenn der Validierungs-Task erfolgt ist
 
-    def valCompleted(self, exception, result=None):
-        if len(result.statements) != 0:
-            self.parent.dlg.log(str(len(result.statements)) + " " + QCoreApplication.translate('IFC-to-CityGML', u'errors found'))
-            self.parent.dlg.setIfcMsg("<p style='color:orange'>" + QCoreApplication.translate('IFC-to-CityGML', u'conditionally valid') + "</p>")
+        Args:
+            ex: ggf. Exception
+                Default: None
+            result: Ergebniss der Validierung
+                Default: None
+        """
+        # Wenn Ergebnis vorhanden und nicht leer: Fehler vorhanden
+        if result is not None and len(result.statements) != 0:
+            # Mitteilen
+            self.parent.dlg.log(
+                str(len(result.statements)) + " " + self.parent.tr(u'errors found'))
+            self.parent.dlg.setIfcMsg("<p style='color:orange'>" + self.parent.tr(u'conditionally valid') + "</p>")
+
+            # Fehler in redundanzfreie Liste umformen und mitteilen
             stmtList = []
             for stmt in result.statements:
                 if stmt["message"] not in stmtList:
                     stmtList.append(str(stmt["message"]))
             for stmt in stmtList:
-                self.parent.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'Error') + ": " + stmt)
+                self.parent.dlg.log(self.parent.tr(u'Error') + ": " + stmt)
+
+        # Wenn kein Ergebnis vorhanden oder leer: kein Fehler vorhanden
         else:
-            self.parent.dlg.setIfcMsg(QCoreApplication.translate('IFC-to-CityGML', u'valid'))
+            self.parent.dlg.setIfcMsg(self.parent.tr(u'valid'))
+
+        # In beiden Fällen: Freigeben
         self.parent.valid = True
         self.parent.checkEnable()
-
-

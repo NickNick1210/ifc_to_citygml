@@ -17,7 +17,6 @@ from qgis.PyQt.QtCore import QCoreApplication
 from .models.ifc_analyzer import IfcAnalyzer
 from .models.converter import Converter
 
-
 #####
 
 

@@ -8,7 +8,10 @@
  ***************************************************************************/
 """
 
+
 class XmlNs:
+    """ Klasse zum Speichern von Namespaces """
+
     schemaLocation = "http://www.opengis.net/citygml/2.0"
     core = "http://www.opengis.net/citygml/2.0"
     xmlns = "http://www.opengis.net/citygml/profiles/base/2.0"
@@ -20,7 +23,3 @@ class XmlNs:
     xAL = "urn:oasis:names:tc:ciq:xsdschema:xAL:2.0"
     xlink = "http://www.w3.org/1999/xlink"
     xsi = "http://www.w3.org/2001/XMLSchema-instance"
-
-
-
-

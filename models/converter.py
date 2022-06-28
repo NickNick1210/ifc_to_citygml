@@ -13,10 +13,13 @@
 # Standard-Bibliotheken
 import uuid
 import numpy as np
+from datetime import datetime
 
 # IFC-Bibliotheken
 import ifcopenshell
 from ifcopenshell import geom
+from ifcopenshell import util
+import ifcopenshell.util.pset
 
 # XML-Bibliotheken
 from lxml import etree
@@ -108,9 +111,9 @@ class Converter:
             XML-Element
         """
         return etree.Element(QName(XmlNs.core, "CityModel"),
-                             nsmap={'schemaLocation': XmlNs.schemaLocation, 'core': XmlNs.core, 'xmlns': XmlNs.xmlns,
-                                    'bdlg': XmlNs.bldg, 'gen': XmlNs.gen, 'grp': XmlNs.grp, 'app': XmlNs.app,
-                                    'gml': XmlNs.gml, 'xAL': XmlNs.xAL, 'xlink': XmlNs.xlink, 'xsi': XmlNs.xsi})
+                             nsmap={'core': XmlNs.core, 'xmlns': XmlNs.xmlns, 'bdlg': XmlNs.bldg, 'gen': XmlNs.gen,
+                                    'grp': XmlNs.grp, 'app': XmlNs.app, 'gml': XmlNs.gml, 'xAL': XmlNs.xAL,
+                                    'xlink': XmlNs.xlink, 'xsi': XmlNs.xsi})
 
     def writeCGML(self, root):
         """ Schreiben der XML-Struktur in eine GML-Datei
@@ -229,12 +232,59 @@ class Converter:
         # Building
         chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
         chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
+
+        # Attribute
+        # GML
         chBldg.set("id", "UUID_" + str(uuid.uuid4()))
         chBldgName = etree.SubElement(chBldg, QName(XmlNs.gml, "name"))
         chBldgName.text = ifcBuilding.Name
         chBldgDescr = etree.SubElement(chBldg, QName(XmlNs.gml, "description"))
         chBldgDescr.text = ifcBuilding.Description
-        # TODO: Weitere Gebäude-Attribute
+
+        # Core
+        chBldgCrDate = etree.SubElement(chBldg, QName(XmlNs.core, "creationDate"))
+        chBldgCrDate.text = datetime.now().strftime("%Y-%m-%d")
+
+        chBldgRelTerr = etree.SubElement(chBldg, QName(XmlNs.core, "relativeToTerrain"))
+        chBldgRelTerr.text = ""
+
+        chBldgRelWater = etree.SubElement(chBldg, QName(XmlNs.core, "relativeToWater"))
+        chBldgRelWater.text = ""
+
+        # Building
+        chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
+        chBldgClass.text = ""
+
+        chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
+        chBldgFunc.text = ""
+
+        chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
+        chBldgUsage.text = ""
+
+        chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
+        chBldgYearConstr.text = ""
+
+        chBldgYearDem = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfDemolition"))
+        chBldgYearDem.text = ""
+
+        chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
+        chBldgRoofType.text = ""
+
+        chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
+        chBldgHeight.text = ""
+
+        chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
+        chBldgStoreysAG.text = ""
+
+        chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
+        chBldgStoreysBG.text = ""
+
+        chBldgStoreysHeightAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsAboveGround"))
+        chBldgStoreysHeightAG.text = ""
+
+        chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
+        chBldgStoreysHeightBG.text = ""
+        # TODO
 
         # FootPrint
         chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
@@ -244,15 +294,77 @@ class Converter:
         chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
         # TODO: RoofEdge-Geometrie
 
-        chBldgAdr = etree.SubElement(chBldg, QName(XmlNs.bldg, "address"))
-        chBldgAdrObj = etree.SubElement(chBldgAdr, QName(XmlNs.core, "Address"))
-        chBldgAdrXal = etree.SubElement(chBldgAdrObj, QName(XmlNs.core, "xalAddress"))
-        chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
-        chBldgAdrLocality = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "AddressDetails"))
-        # TODO: Addresse
+        # Adresse
+        self.convertAddress(ifc, ifcBuilding, ifcSite, chBldg)
 
+        # EnergyADE
         if eade:
             # TODO: EnergyADE
             pass
 
         return root
+
+    def convertAddress(self, ifc, ifcBuilding, ifcSite, chBldg):
+        # Prüfen, wo Addresse vorhanden
+        ifcAddress = None
+
+        # Als Gebäudeattribut
+        if ifcBuilding.BuildingAddress is not None:
+            ifcAddress = ifcBuilding.BuildingAddress
+        else:
+
+            # Als Gebäude-Pset
+            for element in ifc.get_inverse(ifcBuilding):
+                if element.is_a('IfcPropertySet'):
+                    if element.Name == "Pset_Address":
+                        ifcAddress = element
+            if ifcAddress is None:
+
+                # Als Grundstücksattribut
+                if ifcSite.SiteAddress is not None:
+                    ifcAddress = ifcSite.SiteAddress
+                else:
+
+                    # Als Grundstücks-Pset
+                    for element in ifc.get_inverse(ifcSite):
+                        if element.is_a('IfcPropertySet'):
+                            if element.Name == "Pset_Address":
+                                ifcAddress = element
+
+        if ifcAddress is not None:
+            # XML-Struktur
+            chBldgAdr = etree.SubElement(chBldg, QName(XmlNs.bldg, "address"))
+            chBldgAdrObj = etree.SubElement(chBldgAdr, QName(XmlNs.core, "Address"))
+            chBldgAdrXal = etree.SubElement(chBldgAdrObj, QName(XmlNs.core, "xalAddress"))
+            chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
+            chBldgAdrLoc = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "Locality"))
+            chBldgAdrLoc.set("Type", "Town")
+            chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
+            chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
+            chBldgAdrLocTh.set("Type", "Street")
+            chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
+            chBldgAdrLocThName = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareName"))
+            chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
+            chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
+
+            # Eintragen der Adresse
+            address = ifcAddress.AddressLines[0]
+            if address[0].isdigit():
+                sep = address.find(" ")
+                street = address[sep+1:]
+                nr = address[0:sep]
+            elif address[len(address) - 1].isdigit():
+                sep = address.rfind(" ")
+                street = address[0:sep]
+                nr = address[sep+1:]
+            else:
+                street = address
+                nr = ""
+            chBldgAdrLocThName.text = street
+            chBldgAdrLocThNr.text = nr
+            chBldgAdrLocPCNr.text = ifcAddress.PostalCode
+            chBldgAdrLocName.text = ifcAddress.Town
+
+        # Addresse nicht vorhanden
+        else:
+            self.parent.dlg.log(u'No address details existing')

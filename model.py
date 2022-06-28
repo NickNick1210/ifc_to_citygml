@@ -103,4 +103,5 @@ class Model:
 
     def completed(self):
         """ Beenden der Konvertierung """
+        self.dlg.setProgress(100)
         self.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'Conversion completed'))

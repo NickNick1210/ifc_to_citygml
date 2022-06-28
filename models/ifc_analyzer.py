@@ -154,7 +154,7 @@ class IfcAnalyzer:
 
         # Wenn kein Ergebnis vorhanden oder leer: kein Fehler vorhanden
         else:
-            self.parent.dlg.setIfcMsg(self.parent.tr(u'valid'))
+            self.parent.dlg.setIfcMsg("<p style='color:black'>" + self.parent.tr(u'valid') + "</p>")
 
         # In beiden Fällen: Freigeben
         self.parent.valid = True

@@ -21,38 +21,49 @@ import osgeo.osr as osr
 
 class Transformer:
     """ Model-Klasse zum Transformieren vom lokalen in ein projizertes Koordinatensystem """
+    def __init__(self, ifc):
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
 
-    @staticmethod
-    def getModelContext(proj):
-        for context in proj.RepresentationContexts:
+        Args:
+            parent: Die zugrunde liegende zentrale Model-Klasse
+            inPath: Pfad zur IFC-Datei
+            outPath: Pfad zur CityGML-Datei
+        """
+
+        self.ifc = ifc
+        self.epsg = self.getCRS()
+        self.originShift = self.getOriginShift()
+        self.trans = self.getTransformMatrix()
+
+    def getModelContext(self):
+        project = self.ifc.by_type("IfcProject")[0]
+        for context in project.RepresentationContexts:
             if context.ContextType == "Model":
                 return context
         print("No context for model was found in this project")
 
-    @staticmethod
-    def getTransformMatrix(project):
-        contextForModel = Transformer.getModelContext(project)
+    def getTransformMatrix(self):
+        contextForModel = self.getModelContext()
         a, b = contextForModel.TrueNorth.DirectionRatios
         transformMatrix = [[b, -a, 0], [a, b, 0], [0, 0, 1]]
         transformMatrix = np.mat(transformMatrix).I
         return transformMatrix
 
-    @staticmethod
-    def getOriginShift(site, epsg):
+    def getOriginShift(self):
+        site = self.ifc.by_type("IfcSite")[0]
         Lat, Lon = site.RefLatitude, site.RefLongitude
-        a, b = Transformer.mergeDegrees(Lat), Transformer.mergeDegrees(Lon)
+        a, b = self.mergeDegrees(Lat), self.mergeDegrees(Lon)
 
         source = osr.SpatialReference()
         source.ImportFromEPSG(4326)
         target = osr.SpatialReference()
-        target.ImportFromEPSG(epsg)
+        target.ImportFromEPSG(self.epsg)
         transform = osr.CoordinateTransformation(source, target)
         x, y, z = transform.TransformPoint(a, b)
         c = site.RefElevation
         return [x, y, c]
 
-    @staticmethod
-    def mergeDegrees(Degrees):
+    def mergeDegrees(self, Degrees):
         if len(Degrees) == 4:
             degree = Degrees[0] + Degrees[1] / 60.0 + (Degrees[2] + Degrees[3] / 1000000.0) / 3600.0
         elif len(Degrees) == 3:
@@ -61,10 +72,10 @@ class Transformer:
             degree = -1
         return degree
 
-    @staticmethod
-    def getCRS(ifcSite):
-        Lat, Lon = ifcSite.RefLatitude, ifcSite.RefLongitude
-        a, b = Transformer.mergeDegrees(Lat), Transformer.mergeDegrees(Lon)
+    def getCRS(self):
+        site = self.ifc.by_type("IfcSite")[0]
+        Lat, Lon = site.RefLatitude, site.RefLongitude
+        a, b = self.mergeDegrees(Lat), self.mergeDegrees(Lon)
 
         source = osr.SpatialReference()
         source.ImportFromEPSG(4326)
@@ -79,36 +90,29 @@ class Transformer:
 
         return epsg
 
-    @staticmethod
-    def georeferencePoint(transMatrix, originShift, point):
+    def georeferencePoint(self, point):
         a = [point[0], point[1], point[2]]
-        result = np.mat(a) * np.mat(transMatrix) + np.mat(originShift)
+        result = np.mat(a) * np.mat(self.trans) + np.mat(self.originShift)
         return np.array(result)[0]
 
-    @staticmethod
-    def place(ifc, ifcElement, points):
+    def placePoints(self, ifcElement, points):
         ifcLocalPlacement = ifcElement.ObjectPlacement
-        shift = Transformer.calcShift(ifc, ifcLocalPlacement, [0, 0, 0])
-        print("ResShift: " + str(shift))
+        shift = self.calcShift(ifcLocalPlacement, [0, 0, 0])
+        pointsTr = []
         for point in points:
-            point[0] += shift[0]
-            point[1] += shift[1]
-            point[2] += shift[2]
-        return points
+            pointTr = np.add(point, shift)
+            pointTr = self.georeferencePoint(pointTr)
+            pointsTr.append(pointTr)
+        return np.array(pointsTr).tolist()
 
-    @staticmethod
-    def calcShift(ifc, ifcLocalPlacement, shift=[0, 0, 0]):
-        ifcAxis2Placement3D = ifcLocalPlacement.RelativePlacement
-        ifcCartesianPoint = ifcAxis2Placement3D.Location
-        coords = ifcCartesianPoint.Coordinates
-        print("Coords: " + str(coords))
+    def calcShift(self, ifcLocalPlacement, shift=[0, 0, 0]):
+        coords = ifcLocalPlacement.RelativePlacement.Location.Coordinates
         shift[0] += coords[0]
         shift[1] += coords[1]
         shift[2] += coords[2]
-        print("Shift: " + str(shift))
-        ifcLocalPlaecement2 = ifcLocalPlacement.PlacementRelTo
-        if ifcLocalPlaecement2 is None:
+        ifcLocalPlacementNext = ifcLocalPlacement.PlacementRelTo
+        if ifcLocalPlacementNext is None:
             return shift
         else:
-            return Transformer.calcShift(ifc, ifcLocalPlaecement2, shift)
+            return self.calcShift(ifcLocalPlacementNext, shift)
 

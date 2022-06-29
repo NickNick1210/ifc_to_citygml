@@ -51,8 +51,6 @@ class Converter:
         self.inPath = inPath
         self.outPath = outPath
         self.ifc = None
-        self.epsg = None
-        self.originShift = None
         self.trans = None
 
     def run(self, lod, eade, integr):
@@ -63,10 +61,12 @@ class Converter:
             eade: Ob die EnergyADE gewählt wurde als Boolean
             integr: Ob die QGIS-Integration gewählt wurde als Boolean
         """
-
         # Initialisieren von IFC und CityGML
         self.ifc = self.readIfc(self.inPath)
         root = self.createSchema()
+
+        # Initialisieren vom Transformer
+        self.trans = Transformer(self.ifc)
 
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
         if lod == 0:
@@ -141,15 +141,11 @@ class Converter:
         ifcSite = self.ifc.by_type("IfcSite")[0]
         ifcBuilding = self.ifc.by_type("IfcBuilding")[0]
 
-        self.epsg = Transformer.getCRS(ifcSite)
-        self.originShift = Transformer.getOriginShift(ifcSite, self.epsg)
-        self.trans = Transformer.getTransformMatrix(ifcProject)
-
         # BoundedBy
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
         chBoundEnv = etree.SubElement(chBound, QName(XmlNs.gml, "Envelope"))
         chBoundEnv.set("srsDimension", "3")
-        chBoundEnv.set("srsName", "EPSG:" + str(self.epsg))
+        chBoundEnv.set("srsName", "EPSG:" + str(self.trans.epsg))
         chBoundEnvLC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "lowerCorner"))
         chBoundEnvLC.set("srsDimension", "3")
         chBoundEnvUC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "upperCorner"))
@@ -160,7 +156,20 @@ class Converter:
         chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
         chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
-        # Attribute
+        self.convertBldgAttr(ifcBuilding, chBldg)
+        self.convertFootPrint(ifcBuilding, chBldg)
+        self.convertRoofEdge(ifcBuilding, chBldg)
+        self.convertAddress(ifcBuilding, ifcSite, chBldg)
+
+        # EnergyADE
+        if eade:
+            # TODO: EnergyADE
+            pass
+
+        return root
+
+    def convertBldgAttr(self, ifcBuilding, chBldg):
+
         # GML
         chBldg.set("id", "UUID_" + str(uuid.uuid4()))
         chBldgName = etree.SubElement(chBldg, QName(XmlNs.gml, "name"))
@@ -222,84 +231,81 @@ class Converter:
         chBldgStoreysHeightBG.text = ""
         # TODO
 
-        # FootPrint
+    def convertFootPrint(self, ifcBuilding, chBldg):
+        """ Konvertieren der Grundfläche von IFC zu CityGML
+
+        Args:
+            ifcBuilding: Das Gebäude, aus dem die Grundfläche entnommen werden soll
+            chBldg: XML-Element an dem die Grundfläche angefügt werden soll
+        """
+        # XML-Struktur
         chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
         chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
         chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
 
-        ifcSlab = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")[0]
-        settings = ifcopenshell.geom.settings()
-        shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
-        verts = shape.geometry.verts
-        grVerts = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
-        grVerts = Transformer.place(self.ifc, ifcSlab, grVerts)
-        maxHeight = -sys.maxsize
-        for grVert in grVerts:
-            if grVert[2] > maxHeight:
-                maxHeight = grVert[2]
-
-        ring = ogr.Geometry(ogr.wkbLinearRing)
-        grVertsCheck = []
-        for grVert in grVerts:
-            grVert[2] = maxHeight
-            if grVert not in grVertsCheck:
-                grVertsCheck.append(grVert)
-                grVertTr = Transformer.georeferencePoint(self.trans, self.originShift, grVert)
-                ring.AddPoint(grVertTr[0], grVertTr[1], grVertTr[2])
-
-        geom1 = ogr.Geometry(ogr.wkbPolygon)
-        geom1.AddGeometry(ring)
-        geomXML = Utilities.geomToGml(geom1)
+        # Geometrie
+        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        geomXML = self.calcPlane(ifcSlabs, True)
         chBldgFootPrintSM.append(geomXML)
 
-        # RoofEdge
+    def convertRoofEdge(self, ifcBuilding, chBldg):
+        """ Konvertieren der Dachkantenfläche von IFC zu CityGML
+
+        Args:
+            ifcBuilding: Das Gebäude, aus dem die Dachkantenfläche entnommen werden soll
+            chBldg: XML-Element an dem die Dachkantenfläche angefügt werden soll
+        """
+        # XML-Struktur
         chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
         chBldgRoofEdgeMS = etree.SubElement(chBldgRoofEdge, QName(XmlNs.gml, "MultiSurface"))
         chBldgRoofEdgeSM = etree.SubElement(chBldgRoofEdgeMS, QName(XmlNs.gml, "surfaceMember"))
 
+        # Geometrie
         ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        geomXML = self.calcPlane(ifcSlabs, False)
+        chBldgRoofEdgeSM.append(geomXML)
+
+    def calcPlane(self, ifcElements, mode):
+        """ Berechnung einer planen Flächengeometrie
+
+        Args:
+            ifcElements: Elemente, aus denen die Fläche berechnet werden soll
+            mode: Ob die höchste oder geringste Höhe zählt als Boolean
+
+        Returns:
+            chBldg: Erzeugte GML-Geometrie
+        """
+        # Vertizes aus den Elementen entnehmen
         grVerts = []
-        for ifcSlab in ifcSlabs:
+        for ifcElement in ifcElements:
             settings = ifcopenshell.geom.settings()
-            shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
+            shape = ifcopenshell.geom.create_shape(settings, ifcElement)
             verts = shape.geometry.verts
             grVertsCurr = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
-            grVerts += Transformer.place(self.ifc, ifcSlab, grVertsCurr)
-        print("Alle: " + str(grVerts))
+            points = self.trans.placePoints(ifcElement, grVertsCurr)
+            grVerts += points
 
-        minHeight = sys.maxsize
+        # Höhe berechnen, abhängig vom Modus
+        height = -sys.maxsize if mode else sys.maxsize
         for grVert in grVerts:
-            print("Höhe: " + str(grVert[2]))
-            if grVert[2] < minHeight:
-                minHeight = grVert[2]
+            if (mode and grVert[2] > height) or (not mode and grVert[2] < height):
+                height = grVert[2]
 
+        #
         ring = ogr.Geometry(ogr.wkbLinearRing)
         grVertsCheck = []
         for grVert in grVerts:
-            grVert[2] = minHeight
+            grVert[2] = height
             if grVert not in grVertsCheck:
                 grVertsCheck.append(grVert)
-                grVertTr = Transformer.georeferencePoint(self.trans, self.originShift, grVert)
-                ring.AddPoint(grVertTr[0], grVertTr[1], grVertTr[2])
+                ring.AddPoint(grVert[0], grVert[1], grVert[2])
 
         geom1 = ogr.Geometry(ogr.wkbPolygon)
         geom1.AddGeometry(ring)
         geomXML = Utilities.geomToGml(geom1)
-        chBldgRoofEdgeSM.append(geomXML)
+        return geomXML
 
-        # TODO: RoofEdge-Geometrie
-
-        # Adresse
-        self.convertAddress(self.ifc, ifcBuilding, ifcSite, chBldg)
-
-        # EnergyADE
-        if eade:
-            # TODO: EnergyADE
-            pass
-
-        return root
-
-    def convertAddress(self, ifc, ifcBuilding, ifcSite, chBldg):
+    def convertAddress(self, ifcBuilding, ifcSite, chBldg):
         """ Konvertieren der Adresse von IFC zu CityGML
 
         Args:
@@ -311,12 +317,12 @@ class Converter:
         # Prüfen, wo Addresse vorhanden
         if ifcBuilding.BuildingAddress is not None:
             ifcAddress = ifcBuilding.BuildingAddress
-        elif Utilities.findPset(ifc, ifcBuilding, "Pset_Address") is not None:
-            ifcAddress = Utilities.findPset(ifc, ifcBuilding, "Pset_Address")
+        elif Utilities.findPset(self.ifc, ifcBuilding, "Pset_Address") is not None:
+            ifcAddress = Utilities.findPset(self.ifc, ifcBuilding, "Pset_Address")
         elif ifcSite.SiteAddress is not None:
             ifcAddress = ifcSite.SiteAddress
-        elif Utilities.findPset(ifc, ifcSite, "Pset_Address") is not None:
-            ifcAddress = Utilities.findPset(ifc, ifcSite, "Pset_Address")
+        elif Utilities.findPset(self.ifc, ifcSite, "Pset_Address") is not None:
+            ifcAddress = Utilities.findPset(self.ifc, ifcSite, "Pset_Address")
         else:
             self.parent.dlg.log(u'No address details existing')
             return

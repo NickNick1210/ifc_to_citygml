@@ -29,39 +29,42 @@ from lxml.etree import QName
 from osgeo import ogr
 
 # Plugin
+from qgis.core import QgsTask
+
 from .xmlns import XmlNs
 from .transformer import Transformer
 from .utilities import Utilities
 
 
-class Converter:
+class Converter(QgsTask):
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
 
-    def __init__(self, parent, inPath, outPath):
+    def __init__(self, description, parent, inPath, outPath, lod, eade, integr):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
 
         Args:
             parent: Die zugrunde liegende zentrale Model-Klasse
             inPath: Pfad zur IFC-Datei
             outPath: Pfad zur CityGML-Datei
+            lod: Gewähltes Level of Detail (LoD) als Integer
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+            integr: Ob die QGIS-Integration gewählt wurde als Boolean
         """
+        super().__init__(description, QgsTask.CanCancel)
 
         # Initialisierung von Attributen
         self.parent = parent
         self.inPath = inPath
         self.outPath = outPath
+        self.lod = lod
+        self.eade = eade
+        self.integr = integr
         self.ifc = None
         self.trans = None
         self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
 
-    def run(self, lod, eade, integr):
-        """ Ausführen der Konvertierung
-
-        Args:
-            lod: Gewähltes Level of Detail (LoD) als Integer
-            eade: Ob die EnergyADE gewählt wurde als Boolean
-            integr: Ob die QGIS-Integration gewählt wurde als Boolean
-        """
+    def run(self):
+        """ Ausführen der Konvertierung """
         # Initialisieren von IFC und CityGML
         self.ifc = self.readIfc(self.inPath)
         root = self.createSchema()
@@ -70,18 +73,18 @@ class Converter:
         self.trans = Transformer(self.ifc)
 
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
-        if lod == 0:
-            root = self.convertLoD0(root, eade)
-        elif lod == 1:
+        if self.lod == 0:
+            root = self.convertLoD0(root, self.eade)
+        elif self.lod == 1:
             # TODO LoD1
             pass
-        elif lod == 2:
+        elif self.lod == 2:
             # TODO LoD2
             pass
-        elif lod == 3:
+        elif self.lod == 3:
             # TODO LoD3
             pass
-        elif lod == 4:
+        elif self.lod == 4:
             # TODO LoD4
             pass
 
@@ -89,12 +92,9 @@ class Converter:
         self.writeCGML(root)
 
         # Integration der CityGML in QGIS
-        if integr:
+        if self.integr:
             # TODO QGIS-Integration
             pass
-
-        # Fertigstellung
-        self.parent.completed()
 
     @staticmethod
     def readIfc(path):
@@ -127,6 +127,12 @@ class Converter:
             root: XML-Element
         """
         etree.ElementTree(root).write(self.outPath, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+
+    def finished(self, result):
+        self.parent.completed()
+
+    def cancel(self):
+        pass
 
     def convertLoD0(self, root, eade):
         """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 0
@@ -179,7 +185,6 @@ class Converter:
         chBoundEnvUC.text = str(env[1]) + " " + str(env[3]) + " " + str(env[5])
 
     def convertBldgAttr(self, ifcBuilding, chBldg):
-
         # GML
         chBldg.set("id", "UUID_" + str(uuid.uuid4()))
         chBldgName = etree.SubElement(chBldg, QName(XmlNs.gml, "name"))

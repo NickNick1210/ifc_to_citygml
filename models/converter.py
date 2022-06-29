@@ -52,6 +52,7 @@ class Converter:
         self.outPath = outPath
         self.ifc = None
         self.trans = None
+        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
 
     def run(self, lod, eade, integr):
         """ Ausführen der Konvertierung
@@ -72,16 +73,16 @@ class Converter:
         if lod == 0:
             root = self.convertLoD0(root, eade)
         elif lod == 1:
-            # TODO
+            # TODO LoD1
             pass
         elif lod == 2:
-            # TODO
+            # TODO LoD2
             pass
         elif lod == 3:
-            # TODO
+            # TODO LoD3
             pass
         elif lod == 4:
-            # TODO
+            # TODO LoD4
             pass
 
         # Schreiben der CityGML in eine Datei
@@ -89,7 +90,7 @@ class Converter:
 
         # Integration der CityGML in QGIS
         if integr:
-            # TODO
+            # TODO QGIS-Integration
             pass
 
         # Fertigstellung
@@ -134,15 +135,36 @@ class Converter:
             root: Das vorbereitete XML-Schema
             eade: Ob die EnergyADE gewählt wurde als Boolean
         """
+        # IFC-Grundelemente
+        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcBuildings = self.ifc.by_type("IfcBuilding")
+
+        # XML-Struktur
         chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
         chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
-
-        ifcProject = self.ifc.by_type("IfcProject")[0]
-        ifcSite = self.ifc.by_type("IfcSite")[0]
-        ifcBuilding = self.ifc.by_type("IfcBuilding")[0]
-
-        # BoundedBy
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
+
+        # Über alle enthaltenen Gebäude iterieren
+        for ifcBuilding in ifcBuildings:
+            chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
+            chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
+
+            # Konvertierung
+            self.convertBldgAttr(ifcBuilding, chBldg)
+            self.convertFootPrint(ifcBuilding, chBldg)
+            self.convertRoofEdge(ifcBuilding, chBldg)
+            self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.convertBound(self.geom, chBound)
+
+            # EnergyADE
+            if eade:
+                # TODO: EnergyADE
+                pass
+
+        return root
+
+    def convertBound(self, geometry, chBound):
+        # XML-Struktur
         chBoundEnv = etree.SubElement(chBound, QName(XmlNs.gml, "Envelope"))
         chBoundEnv.set("srsDimension", "3")
         chBoundEnv.set("srsName", "EPSG:" + str(self.trans.epsg))
@@ -150,23 +172,11 @@ class Converter:
         chBoundEnvLC.set("srsDimension", "3")
         chBoundEnvUC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "upperCorner"))
         chBoundEnvUC.set("srsDimension", "3")
-        # TODO: Envelope
 
-        # Building
-        chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
-        chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
-
-        self.convertBldgAttr(ifcBuilding, chBldg)
-        self.convertFootPrint(ifcBuilding, chBldg)
-        self.convertRoofEdge(ifcBuilding, chBldg)
-        self.convertAddress(ifcBuilding, ifcSite, chBldg)
-
-        # EnergyADE
-        if eade:
-            # TODO: EnergyADE
-            pass
-
-        return root
+        # Envelope-Berechnung
+        env = self.geom.GetEnvelope3D()
+        chBoundEnvLC.text = str(env[0]) + " " + str(env[2]) + " " + str(env[4])
+        chBoundEnvUC.text = str(env[1]) + " " + str(env[3]) + " " + str(env[5])
 
     def convertBldgAttr(self, ifcBuilding, chBldg):
 
@@ -229,7 +239,7 @@ class Converter:
 
         chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
         chBldgStoreysHeightBG.text = ""
-        # TODO
+        # TODO Gebäudeattribute
 
     def convertFootPrint(self, ifcBuilding, chBldg):
         """ Konvertieren der Grundfläche von IFC zu CityGML
@@ -275,7 +285,7 @@ class Converter:
         Returns:
             chBldg: Erzeugte GML-Geometrie
         """
-        # Vertizes aus den Elementen entnehmen
+        # Vertizes aus den Elementen entnehmen und transformieren/georeferenzieren
         grVerts = []
         for ifcElement in ifcElements:
             settings = ifcopenshell.geom.settings()
@@ -291,7 +301,7 @@ class Converter:
             if (mode and grVert[2] > height) or (not mode and grVert[2] < height):
                 height = grVert[2]
 
-        #
+        # Ring aus Punkten erstellen
         ring = ogr.Geometry(ogr.wkbLinearRing)
         grVertsCheck = []
         for grVert in grVerts:
@@ -300,16 +310,17 @@ class Converter:
                 grVertsCheck.append(grVert)
                 ring.AddPoint(grVert[0], grVert[1], grVert[2])
 
-        geom1 = ogr.Geometry(ogr.wkbPolygon)
-        geom1.AddGeometry(ring)
-        geomXML = Utilities.geomToGml(geom1)
+        # Polygon erstellen, speichern und in XML konvertieren
+        geometry = ogr.Geometry(ogr.wkbPolygon)
+        geometry.AddGeometry(ring)
+        self.geom.AddGeometry(geometry)
+        geomXML = Utilities.geomToGml(geometry)
         return geomXML
 
     def convertAddress(self, ifcBuilding, ifcSite, chBldg):
         """ Konvertieren der Adresse von IFC zu CityGML
 
         Args:
-            ifc: Das IFC-Objekt
             ifcBuilding: Das Gebäude, aus dem die Adresse entnommen werden soll
             ifcSite: Das Grundstück, auf dem das Gebäude steht
             chBldg: XML-Element an dem die Adresse angefügt werden soll

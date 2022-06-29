@@ -37,7 +37,9 @@ class Transformer:
 
     def getModelContext(self):
         project = self.ifc.by_type("IfcProject")[0]
+        print(project)
         for context in project.RepresentationContexts:
+            print(context)
             if context.ContextType == "Model":
                 return context
         print("No context for model was found in this project")
@@ -84,6 +86,10 @@ class Transformer:
             epsg = 32633
         elif 6 <= b < 12:
             epsg = 32632
+        elif 54 <= b < 60:
+            epsg = 32640
+        elif 0 <= b < 6:
+            epsg = 32631
         else:
             epsg = -1
         # TODO: weitere Zonen

@@ -53,6 +53,7 @@ class Converter(QgsTask):
         super().__init__(description, QgsTask.CanCancel)
 
         # Initialisierung von Attributen
+        self.exception = None
         self.parent = parent
         self.inPath = inPath
         self.outPath = outPath
@@ -96,6 +97,9 @@ class Converter(QgsTask):
             # TODO QGIS-Integration
             pass
 
+        self.finished(True)
+        return True
+
     @staticmethod
     def readIfc(path):
         """ Einlesen einer IFC-Datei
@@ -129,10 +133,7 @@ class Converter(QgsTask):
         etree.ElementTree(root).write(self.outPath, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
     def finished(self, result):
-        self.parent.completed()
-
-    def cancel(self):
-        pass
+        self.parent.completed(result)
 
     def convertLoD0(self, root, eade):
         """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 0
@@ -208,33 +209,37 @@ class Converter(QgsTask):
                         "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
         chBldgClass.text = ifcBuilding.ObjectType
 
-        chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
-        chBldgFunc.set("codeSpace",
-                       "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
-        chBldgFunc.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
+            chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
+            chBldgFunc.set("codeSpace",
+                           "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
+            chBldgFunc.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
 
-        chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
-        chBldgUsage.set("codeSpace",
-                        "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
-        chBldgUsage.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
+            chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
+            chBldgUsage.set("codeSpace",
+                            "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
+            chBldgUsage.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+
         # TODO: Mapping zwischen IFC-Freitext und CityGML-Code
 
-        chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
-        chBldgYearConstr.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"][
-            "YearOfConstruction"]
+        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
+            chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
+            chBldgYearConstr.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["YearOfConstruction"]
 
         chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
         chBldgRoofType.set("codeSpace",
                            "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_roofType.xml")
         chBldgRoofType.text = ""
 
-        chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
-        chBldgHeight.set("uom", "m")
         if Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities") is not None:
+            chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
+            chBldgHeight.set("uom", "m")
             chBldgHeight.text = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
 
-        chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
-        chBldgStoreysAG.text = str(element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
+        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
+            chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
+            chBldgStoreysAG.text = str(element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
 
         chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
         chBldgStoreysBG.text = ""
@@ -253,13 +258,20 @@ class Converter(QgsTask):
             ifcBuilding: Das Gebäude, aus dem die Grundfläche entnommen werden soll
             chBldg: XML-Element an dem die Grundfläche angefügt werden soll
         """
+
+        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        if len(ifcSlabs) == 0:
+            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            if len(ifcSlabs) == 0:
+                self.parent.dlg.log(u"Due to the missing baseslab, no FootPrint geometry can to be calculated")
+                return
+
         # XML-Struktur
         chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
         chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
         chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
 
         # Geometrie
-        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
         geomXML = self.calcPlane(ifcSlabs, True)
         chBldgFootPrintSM.append(geomXML)
 
@@ -270,6 +282,12 @@ class Converter(QgsTask):
             ifcBuilding: Das Gebäude, aus dem die Dachkantenfläche entnommen werden soll
             chBldg: XML-Element an dem die Dachkantenfläche angefügt werden soll
         """
+
+        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        if len(ifcSlabs) == 0:
+            self.parent.dlg.log(u"Due to the missing roof, no RoofEdge geometry can to be calculated")
+            return
+
         # XML-Struktur
         chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
         chBldgRoofEdgeMS = etree.SubElement(chBldgRoofEdge, QName(XmlNs.gml, "MultiSurface"))
@@ -338,7 +356,7 @@ class Converter(QgsTask):
         elif ifcSite.SiteAddress is not None:
             ifcAddress = ifcSite.SiteAddress
         elif Utilities.findPset(self.ifc, ifcSite, "Pset_Address") is not None:
-            ifcAddress = Utilities.findPset(self.ifc, ifcSite, "Pset_Address")
+              ifcAddress = Utilities.findPset(self.ifc, ifcSite, "Pset_Address")
         else:
             self.parent.dlg.log(u'No address details existing')
             return
@@ -350,28 +368,34 @@ class Converter(QgsTask):
         chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
         chBldgAdrLoc = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "Locality"))
         chBldgAdrLoc.set("Type", "Town")
-        chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
-        chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
-        chBldgAdrLocTh.set("Type", "Street")
-        chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
-        chBldgAdrLocThName = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareName"))
-        chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
-        chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
 
         # Eintragen der Adresse
-        address = ifcAddress.AddressLines[0]
-        if address[0].isdigit():
-            sep = address.find(" ")
-            street = address[sep + 1:]
-            nr = address[0:sep]
-        elif address[len(address) - 1].isdigit():
-            sep = address.rfind(" ")
-            street = address[0:sep]
-            nr = address[sep + 1:]
-        else:
-            street = address
-            nr = ""
-        chBldgAdrLocThName.text = street
-        chBldgAdrLocThNr.text = nr
-        chBldgAdrLocPCNr.text = ifcAddress.PostalCode
-        chBldgAdrLocName.text = ifcAddress.Town
+        if ifcAddress.Town is not None:
+            chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
+            chBldgAdrLocName.text = ifcAddress.Town
+
+        if ifcAddress.AddressLines is not None:
+            chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
+            chBldgAdrLocTh.set("Type", "Street")
+            chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
+            chBldgAdrLocThName = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareName"))
+
+            address = ifcAddress.AddressLines[0]
+            if address[0].isdigit():
+                sep = address.find(" ")
+                street = address[sep + 1:]
+                nr = address[0:sep]
+            elif address[len(address) - 1].isdigit():
+                sep = address.rfind(" ")
+                street = address[0:sep]
+                nr = address[sep + 1:]
+            else:
+                street = address
+                nr = ""
+            chBldgAdrLocThName.text = street
+            chBldgAdrLocThNr.text = nr
+
+        if ifcAddress.PostalCode is not None:
+            chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
+            chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
+            chBldgAdrLocPCNr.text = ifcAddress.PostalCode

@@ -93,7 +93,7 @@ class Utilities:
                         else:
                             Utilities.findElement(ifc, obj, outElement, result, type)
 
-            # Bei räumlichen Zusammenhängen
+            # Bei räumlichen Begrenzungen
             elif rel.is_a("IfcRelSpaceBoundary"):
                 if rel.RelatingSpace == inElement:
                     obj = rel.RelatedBuildingElement
@@ -108,4 +108,20 @@ class Utilities:
                                     result.append(obj)
                         else:
                             Utilities.findElement(ifc, obj, outElement, result, type)
+            # Bei räumlichen Enthaltungen
+            elif rel.is_a("IfcRelContainedInSpatialStructure"):
+                if rel.RelatingStructure == inElement:
+                    objs = rel.RelatedElements
+                    for obj in objs:
+                        if obj is not None:
+                            if obj.is_a(outElement):
+                                if type is not None:
+                                    if obj.PredefinedType == type:
+                                        if obj not in result:
+                                            result.append(obj)
+                                else:
+                                    if obj not in result:
+                                        result.append(obj)
+                            else:
+                                Utilities.findElement(ifc, obj, outElement, result, type)
         return result

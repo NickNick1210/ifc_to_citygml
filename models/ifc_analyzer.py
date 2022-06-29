@@ -94,6 +94,26 @@ class IfcAnalyzer:
             self.parent.dlg.log(self.parent.tr(u'There are no buildings in the IFC file!'))
             return
 
+        site = self.ifc.by_type("IfcSite")[0]
+        if site.RefLatitude is None or site.RefLongitude is None:
+            self.parent.valid = False
+            self.parent.checkEnable()
+            self.parent.dlg.setIfcMsg("<p style='color:red'>" + self.parent.tr(u'not valid') + "</p>")
+            self.parent.dlg.log(self.parent.tr(u'There is no georeferencing in the IFC file!'))
+            return
+
+        project = self.ifc.by_type("IfcProject")[0]
+        for context in project.RepresentationContexts:
+            print(context)
+            if context.ContextType == "Model":
+                if context.TrueNorth is None:
+                    self.parent.valid = False
+                    self.parent.checkEnable()
+                    self.parent.dlg.setIfcMsg("<p style='color:red'>" + self.parent.tr(u'not valid') + "</p>")
+                    self.parent.dlg.log(self.parent.tr(u'There is no northing in the IFC file!'))
+                    return
+
+
         # Validierung über einen QgsTask, der asynchron ausgeführt wird
         # Wichtig, da sonst die QGIS-Oberfläche einfriert
         if val:

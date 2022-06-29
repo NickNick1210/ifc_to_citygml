@@ -12,6 +12,7 @@
 
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QCoreApplication
+from qgis.core import QgsMessageLog, Qgis
 from qgis.core import QgsApplication
 
 # Plugin
@@ -99,11 +100,16 @@ class Model:
             lod) + ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
-        self.task = Converter(u"IFC-to-CityGML Conversion", self, self.inputPath, self.outputPath, lod, eade, integr)
-        QgsApplication.taskManager().addTask(self.task)
+        #self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade, integr)
+        #QgsApplication.taskManager().addTask(self.task)
+        conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade, integr)
+        conv.run()
 
-
-    def completed(self):
+    def completed(self, result):
         """ Beenden der Konvertierung """
         self.dlg.setProgress(100)
-        self.dlg.log(QCoreApplication.translate('IFC-to-CityGML', u'Conversion completed'))
+
+        if result:
+            self.dlg.log(self.tr(u'Conversion completed'))
+        else:
+            self.dlg.log(self.tr(u'Conversion crashed'))

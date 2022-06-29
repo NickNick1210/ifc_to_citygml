@@ -17,8 +17,6 @@ from datetime import datetime
 
 # IFC-Bibliotheken
 import ifcopenshell
-from ifcopenshell import geom
-from ifcopenshell import util
 import ifcopenshell.util.pset
 from ifcopenshell.util import element
 
@@ -229,37 +227,66 @@ class Converter:
         chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
         chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
 
-        ifcSlab = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", type="BASESLAB")[0]
+        ifcSlab = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")[0]
         settings = ifcopenshell.geom.settings()
         shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
         verts = shape.geometry.verts
         grVerts = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
+        grVerts = Transformer.place(self.ifc, ifcSlab, grVerts)
         maxHeight = -sys.maxsize
         for grVert in grVerts:
             if grVert[2] > maxHeight:
                 maxHeight = grVert[2]
 
-        grVertsNew = []
+        ring = ogr.Geometry(ogr.wkbLinearRing)
+        grVertsCheck = []
         for grVert in grVerts:
             grVert[2] = maxHeight
-            if grVert not in grVertsNew:
-                grVertsNew.append(grVert)
+            if grVert not in grVertsCheck:
+                grVertsCheck.append(grVert)
+                grVertTr = Transformer.georeferencePoint(self.trans, self.originShift, grVert)
+                ring.AddPoint(grVertTr[0], grVertTr[1], grVertTr[2])
 
-        ring = ogr.Geometry(ogr.wkbLinearRing)
-        for grVert in grVertsNew:
-            grVertTr = Transformer.georeferencePoint(self.trans, self.originShift, grVert)
-            ring.AddPoint(grVertTr[0], grVertTr[1], grVertTr[2])
         geom1 = ogr.Geometry(ogr.wkbPolygon)
         geom1.AddGeometry(ring)
-        cgml = geom1.ExportToGML()
-
-        cgml = cgml[0:cgml.find(">")] + " xmlns:gml='http://www.opengis.net/gml'" + cgml[cgml.find(">"):]
-
-        geomXML = etree.XML(cgml)
+        geomXML = Utilities.geomToGml(geom1)
         chBldgFootPrintSM.append(geomXML)
 
         # RoofEdge
         chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
+        chBldgRoofEdgeMS = etree.SubElement(chBldgRoofEdge, QName(XmlNs.gml, "MultiSurface"))
+        chBldgRoofEdgeSM = etree.SubElement(chBldgRoofEdgeMS, QName(XmlNs.gml, "surfaceMember"))
+
+        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        grVerts = []
+        for ifcSlab in ifcSlabs:
+            settings = ifcopenshell.geom.settings()
+            shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
+            verts = shape.geometry.verts
+            grVertsCurr = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
+            grVerts += Transformer.place(self.ifc, ifcSlab, grVertsCurr)
+        print("Alle: " + str(grVerts))
+
+        minHeight = sys.maxsize
+        for grVert in grVerts:
+            print("Höhe: " + str(grVert[2]))
+            if grVert[2] < minHeight:
+                minHeight = grVert[2]
+
+        ring = ogr.Geometry(ogr.wkbLinearRing)
+        grVertsCheck = []
+        for grVert in grVerts:
+            grVert[2] = minHeight
+            if grVert not in grVertsCheck:
+                grVertsCheck.append(grVert)
+                grVertTr = Transformer.georeferencePoint(self.trans, self.originShift, grVert)
+                ring.AddPoint(grVertTr[0], grVertTr[1], grVertTr[2])
+
+        geom1 = ogr.Geometry(ogr.wkbPolygon)
+        geom1.AddGeometry(ring)
+        geomXML = Utilities.geomToGml(geom1)
+        chBldgRoofEdgeSM.append(geomXML)
+
         # TODO: RoofEdge-Geometrie
 
         # Adresse

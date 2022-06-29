@@ -16,14 +16,31 @@ from ifcopenshell import util
 import ifcopenshell.util.pset
 
 # XML-Bibliotheken
+from lxml import etree
 # noinspection PyUnresolvedReferences
 from lxml.etree import QName
+
 
 #####
 
 
 class Utilities:
     """ Model-Klasse mit nützlichen Tools """
+
+    @staticmethod
+    def geomToGml(geom):
+        """ Umwandeln von Geometrien in ein XML-Objekt
+
+        Args:
+            geom: Die umzuwandelnde Geometrie
+
+        Returns:
+            Das daraus erzeugte XML-Objekt
+        """
+        gmlGeom = geom.ExportToGML()
+        gmlGeom = gmlGeom[0:gmlGeom.find(">")] + " xmlns:gml='http://www.opengis.net/gml'" + gmlGeom[gmlGeom.find(">"):]
+        xml = etree.XML(gmlGeom)
+        return xml
 
     @staticmethod
     def findPset(ifc, ifcElement, psetName):

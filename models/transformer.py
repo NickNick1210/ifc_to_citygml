@@ -84,3 +84,31 @@ class Transformer:
         a = [point[0], point[1], point[2]]
         result = np.mat(a) * np.mat(transMatrix) + np.mat(originShift)
         return np.array(result)[0]
+
+    @staticmethod
+    def place(ifc, ifcElement, points):
+        ifcLocalPlacement = ifcElement.ObjectPlacement
+        shift = Transformer.calcShift(ifc, ifcLocalPlacement, [0, 0, 0])
+        print("ResShift: " + str(shift))
+        for point in points:
+            point[0] += shift[0]
+            point[1] += shift[1]
+            point[2] += shift[2]
+        return points
+
+    @staticmethod
+    def calcShift(ifc, ifcLocalPlacement, shift=[0, 0, 0]):
+        ifcAxis2Placement3D = ifcLocalPlacement.RelativePlacement
+        ifcCartesianPoint = ifcAxis2Placement3D.Location
+        coords = ifcCartesianPoint.Coordinates
+        print("Coords: " + str(coords))
+        shift[0] += coords[0]
+        shift[1] += coords[1]
+        shift[2] += coords[2]
+        print("Shift: " + str(shift))
+        ifcLocalPlaecement2 = ifcLocalPlacement.PlacementRelTo
+        if ifcLocalPlaecement2 is None:
+            return shift
+        else:
+            return Transformer.calcShift(ifc, ifcLocalPlaecement2, shift)
+

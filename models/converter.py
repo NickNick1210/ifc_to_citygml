@@ -11,6 +11,7 @@
 #####
 
 # Standard-Bibliotheken
+import math
 import sys
 import uuid
 from datetime import datetime
@@ -27,6 +28,7 @@ from lxml.etree import QName
 
 # QGIS-Bibliotheken
 from osgeo import ogr
+import processing
 
 # Plugin
 from qgis.core import QgsTask
@@ -34,6 +36,31 @@ from qgis.core import QgsTask
 from .xmlns import XmlNs
 from .transformer import Transformer
 from .utilities import Utilities
+
+import os.path
+import math
+
+from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtCore import QVariant
+
+from qgis.core import (QgsApplication,
+                       QgsExpression,
+                       QgsFeature,
+                       QgsFeatureRequest,
+                       QgsFeatureSink,
+                       QgsField,
+                       QgsFields,
+                       QgsGeometry,
+                       QgsProcessing,
+                       QgsProcessingException,
+                       QgsProcessingParameterFeatureSink,
+                       QgsProcessingParameterFeatureSource,
+                       QgsProcessingParameterField,
+                       QgsProcessingParameterNumber,
+                       QgsPoint,
+                       QgsPointXY,
+                       QgsWkbTypes)
+from processing.algs.qgis.QgisAlgorithm import QgisAlgorithm
 
 
 class Converter(QgsTask):
@@ -266,14 +293,14 @@ class Converter(QgsTask):
                 self.parent.dlg.log(u"Due to the missing baseslab, no FootPrint geometry can to be calculated")
                 return
 
-        # XML-Struktur
-        chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
-        chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
-        chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
-
         # Geometrie
         geomXML = self.calcPlane(ifcSlabs, True)
-        chBldgFootPrintSM.append(geomXML)
+        if geomXML is not None:
+            # XML-Struktur
+            chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
+            chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
+            chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
+            chBldgFootPrintSM.append(geomXML)
 
     def convertRoofEdge(self, ifcBuilding, chBldg):
         """ Konvertieren der Dachkantenfläche von IFC zu CityGML
@@ -288,15 +315,15 @@ class Converter(QgsTask):
             self.parent.dlg.log(u"Due to the missing roof, no RoofEdge geometry can to be calculated")
             return
 
-        # XML-Struktur
-        chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
-        chBldgRoofEdgeMS = etree.SubElement(chBldgRoofEdge, QName(XmlNs.gml, "MultiSurface"))
-        chBldgRoofEdgeSM = etree.SubElement(chBldgRoofEdgeMS, QName(XmlNs.gml, "surfaceMember"))
-
         # Geometrie
         ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
         geomXML = self.calcPlane(ifcSlabs, False)
-        chBldgRoofEdgeSM.append(geomXML)
+        if geomXML is not None:
+            # XML-Struktur
+            chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
+            chBldgRoofEdgeMS = etree.SubElement(chBldgRoofEdge, QName(XmlNs.gml, "MultiSurface"))
+            chBldgRoofEdgeSM = etree.SubElement(chBldgRoofEdgeMS, QName(XmlNs.gml, "surfaceMember"))
+            chBldgRoofEdgeSM.append(geomXML)
 
     def calcPlane(self, ifcElements, mode):
         """ Berechnung einer planen Flächengeometrie
@@ -309,33 +336,65 @@ class Converter(QgsTask):
             chBldg: Erzeugte GML-Geometrie
         """
         # Vertizes aus den Elementen entnehmen und transformieren/georeferenzieren
-        grVerts = []
+        grVertsList = []
         for ifcElement in ifcElements:
             settings = ifcopenshell.geom.settings()
             shape = ifcopenshell.geom.create_shape(settings, ifcElement)
             verts = shape.geometry.verts
             grVertsCurr = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
             points = self.trans.placePoints(ifcElement, grVertsCurr)
-            grVerts += points
+            grVertsList.append(points)
 
         # Höhe berechnen, abhängig vom Modus
-        height = -sys.maxsize if mode else sys.maxsize
-        for grVert in grVerts:
-            if (mode and grVert[2] > height) or (not mode and grVert[2] < height):
-                height = grVert[2]
+        height = sys.maxsize
+        for grVerts in grVertsList:
+            for grVert in grVerts:
+                if grVert[2] < height:
+                    height = grVert[2]
 
         # Ring aus Punkten erstellen
-        ring = ogr.Geometry(ogr.wkbLinearRing)
-        grVertsCheck = []
-        for grVert in grVerts:
-            grVert[2] = height
-            if grVert not in grVertsCheck:
-                grVertsCheck.append(grVert)
-                ring.AddPoint(grVert[0], grVert[1], grVert[2])
 
-        # Polygon erstellen, speichern und in XML konvertieren
-        geometry = ogr.Geometry(ogr.wkbPolygon)
-        geometry.AddGeometry(ring)
+        geometries = ogr.Geometry(ogr.wkbMultiPolygon)
+        for grVerts in grVertsList:
+            grVertsCheck = []
+            geometry = ogr.Geometry(ogr.wkbPolygon)
+            ring = ogr.Geometry(ogr.wkbLinearRing)
+            for grVert in grVerts:
+                grVert[2] = height
+                if grVert not in grVertsCheck:
+                    grVertsCheck.append(grVert)
+                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
+            ring.AddPoint(grVerts[0][0], grVerts[0][1], height)
+
+            geometry.AddGeometry(ring)
+            if not geometry.IsValid():
+                geomValid = geometry.MakeValid()
+                if geomValid is not None:
+                    geometry = geomValid
+                geomNorm = geometry.Normalize()
+                if geomNorm is not None:
+                    geometry = geomNorm
+
+            geometries.AddGeometry(geometry)
+
+        if len(grVertsList) != 1:
+            geometry = geometries.UnionCascaded()
+            if geometry.GetGeometryCount() > 1:
+                geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
+                for i in range(0, geometry.GetGeometryCount()):
+                    g = geometry.GetGeometryRef(i)
+                    geometriesBuffer.AddGeometry(g.Buffer(0.1, quadsecs=2))
+                geometry = geometriesBuffer.UnionCascaded()
+
+                if geometry.GetGeometryCount() > 1:
+                    self.parent.dlg.log(u'Can\'t calculate lod0 geometry due to the lack of topology or non-meter-metrics')
+                    return None
+                else:
+                    geometry.Set3D(True)
+                    wkt = geometry.ExportToWkt()
+                    geometry = ogr.CreateGeometryFromWkt(wkt)
+                    geometry = geometry.UnionCascaded()
+
         self.geom.AddGeometry(geometry)
         geomXML = Utilities.geomToGml(geometry)
         return geomXML
@@ -356,7 +415,7 @@ class Converter(QgsTask):
         elif ifcSite.SiteAddress is not None:
             ifcAddress = ifcSite.SiteAddress
         elif Utilities.findPset(self.ifc, ifcSite, "Pset_Address") is not None:
-              ifcAddress = Utilities.findPset(self.ifc, ifcSite, "Pset_Address")
+            ifcAddress = Utilities.findPset(self.ifc, ifcSite, "Pset_Address")
         else:
             self.parent.dlg.log(u'No address details existing')
             return

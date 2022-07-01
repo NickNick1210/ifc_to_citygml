@@ -383,7 +383,7 @@ class Converter(QgsTask):
                 return
 
         # Geometrie
-        geomXML = self.calcPlane(ifcSlabs, True)
+        geomXML = self.calcPlane(ifcSlabs)
         if geomXML is not None:
             # XML-Struktur
             chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
@@ -399,14 +399,15 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem die Dachkantenfläche angefügt werden soll
         """
 
-        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
-        if len(ifcSlabs) == 0:
-            self.parent.dlg.log(u"Due to the missing roof, no RoofEdge geometry can to be calculated")
-            return
+        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        if len(ifcRoofs) == 0:
+            ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+            if len(ifcRoofs) == 0:
+                self.parent.dlg.log(u"Due to the missing roof, no RoofEdge geometry can to be calculated")
+                return
 
         # Geometrie
-        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
-        geomXML = self.calcPlane(ifcSlabs, False)
+        geomXML = self.calcPlane(ifcRoofs)
         if geomXML is not None:
             # XML-Struktur
             chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
@@ -414,7 +415,7 @@ class Converter(QgsTask):
             chBldgRoofEdgeSM = etree.SubElement(chBldgRoofEdgeMS, QName(XmlNs.gml, "surfaceMember"))
             chBldgRoofEdgeSM.append(geomXML)
 
-    def calcPlane(self, ifcElements, mode):
+    def calcPlane(self, ifcElements):
         """ Berechnung einer planen Flächengeometrie
 
         Args:
@@ -426,13 +427,19 @@ class Converter(QgsTask):
         """
         # Vertizes aus den Elementen entnehmen und transformieren/georeferenzieren
         grVertsList = []
+        i = 0
         for ifcElement in ifcElements:
+            i += 1
             settings = ifcopenshell.geom.settings()
             shape = ifcopenshell.geom.create_shape(settings, ifcElement)
             verts = shape.geometry.verts
-            grVertsCurr = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
-            points = self.trans.placePoints(ifcElement, grVertsCurr)
-            grVertsList.append(points)
+            faces = shape.geometry.faces
+            grVertsCurr = [[round(verts[i],5), round(verts[i + 1]), round(verts[i + 2])] for i in range(0, len(verts), 3)]
+            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
+            for face in grFacesCurr:
+                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
+                points = self.trans.placePoints(ifcElement, facePoints)
+                grVertsList.append(points)
 
         # Höhe berechnen
         height = sys.maxsize
@@ -442,18 +449,14 @@ class Converter(QgsTask):
                     height = grVert[2]
 
         # Ring aus Punkten erstellen
-
         geometries = ogr.Geometry(ogr.wkbMultiPolygon)
         for grVerts in grVertsList:
-            grVertsCheck = []
             geometry = ogr.Geometry(ogr.wkbPolygon)
             ring = ogr.Geometry(ogr.wkbLinearRing)
             for grVert in grVerts:
                 grVert[2] = height
-                if grVert not in grVertsCheck:
-                    grVertsCheck.append(grVert)
-                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
-            ring.AddPoint(grVerts[0][0], grVerts[0][1], height)
+                ring.AddPoint(grVert[0], grVert[1], grVert[2])
+            ring.CloseRings()
 
             geometry.AddGeometry(ring)
             if not geometry.IsValid():
@@ -463,19 +466,21 @@ class Converter(QgsTask):
                 geomNorm = geometry.Normalize()
                 if geomNorm is not None:
                     geometry = geomNorm
+            if geometry.GetGeometryName() == "POLYGON":
+                geometries.AddGeometry(geometry)
 
-            geometries.AddGeometry(geometry)
-
-        if len(grVertsList) != 1:
+        if geometries.GetGeometryCount() != 1:
             geometry = geometries.UnionCascaded()
             if geometry.GetGeometryCount() > 1:
                 geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
-                for i in range(0, geometry.GetGeometryCount()):
-                    g = geometry.GetGeometryRef(i)
-                    geometriesBuffer.AddGeometry(g.Buffer(0.1, quadsecs=2))
+                for i in range(0, geometries.GetGeometryCount()):
+                    g = geometries.GetGeometryRef(i)
+                    gBuffer = g.Buffer(0.1, quadsecs=2)
+                    geometriesBuffer.AddGeometry(gBuffer)
                 geometry = geometriesBuffer.UnionCascaded()
 
-                if geometry.GetGeometryCount() > 1:
+                if geometry.GetGeometryName() != "POLYGON":
+                    print("ERGEBNIS: " + str(geometry))
                     self.parent.dlg.log(
                         u'Can\'t calculate lod0 geometry due to the lack of topology or non-meter-metrics')
                     return None
@@ -483,7 +488,7 @@ class Converter(QgsTask):
                     geometry.Set3D(True)
                     wkt = geometry.ExportToWkt()
                     geometry = ogr.CreateGeometryFromWkt(wkt)
-                    geometry = geometry.UnionCascaded()
+
 
         self.geom.AddGeometry(geometry)
         geomXML = Utilities.geomToGml(geometry)

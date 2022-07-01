@@ -13,6 +13,7 @@
 # Standard-Bibliotheken
 import math
 
+import numpy
 import numpy as np
 
 # QGIS-Bibliotheken
@@ -84,7 +85,7 @@ class Transformer:
         source = osr.SpatialReference()
         source.ImportFromEPSG(4326)
         # Berechnung des EPSG-Codes des Zielkoordinatensystems
-        zone = math.ceil(((b+180)/6))
+        zone = math.ceil((b+180)/6)
         if b >= 0:
             epsg = zone + 32600
         else:
@@ -99,21 +100,31 @@ class Transformer:
     def placePoints(self, ifcElement, points):
         ifcLocalPlacement = ifcElement.ObjectPlacement
         shift = self.calcShift(ifcLocalPlacement, [0, 0, 0])
+        xDir = ifcElement.ObjectPlacement.RelativePlacement.RefDirection.DirectionRatios
+        xAngle = numpy.arccos(np.dot(xDir, [1, 0, 0]))
+        print("Ges.: Shift: " + str(shift))
         pointsTr = []
         for point in points:
-            pointTr = np.add(point, shift)
+            pointTrX = point[0]*np.cos(xAngle)+point[1]*np.sin(xAngle)
+            pointTrY = point[1] * np.cos(xAngle) - point[0] * np.sin(xAngle)
+            pointTr = [pointTrX, pointTrY, point[2]]
+            pointTr = np.add(pointTr, shift)
             pointTr = self.georeferencePoint(pointTr)
             pointsTr.append(pointTr)
         return np.array(pointsTr).tolist()
 
-    def calcShift(self, ifcLocalPlacement, shift=[0, 0, 0]):
-        coords = ifcLocalPlacement.RelativePlacement.Location.Coordinates
-        shift[0] += coords[0]
-        shift[1] += coords[1]
+    def calcShift(self, ifcLocalPlacement, shift=[0, 0, 0], coords=[0, 0, 0]):
+        xDir = ifcLocalPlacement.RelativePlacement.RefDirection.DirectionRatios
+        xAngle = numpy.arccos(np.dot(xDir, [1, 0, 0]))
+        coordsX = coords[0] * np.cos(xAngle) + coords[1] * np.sin(xAngle)
+        coordsY = coords[1] * np.cos(xAngle) - coords[0] * np.sin(xAngle)
+        shift[0] += coordsX
+        shift[1] += coordsY
         shift[2] += coords[2]
+        coords = ifcLocalPlacement.RelativePlacement.Location.Coordinates
         ifcLocalPlacementNext = ifcLocalPlacement.PlacementRelTo
         if ifcLocalPlacementNext is None:
             return shift
         else:
-            return self.calcShift(ifcLocalPlacementNext, shift)
+            return self.calcShift(ifcLocalPlacementNext, shift, coords)
 

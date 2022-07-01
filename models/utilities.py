@@ -16,6 +16,7 @@ from ifcopenshell import util
 import ifcopenshell.util.pset
 
 # XML-Bibliotheken
+from ifcopenshell.util import element
 from lxml import etree
 # noinspection PyUnresolvedReferences
 from lxml.etree import QName
@@ -43,7 +44,7 @@ class Utilities:
         return xml
 
     @staticmethod
-    def findPset(ifc, ifcElement, psetName):
+    def findPset(ifc, ifcElement, psetName, attrName=None):
         """ Finden eines PropertySets eines IFC-Elements
 
         Args:
@@ -54,9 +55,16 @@ class Utilities:
         Returns:
             Das gesuchte PropertySet, falls gefunden. Ansonsten None
         """
-        psets = ifcopenshell.util.element.get_psets(ifcElement)
+        psets = element.get_psets(ifcElement)
         if psetName in psets:
-            return psets[psetName]
+            if attrName is None:
+                return psets[psetName]
+            else:
+                pset = element.get_psets(ifcElement)[psetName]
+                if attrName in pset.keys():
+                    return pset[attrName]
+                else:
+                    return None
         else:
             return None
 

@@ -15,6 +15,7 @@ import math
 import sys
 import uuid
 from datetime import datetime
+import re
 
 # IFC-Bibliotheken
 import ifcopenshell
@@ -34,33 +35,9 @@ import processing
 from qgis.core import QgsTask
 
 from .xmlns import XmlNs
+from .mapper import Mapper
 from .transformer import Transformer
 from .utilities import Utilities
-
-import os.path
-import math
-
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtCore import QVariant
-
-from qgis.core import (QgsApplication,
-                       QgsExpression,
-                       QgsFeature,
-                       QgsFeatureRequest,
-                       QgsFeatureSink,
-                       QgsField,
-                       QgsFields,
-                       QgsGeometry,
-                       QgsProcessing,
-                       QgsProcessingException,
-                       QgsProcessingParameterFeatureSink,
-                       QgsProcessingParameterFeatureSource,
-                       QgsProcessingParameterField,
-                       QgsProcessingParameterNumber,
-                       QgsPoint,
-                       QgsPointXY,
-                       QgsWkbTypes)
-from processing.algs.qgis.QgisAlgorithm import QgisAlgorithm
 
 
 class Converter(QgsTask):
@@ -213,70 +190,182 @@ class Converter(QgsTask):
         chBoundEnvUC.text = str(env[1]) + " " + str(env[3]) + " " + str(env[5])
 
     def convertBldgAttr(self, ifcBuilding, chBldg):
-        # GML
+        # Allgemeines
         chBldg.set("id", "UUID_" + str(uuid.uuid4()))
-        chBldgName = etree.SubElement(chBldg, QName(XmlNs.gml, "name"))
-        chBldgName.text = ifcBuilding.Name
-        chBldgDescr = etree.SubElement(chBldg, QName(XmlNs.gml, "description"))
-        chBldgDescr.text = ifcBuilding.Description
-
-        # Core
+        if ifcBuilding.Name is not None:
+            chBldgName = etree.SubElement(chBldg, QName(XmlNs.gml, "name"))
+            chBldgName.text = ifcBuilding.Name
+        if ifcBuilding.Description is not None:
+            chBldgDescr = etree.SubElement(chBldg, QName(XmlNs.gml, "description"))
+            chBldgDescr.text = ifcBuilding.Description
         chBldgCrDate = etree.SubElement(chBldg, QName(XmlNs.core, "creationDate"))
         chBldgCrDate.text = datetime.now().strftime("%Y-%m-%d")
 
-        chBldgRelTerr = etree.SubElement(chBldg, QName(XmlNs.core, "relativeToTerrain"))
-        chBldgRelTerr.text = ""
+        # Typ & Funktion
+        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
+            occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"].lower()
+            if any(char.isdigit() for char in occType):
+                number = ""
+                for char in occType:
+                    if char.isdigit():
+                        number += char
+                    elif len(number) != 4:
+                        number = ""
+                numberNr = int(number)
+                if 2700 >= numberNr >= 1000 and numberNr % 10 == 0:
+                    type = number
+            elif occType in Mapper.functionUsageDict:
+                type = Mapper.functionUsageDict[occType]
+            else:
+                occType = occType.replace("_", " ").replace("-", " ").replace(",", " ").replace(";", " ")
+                for occTypeSub in occType.split():
+                    if occTypeSub in Mapper.functionUsageDict:
+                        type = Mapper.functionUsageDict[occTypeSub]
 
-        chBldgRelWater = etree.SubElement(chBldg, QName(XmlNs.core, "relativeToWater"))
-        chBldgRelWater.text = ""
+            if type is None:
+                if ifcBuilding.ObjectType is not None:
+                    objType = ifcBuilding.ObjectType.lower()
+                    if any(char.isdigit() for char in objType):
+                        number = ""
+                        for char in objType:
+                            if char.isdigit():
+                                number += char
+                            elif len(number) != 4:
+                                number = ""
+                        numberNr = int(number)
+                        if 2700 >= numberNr >= 1000 and numberNr % 10 == 0:
+                            type = number
+                    elif objType in Mapper.functionUsageDict:
+                        type = Mapper.functionUsageDict[objType]
+                    else:
+                        objType = objType.replace("_", " ").replace("-", " ").replace(",", " ").replace(";", " ")
+                        for objTypeSub in objType.split():
+                            if objTypeSub in Mapper.functionUsageDict:
+                                type = Mapper.functionUsageDict[objTypeSub]
 
-        # Building
-        chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
-        chBldgClass.set("codeSpace",
-                        "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
-        chBldgClass.text = ifcBuilding.ObjectType
+            if type is not None:
+                # XML-Struktur + Eintragen
+                chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
+                chBldgClass.set("codeSpace",
+                                "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
+                chBldgClass.text = str(Mapper.classFunctionUsage[int(type)])
+                chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
+                chBldgFunc.set("codeSpace",
+                               "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
+                chBldgFunc.text = str(type)
+                chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
+                chBldgUsage.set("codeSpace",
+                                "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
+                chBldgUsage.text = str(type)
 
-        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
-            chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
-            chBldgFunc.set("codeSpace",
-                           "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
-            chBldgFunc.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
-
-        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
-            chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
-            chBldgUsage.set("codeSpace",
-                            "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
-            chBldgUsage.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
-
-        # TODO: Mapping zwischen IFC-Freitext und CityGML-Code
-
-        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
+        # Eigenschaften
+        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction") is not None:
             chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
             chBldgYearConstr.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["YearOfConstruction"]
+        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+        roofTypes = []
+        if ifcRoofs is not None:
+            for ifcRoof in ifcRoofs:
+                if ifcRoof.PredefinedType is not None and ifcRoof.PredefinedType != "NOTDEFINED":
+                    roofTypes.append(ifcRoof.PredefinedType)
+        if len(roofTypes) > 0:
+            roofType = max(set(roofTypes), key=roofTypes.count)
+            chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
+            chBldgRoofType.set("codeSpace",
+                               "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_roofType.xml")
+            chBldgRoofType.text = str(Mapper.roofTypeDict[roofType])
 
-        chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
-        chBldgRoofType.set("codeSpace",
-                           "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_roofType.xml")
-        chBldgRoofType.text = ""
+        # Höhen und Geschosse
+        ifcBldgStoreys = Utilities.findElement(self.ifc, ifcBuilding, "IfcBuildingStorey", result=[])
+        storeysAG, storeysBG = 0, 0
+        storeysHeightsAG, storeysHeightsBG = 0, 0
+        missingAG, missingBG = 0, 0
+        # über alle Geschosse iterieren
+        for ifcBldgStorey in ifcBldgStoreys:
+            # Herausfinden, ob über oder unter Grund
+            if Utilities.findPset(self.ifc, ifcBldgStorey, "Pset_BuildingStoreyCommon") is not None and \
+                    element.get_psets(ifcBldgStorey)["Pset_BuildingStoreyCommon"]["AboveGround"] is not None:
+                ag = element.get_psets(ifcBldgStorey)["Pset_BuildingStoreyCommon"]["AboveGround"]
+            elif ifcBldgStorey.Elevation is not None:
+                ag = True if ifcBldgStorey.Elevation >= -1 else False
+            else:
+                ag = True
+            if ag:
+                storeysAG += 1
+            else:
+                storeysBG += 1
 
-        if Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities") is not None:
+            # Herausfinden der Geschosshöhe
+            height = 0
+            if Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "GrossHeight") is not None:
+                height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["GrossHeight"]
+            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "GrossHeight") is not None:
+                height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["GrossHeight"]
+            elif Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "Height") is not None:
+                height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["Height"]
+            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "Height") is not None:
+                height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["Height"]
+            elif Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "NetHeight") is not None:
+                height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["NetHeight"]
+            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "NetHeight") is not None:
+                height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["NetHeight"]
+            else:
+                if ag:
+                    missingAG += 1
+                else:
+                    missingBG += 1
+            if ag:
+                storeysHeightsAG += height
+            else:
+                storeysHeightsBG += height
+
+        # Relative
+        chBldgRelTerr = etree.SubElement(chBldg, QName(XmlNs.core, "relativeToTerrain"))
+        if missingBG == 0:
+            chBldgRelTerr.text = "entirelyAboveTerrain"
+        elif missingAG == 0:
+            chBldgRelTerr.text = "entirelyBelowTerrain"
+        elif missingAG == missingBG:
+            chBldgRelTerr.text = "substaintiallyAboveAndBelowTerrain"
+        elif missingAG > missingBG:
+            chBldgRelTerr.text = "substaintiallyAboveTerrain"
+        else:
+            chBldgRelTerr.text = "substaintiallyBelowTerrain"
+
+        # Gebäudehöhe
+        if Utilities.findPset(self.ifc, ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
+            height = element.get_psets(ifcBuilding)["BaseQuantities"]["GrossHeight"]
+        elif Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities", "GrossHeight") is not None:
+            height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossHeight"]
+        elif Utilities.findPset(self.ifc, ifcBuilding, "BaseQuantities", "Height") is not None:
+            height = element.get_psets(ifcBuilding)["BaseQuantities"]["Height"]
+        elif Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities", "Height") is not None:
+            height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
+        elif Utilities.findPset(self.ifc, ifcBuilding, "BaseQuantities", "NetHeight") is not None:
+            height = element.get_psets(ifcBuilding)["BaseQuantities"]["NetHeight"]
+        elif Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities", "NetHeight") is not None:
+            height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetHeight"]
+        else:
+            if missingAG > 0 or missingBG > 0:
+                height = (storeysHeightsAG + missingAG*(storeysHeightsAG/storeysAG) + storeysHeightsBG + missingBG*(storeysHeightsBG/storeysBG))
+            else:
+                height = storeysHeightsAG + storeysHeightsBG
+        if height != 0:
             chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
             chBldgHeight.set("uom", "m")
-            chBldgHeight.text = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
+            chBldgHeight.text = str(height)
 
-        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon") is not None:
-            chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
-            chBldgStoreysAG.text = str(element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NumberOfStoreys"])
-
+        # Geschossangaben
+        chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
+        chBldgStoreysAG.text = str(storeysAG)
         chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
-        chBldgStoreysBG.text = ""
-
-        chBldgStoreysHeightAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsAboveGround"))
-        chBldgStoreysHeightAG.text = ""
-
-        chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
-        chBldgStoreysHeightBG.text = ""
-        # TODO Gebäudeattribute
+        chBldgStoreysBG.text = str(storeysBG)
+        if (storeysAG-missingAG) > 0:
+            chBldgStoreysHeightAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsAboveGround"))
+            chBldgStoreysHeightAG.text = str(storeysHeightsAG/(storeysAG-missingAG))
+        if (storeysBG-missingBG) > 0:
+            chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
+            chBldgStoreysHeightBG.text = str(storeysHeightsBG/(storeysBG-missingBG))
 
     def convertFootPrint(self, ifcBuilding, chBldg):
         """ Konvertieren der Grundfläche von IFC zu CityGML
@@ -345,7 +434,7 @@ class Converter(QgsTask):
             points = self.trans.placePoints(ifcElement, grVertsCurr)
             grVertsList.append(points)
 
-        # Höhe berechnen, abhängig vom Modus
+        # Höhe berechnen
         height = sys.maxsize
         for grVerts in grVertsList:
             for grVert in grVerts:
@@ -387,7 +476,8 @@ class Converter(QgsTask):
                 geometry = geometriesBuffer.UnionCascaded()
 
                 if geometry.GetGeometryCount() > 1:
-                    self.parent.dlg.log(u'Can\'t calculate lod0 geometry due to the lack of topology or non-meter-metrics')
+                    self.parent.dlg.log(
+                        u'Can\'t calculate lod0 geometry due to the lack of topology or non-meter-metrics')
                     return None
                 else:
                     geometry.Set3D(True)

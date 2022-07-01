@@ -11,6 +11,8 @@
 #####
 
 # Standard-Bibliotheken
+import math
+
 import numpy as np
 
 # QGIS-Bibliotheken
@@ -82,18 +84,11 @@ class Transformer:
         source = osr.SpatialReference()
         source.ImportFromEPSG(4326)
         # Berechnung des EPSG-Codes des Zielkoordinatensystems
-        if 18 > b >= 12:
-            epsg = 32633
-        elif 6 <= b < 12:
-            epsg = 32632
-        elif 54 <= b < 60:
-            epsg = 32640
-        elif 0 <= b < 6:
-            epsg = 32631
+        zone = math.ceil(((b+180)/6))
+        if b >= 0:
+            epsg = zone + 32600
         else:
-            epsg = -1
-        # TODO: weitere Zonen
-
+            epsg = zone + 32700
         return epsg
 
     def georeferencePoint(self, point):

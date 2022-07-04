@@ -177,8 +177,8 @@ class Converter(QgsTask):
 
             # Konvertierung
             self.convertBldgAttr(ifcBuilding, chBldg)
-            self.convertFootPrint(ifcBuilding, chBldg)
-            self.convertRoofEdge(ifcBuilding, chBldg)
+            self.convertLoD0FootPrint(ifcBuilding, chBldg)
+            self.convertLoD1RoofEdge(ifcBuilding, chBldg)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
 
@@ -211,8 +211,8 @@ class Converter(QgsTask):
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Konvertierung
-            self.convertBldgAttr(ifcBuilding, chBldg)
-            # TODO: Geometrie
+            height = self.convertBldgAttr(ifcBuilding, chBldg)
+            self.convertLod1Solid(ifcBuilding, chBldg, height)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
 
@@ -417,6 +417,8 @@ class Converter(QgsTask):
             chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
             chBldgStoreysHeightBG.text = str(storeysHeightsBG / (storeysBG - missingBG))
 
+        return height
+
     @staticmethod
     def convertFunctionUsage(typeIn):
         """ Konvertieren den Eingabetypen in einen standardisierten Code
@@ -509,7 +511,7 @@ class Converter(QgsTask):
         height = maxHeight - minHeight
         return height
 
-    def convertFootPrint(self, ifcBuilding, chBldg):
+    def convertLoD0FootPrint(self, ifcBuilding, chBldg):
         """ Konvertieren der Grundfläche von IFC zu CityGML
 
         Args:
@@ -526,7 +528,8 @@ class Converter(QgsTask):
                 return
 
         # Geometrie
-        geomXML = self.calcPlane(ifcSlabs)
+        geometry = self.calcPlane(ifcSlabs)
+        geomXML = Utilities.geomToGml(geometry)
         if geomXML is not None:
             # XML-Struktur
             chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
@@ -534,7 +537,7 @@ class Converter(QgsTask):
             chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
             chBldgFootPrintSM.append(geomXML)
 
-    def convertRoofEdge(self, ifcBuilding, chBldg):
+    def convertLoD0RoofEdge(self, ifcBuilding, chBldg):
         """ Konvertieren der Dachkantenfläche von IFC zu CityGML
 
         Args:
@@ -552,7 +555,8 @@ class Converter(QgsTask):
                 return
 
         # Geometrie
-        geomXML = self.calcPlane(ifcRoofs)
+        geometry = self.calcPlane(ifcRoofs)
+        geomXML = Utilities.geomToGml(geometry)
         if geomXML is not None:
             # XML-Struktur
             chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
@@ -649,8 +653,43 @@ class Converter(QgsTask):
 
         # Zur Geometrieliste hinzufügen und in GML konvertieren
         self.geom.AddGeometry(geometry)
-        geomXML = Utilities.geomToGml(geometry)
-        return geomXML
+        return geometry
+
+    def convertLoD1Solid(self, ifcBuilding, chBldg, height):
+        """ Konvertieren des Gebäudeumrisses von IFC zu CityGML
+
+        Args:
+            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
+            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+            height: Die Gebäudehöhe
+        """
+        # IFC-Elemente der Grundfläche
+        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        if len(ifcSlabs) == 0:
+            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            # Wenn keine Grundfläche vorhanden
+            if len(ifcSlabs) == 0:
+                self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
+                return
+
+        # Berechnung Grundfläche
+        geomBase = self.calcPlane(ifcSlabs)
+
+        # Berechnung Umriss
+        geometries = self.extrude(geomBase, height)
+
+        # Geometrie
+        geomXML = None
+        if geomXML is not None:
+            # XML-Struktur
+            chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod1Solid"))
+            #chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
+            #chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
+            #chBldgFootPrintSM.append(geomXML)
+
+    def extrude(self, base, height):
+
+        return None
 
     def convertAddress(self, ifcBuilding, ifcSite, chBldg):
         """ Konvertieren der Adresse von IFC zu CityGML

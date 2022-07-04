@@ -178,7 +178,7 @@ class Converter(QgsTask):
             # Konvertierung
             self.convertBldgAttr(ifcBuilding, chBldg)
             self.convertLoD0FootPrint(ifcBuilding, chBldg)
-            self.convertLoD1RoofEdge(ifcBuilding, chBldg)
+            self.convertLoD0RoofEdge(ifcBuilding, chBldg)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
 
@@ -212,7 +212,7 @@ class Converter(QgsTask):
 
             # Konvertierung
             height = self.convertBldgAttr(ifcBuilding, chBldg)
-            self.convertLod1Solid(ifcBuilding, chBldg, height)
+            self.convertLoD1Solid(ifcBuilding, chBldg, height)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
 
@@ -376,7 +376,10 @@ class Converter(QgsTask):
             chBldgRelTerr.text = "substaintiallyBelowTerrain"
 
         # Gebäudehöhe
-        if Utilities.findPset(ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
+        height = self.calcHeight(ifcBuilding)
+        if height is not None:
+            pass
+        elif Utilities.findPset(ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["GrossHeight"]
         elif Utilities.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "GrossHeight") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossHeight"]
@@ -397,8 +400,6 @@ class Converter(QgsTask):
                 height = (storeysHeightsAG + missingAG * (
                         storeysHeightsAG / storeysAG) + storeysHeightsBG + missingBG * (
                                   storeysHeightsBG / storeysBG))
-        else:
-            height = self.calcHeight(ifcBuilding)
 
         if height != 0 and height is not None:
             chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
@@ -680,16 +681,48 @@ class Converter(QgsTask):
 
         # Geometrie
         geomXML = None
-        if geomXML is not None:
+        if geometries is not None and len(geometries) > 0:
             # XML-Struktur
-            chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod1Solid"))
-            #chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
-            #chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
-            #chBldgFootPrintSM.append(geomXML)
+            chBldgSolid = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod1Solid"))
+            chBldgSolidSol = etree.SubElement(chBldgSolid, QName(XmlNs.gml, "Solid"))
+            chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
+            chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
+            for geometry in geometries:
+                print(geometry)
+                chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
+                geomXML = Utilities.geomToGml(geometry)
+                chBldgSolidSM.append(geomXML)
 
-    def extrude(self, base, height):
+    @staticmethod
+    def extrude(geomBase, height):
+        # Grundfläche
+        geometries = [geomBase]
+        ringBase = geomBase.GetGeometryRef(0)
 
-        return None
+        # Dachfläche
+        geomRoof = ogr.Geometry(ogr.wkbPolygon)
+        ringRoof = ogr.Geometry(ogr.wkbLinearRing)
+        for i in range(ringBase.GetPointCount()-1, -1, -1):
+            pt = ringBase.GetPoint(i)
+            ringRoof.AddPoint(pt[0], pt[1], pt[2]+height)
+        geomRoof.AddGeometry(ringRoof)
+        geometries.append(geomRoof)
+
+        # Wandflächen
+        for i in range(0, ringBase.GetPointCount()-1):
+            geomWall = ogr.Geometry(ogr.wkbPolygon)
+            ringWall = ogr.Geometry(ogr.wkbLinearRing)
+            pt1 = ringBase.GetPoint(i)
+            pt2 = ringBase.GetPoint(i+1)
+            ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
+            ringWall.AddPoint(pt1[0], pt1[1], pt1[2]+height)
+            ringWall.AddPoint(pt2[0], pt2[1], pt2[2]+height)
+            ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
+            ringWall.CloseRings()
+            geomWall.AddGeometry(ringWall)
+            geometries.append(geomWall)
+
+        return geometries
 
     def convertAddress(self, ifcBuilding, ifcSite, chBldg):
         """ Konvertieren der Adresse von IFC zu CityGML

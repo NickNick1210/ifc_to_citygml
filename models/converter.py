@@ -573,7 +573,7 @@ class Converter(QgsTask):
             ifcElements: Elemente, aus denen die Fläche berechnet werden soll
 
         Returns:
-            chBldg: Erzeugte GML-Geometrie
+            Erzeugte GML-Geometrie
         """
         # Vertizes aus den Elementen entnehmen und georeferenzieren
         grVertsList = []
@@ -665,6 +665,7 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
             height: Die Gebäudehöhe
         """
+        # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
             self.parent.dlg.log(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
 
@@ -684,7 +685,6 @@ class Converter(QgsTask):
         geometries = self.extrude(geomBase, height)
 
         # Geometrie
-        geomXML = None
         if geometries is not None and len(geometries) > 0:
             # XML-Struktur
             chBldgSolid = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod1Solid"))
@@ -698,6 +698,15 @@ class Converter(QgsTask):
 
     @staticmethod
     def extrude(geomBase, height):
+        """ Berechnung eines Körpers als Extrusion einer Grundfläche
+
+        Args:
+            geomBase: Grundfläche des Körpers als Polygon
+            height: Höhe der Extrusion als float
+
+        Returns:
+            Liste der erzeugten Umriss-Polygone
+        """
         # Grundfläche
         geometries = [geomBase]
         ringBase = geomBase.GetGeometryRef(0)

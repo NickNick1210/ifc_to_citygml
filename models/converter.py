@@ -275,24 +275,25 @@ class Converter(QgsTask):
 
         # Klasse, Typ und Funktion
         # Prüfung des OccupancyType im PropertySet BuildingCommon
-        occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
-        type = self.convertFunctionUsage(occType)
-        if type is None:
-            type = self.convertFunctionUsage(ifcBuilding.ObjectType)
-        if type is not None:
-            # XML-Struktur + Eintragen
-            chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
-            chBldgClass.set("codeSpace",
-                            "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
-            chBldgClass.text = str(Mapper.classFunctionUsage[int(type)])
-            chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
-            chBldgFunc.set("codeSpace",
-                           "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
-            chBldgFunc.text = str(type)
-            chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
-            chBldgUsage.set("codeSpace",
-                            "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
-            chBldgUsage.text = str(type)
+        if Utilities.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
+            occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+            type = self.convertFunctionUsage(occType)
+            if type is None:
+                type = self.convertFunctionUsage(ifcBuilding.ObjectType)
+            if type is not None:
+                # XML-Struktur + Eintragen
+                chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
+                chBldgClass.set("codeSpace",
+                                "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
+                chBldgClass.text = str(Mapper.classFunctionUsage[int(type)])
+                chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
+                chBldgFunc.set("codeSpace",
+                               "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
+                chBldgFunc.text = str(type)
+                chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
+                chBldgUsage.set("codeSpace",
+                                "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
+                chBldgUsage.text = str(type)
 
         # Baujahr
         if Utilities.findPset(ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction") is not None:
@@ -404,7 +405,7 @@ class Converter(QgsTask):
         if height != 0 and height is not None:
             chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
             chBldgHeight.set("uom", "m")
-            chBldgHeight.text = str(height)
+            chBldgHeight.text = str(round(height, 5))
 
         # Geschossangaben
         chBldgStoreysAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysAboveGround"))
@@ -413,10 +414,10 @@ class Converter(QgsTask):
         chBldgStoreysBG.text = str(storeysBG)
         if (storeysAG - missingAG) > 0:
             chBldgStoreysHeightAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsAboveGround"))
-            chBldgStoreysHeightAG.text = str(storeysHeightsAG / (storeysAG - missingAG))
+            chBldgStoreysHeightAG.text = str(round(storeysHeightsAG / (storeysAG - missingAG), 5))
         if (storeysBG - missingBG) > 0:
             chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
-            chBldgStoreysHeightBG.text = str(storeysHeightsBG / (storeysBG - missingBG))
+            chBldgStoreysHeightBG.text = str(round(storeysHeightsBG / (storeysBG - missingBG), 5))
 
         return height
 
@@ -688,7 +689,6 @@ class Converter(QgsTask):
             chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
             chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
             for geometry in geometries:
-                print(geometry)
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
                 geomXML = Utilities.geomToGml(geometry)
                 chBldgSolidSM.append(geomXML)

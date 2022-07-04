@@ -531,6 +531,7 @@ class Converter(QgsTask):
 
         # Geometrie
         geometry = self.calcPlane(ifcSlabs)
+        self.geom.AddGeometry(geometry)
         geomXML = Utilities.geomToGml(geometry)
         if geomXML is not None:
             # XML-Struktur
@@ -558,6 +559,7 @@ class Converter(QgsTask):
 
         # Geometrie
         geometry = self.calcPlane(ifcRoofs)
+        self.geom.AddGeometry(geometry)
         geomXML = Utilities.geomToGml(geometry)
         if geomXML is not None:
             # XML-Struktur
@@ -654,7 +656,6 @@ class Converter(QgsTask):
                     geometry = ogr.CreateGeometryFromWkt(wkt)
 
         # Zur Geometrieliste hinzufügen und in GML konvertieren
-        self.geom.AddGeometry(geometry)
         return geometry
 
     def convertLoD1Solid(self, ifcBuilding, chBldg, height):
@@ -692,6 +693,7 @@ class Converter(QgsTask):
             chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
             chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
             for geometry in geometries:
+                self.geom.AddGeometry(geometry)
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
                 geomXML = Utilities.geomToGml(geometry)
                 chBldgSolidSM.append(geomXML)

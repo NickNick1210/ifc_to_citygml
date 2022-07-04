@@ -29,10 +29,10 @@ from lxml.etree import QName
 
 # QGIS-Bibliotheken
 from osgeo import ogr
-import processing
 
 # Plugin
 from qgis.core import QgsTask
+from qgis.PyQt.QtCore import QCoreApplication
 
 from .xmlns import XmlNs
 from .mapper import Mapper
@@ -67,6 +67,18 @@ class Converter(QgsTask):
         self.ifc = None
         self.trans = None
         self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
+
+    @staticmethod
+    def tr(msg):
+        """ Übersetzen
+
+        Args:
+            msg: zu übersetzender Text
+
+        Returns:
+            Übersetzter Text
+        """
+        return QCoreApplication.translate('Converter', msg)
 
     def run(self):
         """ Ausführen der Konvertierung """
@@ -175,6 +187,10 @@ class Converter(QgsTask):
         return root
 
     def convertBound(self, geometry, chBound):
+        if self.geom.GetGeometryCount() == 0:
+            self.parent.dlg.log(self.tr(u'Due to the missing geometries, no bounding box can be calculated'))
+            return
+
         # XML-Struktur
         chBoundEnv = etree.SubElement(chBound, QName(XmlNs.gml, "Envelope"))
         chBoundEnv.set("srsDimension", "3")
@@ -382,16 +398,16 @@ class Converter(QgsTask):
         if len(ifcSlabs) == 0:
             ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             if len(ifcSlabs) == 0:
-                self.parent.dlg.log(
-                    u"Due to the missing baseslab and building/storey attributes, no building height can be calculated")
+                self.parent.dlg.log(self.tr(
+                    u"Due to the missing baseslab and building/storeys attributes, no building height can be calculated"))
                 return
 
         ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
         if len(ifcRoofs) == 0:
             ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
             if len(ifcRoofs) == 0:
-                self.parent.dlg.log(
-                    u"Due to the missing roof and building/storey attributes, no building height can be calculated")
+                self.parent.dlg.log(self.tr(
+                    u"Due to the missing roof and building/storeys attributes, no building height can be calculated"))
                 return
 
         minHeight = sys.maxsize
@@ -431,7 +447,7 @@ class Converter(QgsTask):
         if len(ifcSlabs) == 0:
             ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             if len(ifcSlabs) == 0:
-                self.parent.dlg.log(u"Due to the missing baseslab, no FootPrint geometry can be calculated")
+                self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no FootPrint geometry can be calculated"))
                 return
 
         # Geometrie
@@ -455,7 +471,7 @@ class Converter(QgsTask):
         if len(ifcRoofs) == 0:
             ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
             if len(ifcRoofs) == 0:
-                self.parent.dlg.log(u"Due to the missing roof, no RoofEdge geometry can be calculated")
+                self.parent.dlg.log(self.tr(u"Due to the missing roof, no RoofEdge geometry can be calculated"))
                 return
 
         # Geometrie
@@ -504,7 +520,6 @@ class Converter(QgsTask):
             for grVert in grVerts:
                 if grVert[2] < height:
                     height = grVert[2]
-        print(height)
 
         # Ring aus Punkten erstellen
         geometries = ogr.Geometry(ogr.wkbMultiPolygon)
@@ -530,7 +545,6 @@ class Converter(QgsTask):
         if geometries.GetGeometryCount() != 1:
             geometry = geometries.UnionCascaded()
             if geometry.GetGeometryCount() > 1:
-                print("Multi!")
                 geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                 for i in range(0, geometries.GetGeometryCount()):
                     g = geometries.GetGeometryRef(i)
@@ -539,9 +553,7 @@ class Converter(QgsTask):
                 geometry = geometriesBuffer.UnionCascaded()
 
                 if geometry.GetGeometryName() != "POLYGON":
-                    print("ERGEBNIS: " + str(geometry))
-                    self.parent.dlg.log(
-                        u'Can\'t calculate lod0 geometry due to the lack of topology or non-meter-metrics')
+                    self.parent.dlg.log(self.tr(u'Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated'))
                     return None
                 else:
                     geometry.Set3D(True)

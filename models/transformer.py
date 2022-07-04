@@ -40,12 +40,9 @@ class Transformer:
 
     def getModelContext(self):
         project = self.ifc.by_type("IfcProject")[0]
-        print(project)
         for context in project.RepresentationContexts:
-            print(context)
             if context.ContextType == "Model":
                 return context
-        print("No context for model was found in this project")
 
     def getTransformMatrix(self):
         contextForModel = self.getModelContext()

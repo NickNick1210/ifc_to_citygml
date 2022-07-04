@@ -12,8 +12,6 @@
 
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QCoreApplication
-from qgis.core import QgsMessageLog, Qgis
-from qgis.core import QgsApplication
 
 # Plugin
 from .models.ifc_analyzer import IfcAnalyzer
@@ -55,7 +53,7 @@ class Model:
         Returns:
             Übersetzter Text
         """
-        return QCoreApplication.translate('IFC-to-CityGML', msg)
+        return QCoreApplication.translate('Model', msg)
 
     def ifcFileChanged(self):
         """ EventListener, wenn eine (andere) IFC-Datei als Eingabe angegeben wurde """

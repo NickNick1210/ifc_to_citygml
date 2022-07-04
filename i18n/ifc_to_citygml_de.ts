@@ -2,16 +2,36 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="de_DE" sourcelanguage="en_US">
 <context>
-    <name>Base</name>
+    <name>Converter</name>
     <message>
-        <location filename="../base.py" line="166"/>
-        <source>&amp;IFC-to-CityGML</source>
-        <translation></translation>
+        <location filename="../models/converter.py" line="191"/>
+        <source>Due to the missing geometries, no bounding box can be calculated</source>
+        <translation>Wegen fehlender Geometrien kann keine Bounding Box berechnet werden</translation>
     </message>
     <message>
-        <location filename="../base.py" line="159"/>
-        <source>IFC-to-CityGML</source>
-        <translation></translation>
+        <location filename="../models/converter.py" line="401"/>
+        <source>Due to the missing baseslab and building/storeys attributes, no building height can be calculated</source>
+        <translation>Wegen fehlender Grundfläche und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="409"/>
+        <source>Due to the missing roof and building/storeys attributes, no building height can be calculated</source>
+        <translation>Wegen fehlenden Daches und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="450"/>
+        <source>Due to the missing baseslab, no FootPrint geometry can be calculated</source>
+        <translation>Wegen fehlender Grundfläche kann keine Grundflächengeometrie berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="474"/>
+        <source>Due to the missing roof, no RoofEdge geometry can be calculated</source>
+        <translation>Wegen fehlenden Dachs kann keine Dachkantengeometrie berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="556"/>
+        <source>Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated</source>
+        <translation>Wegen nicht-metrischen Einheiten oder fehlender Topologie kann keine LoD0-Geometrie berechnet werden</translation>
     </message>
 </context>
 <context>
@@ -83,109 +103,132 @@
     </message>
 </context>
 <context>
-    <name>IFC-to-CityGML</name>
+    <name>DialogVM</name>
     <message>
-        <location filename="../dialog_vm.py" line="48"/>
+        <location filename="../dialog_vm.py" line="59"/>
         <source>Tool started</source>
         <translation>Tool gestartet</translation>
     </message>
+</context>
+<context>
+    <name>IfcAnalyzer</name>
     <message>
-        <location filename="../model.py" line="66"/>
-        <source>Conversion started</source>
-        <translation>Konvertierung gestartet</translation>
-    </message>
-    <message>
-        <location filename="../model.py" line="73"/>
-        <source>Input</source>
-        <translation>Eingabe</translation>
-    </message>
-    <message>
-        <location filename="../model.py" line="73"/>
-        <source>Output</source>
-        <translation>Ausgabe</translation>
-    </message>
-    <message>
-        <location filename="../model.py" line="73"/>
-        <source>QGIS integration</source>
-        <translation>QGIS-Integration</translation>
-    </message>
-    <message>
-        <location filename="../models/ifc_analyzer.py" line="65"/>
+        <location filename="../models/ifc_analyzer.py" line="125"/>
         <source>IFC file</source>
         <translation>IFC-Datei</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="42"/>
+        <location filename="../models/ifc_analyzer.py" line="82"/>
         <source>is analyzed</source>
         <translation>wird analysiert</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="43"/>
+        <location filename="../models/ifc_analyzer.py" line="85"/>
         <source>Schema</source>
-        <translation>Schema</translation>
+        <translation></translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="44"/>
+        <location filename="../models/ifc_analyzer.py" line="86"/>
         <source>Name</source>
-        <translation>Name</translation>
+        <translation></translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="48"/>
+        <location filename="../models/ifc_analyzer.py" line="90"/>
         <source>Description</source>
         <translation>Beschreibung</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="49"/>
+        <location filename="../models/ifc_analyzer.py" line="91"/>
         <source>No. of Buildings</source>
         <translation>Anz. Gebäude</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="60"/>
+        <location filename="../models/ifc_analyzer.py" line="136"/>
         <source>not valid</source>
         <translation>nicht valide</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="61"/>
+        <location filename="../models/ifc_analyzer.py" line="107"/>
         <source>There are no buildings in the IFC file!</source>
-        <translation>Die IFC-Datei beinhaltet keine Gebäude!</translation>
+        <translation>Die IFC-Datei enthält keine Gebäude!</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="65"/>
+        <location filename="../models/ifc_analyzer.py" line="115"/>
+        <source>There is no georeferencing in the IFC file!</source>
+        <translation>Die IFC-Datei ist nicht georeferenziert!</translation>
+    </message>
+    <message>
+        <location filename="../models/ifc_analyzer.py" line="125"/>
         <source>is validated</source>
         <translation>wird validiert</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="66"/>
+        <location filename="../models/ifc_analyzer.py" line="128"/>
         <source>Validation of IFC file</source>
         <translation>Validierung der IFC-Datei</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="86"/>
+        <location filename="../models/ifc_analyzer.py" line="137"/>
+        <source>There is no northing in the IFC file!</source>
+        <translation>Die IFC-Datei ist nicht genordet!</translation>
+    </message>
+    <message>
+        <location filename="../models/ifc_analyzer.py" line="174"/>
         <source>errors found</source>
         <translation>Fehler gefunden</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="87"/>
+        <location filename="../models/ifc_analyzer.py" line="176"/>
         <source>conditionally valid</source>
         <translation>bedingt valide</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="93"/>
+        <location filename="../models/ifc_analyzer.py" line="184"/>
         <source>Error</source>
         <translation>Fehler</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="95"/>
+        <location filename="../models/ifc_analyzer.py" line="188"/>
         <source>valid</source>
         <translation>valide</translation>
     </message>
 </context>
 <context>
-    <name>self.parent</name>
+    <name>Model</name>
     <message>
-        <location filename="../dialog_vm.py" line="48"/>
-        <source>Tool started</source>
-        <translation type="obsolete">Tool gestartet</translation>
+        <location filename="../model.py" line="90"/>
+        <source>Conversion started</source>
+        <translation>Konvertierung gestartet</translation>
+    </message>
+    <message>
+        <location filename="../model.py" line="96"/>
+        <source>Input</source>
+        <translation>Eingabe</translation>
+    </message>
+    <message>
+        <location filename="../model.py" line="96"/>
+        <source>Output</source>
+        <translation>Ausgabe</translation>
+    </message>
+    <message>
+        <location filename="../model.py" line="96"/>
+        <source>QGIS integration</source>
+        <translation>QGIS-Integration</translation>
+    </message>
+    <message>
+        <location filename="../model.py" line="103"/>
+        <source>IFC-to-CityGML Conversion</source>
+        <translation>IFC-zu-CityGML-Konvertierung</translation>
+    </message>
+    <message>
+        <location filename="../model.py" line="111"/>
+        <source>Conversion completed</source>
+        <translation>Konvertierung abgeschlossen</translation>
+    </message>
+    <message>
+        <location filename="../model.py" line="113"/>
+        <source>Conversion crashed</source>
+        <translation>Konvertierung fehlgeschlagen</translation>
     </message>
 </context>
 </TS>

@@ -56,7 +56,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         self.fileWidget_ifc.fileChanged.connect(model.ifcFileChanged)
         self.fileWidget_cgml.fileChanged.connect(model.cgmlFileChanged)
 
-        self.log(QCoreApplication.translate('IFC-to-CityGML', u'Tool started'))
+        self.log(QCoreApplication.translate('DialogVM', u'Tool started'))
 
     def getInputPath(self):
         """ Gibt den Eingabepfad zurück.

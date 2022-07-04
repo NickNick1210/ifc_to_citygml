@@ -12,37 +12,90 @@
 
 # Standard-Bibliotheken
 import math
-
-import numpy
 import numpy as np
 
-# QGIS-Bibliotheken
+# Geo-Bibliotheken
 import osgeo.osr as osr
 
 
 #####
 
+
 class Transformer:
     """ Model-Klasse zum Transformieren vom lokalen in ein projizertes Koordinatensystem """
+
     def __init__(self, ifc):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
 
         Args:
-            parent: Die zugrunde liegende zentrale Model-Klasse
-            inPath: Pfad zur IFC-Datei
-            outPath: Pfad zur CityGML-Datei
+            ifc: Die zugrunde liegende IFC-Datei
         """
-
+        # Initialisierung von Attributen
         self.ifc = ifc
+
+        # Transformationsparameter
         self.epsg = self.getCRS()
         self.originShift = self.getOriginShift()
         self.trans = self.getTransformMatrix()
 
-    def getModelContext(self):
-        project = self.ifc.by_type("IfcProject")[0]
-        for context in project.RepresentationContexts:
-            if context.ContextType == "Model":
-                return context
+    def getCRS(self):
+        """ Berechnung des UTM-Koordinatensystems, in dem sich die Szenerie befindet
+
+        Returns:
+            Das UTM-Koordinatensystem als EPSG-Code
+        """
+        # Geographische Koordinaten
+        site = self.ifc.by_type("IfcSite")[0]
+        a, b = self.mergeDegrees(site.RefLatitude), self.mergeDegrees(site.RefLongitude)
+        source = osr.SpatialReference()
+        source.ImportFromEPSG(4326)
+
+        # Einordnung in die UTM-Zonen und Berechnung des EPSG-Codes
+        zone = math.ceil((b + 180) / 6)
+        epsg = (zone + 32600) if b >= 0 else (zone + 32700)
+        return epsg
+
+    def getOriginShift(self):
+        """ Berechnung der Datumsverschiebung zwischen Urpsrungs- und Zielkoordinatensystem
+
+        Returns:
+            Die Datumsverschiebung als Vektor
+        """
+        # Geographische Koordinaten
+        site = self.ifc.by_type("IfcSite")[0]
+        a, b = self.mergeDegrees(site.RefLatitude), self.mergeDegrees(site.RefLongitude)
+
+        # Ursprungs-CRS
+        source = osr.SpatialReference()
+        source.ImportFromEPSG(4326)
+
+        # Ziel-CRS
+        target = osr.SpatialReference()
+        target.ImportFromEPSG(self.epsg)
+
+        # Transformation
+        transform = osr.CoordinateTransformation(source, target)
+        x, y, z = transform.TransformPoint(a, b)
+        c = site.RefElevation
+        return [x, y, c]
+
+    @staticmethod
+    def mergeDegrees(degrees):
+        """ Konvertierung von geographischen Koordinaten aus dem Sexagesimalformat in das Dezimalformat
+
+        Args:
+            degrees: Geographische Koordinate im Sexagesimalformat als Array
+
+        Returns:
+            Geographische Koordinate im Dezimalformat als float
+        """
+        if len(degrees) == 4:
+            degree = degrees[0] + degrees[1] / 60.0 + (degrees[2] + degrees[3] / 1000000.0) / 3600.0
+        elif len(degrees) == 3:
+            degree = degrees[0] + degrees[1] / 60.0 + degrees[2] / 3600.0
+        else:
+            degree = -1
+        return degree
 
     def getTransformMatrix(self):
         contextForModel = self.getModelContext()
@@ -52,43 +105,11 @@ class Transformer:
         transformMatrix = np.mat(transformMatrix).I
         return transformMatrix
 
-    def getOriginShift(self):
-        site = self.ifc.by_type("IfcSite")[0]
-        Lat, Lon = site.RefLatitude, site.RefLongitude
-        a, b = self.mergeDegrees(Lat), self.mergeDegrees(Lon)
-
-        source = osr.SpatialReference()
-        source.ImportFromEPSG(4326)
-        target = osr.SpatialReference()
-        target.ImportFromEPSG(self.epsg)
-        transform = osr.CoordinateTransformation(source, target)
-        x, y, z = transform.TransformPoint(a, b)
-        c = site.RefElevation
-        return [x, y, c]
-
-    def mergeDegrees(self, Degrees):
-        if len(Degrees) == 4:
-            degree = Degrees[0] + Degrees[1] / 60.0 + (Degrees[2] + Degrees[3] / 1000000.0) / 3600.0
-        elif len(Degrees) == 3:
-            degree = Degrees[0] + Degrees[1] / 60.0 + Degrees[2] / 3600.0
-        else:
-            degree = -1
-        return degree
-
-    def getCRS(self):
-        site = self.ifc.by_type("IfcSite")[0]
-        Lat, Lon = site.RefLatitude, site.RefLongitude
-        a, b = self.mergeDegrees(Lat), self.mergeDegrees(Lon)
-
-        source = osr.SpatialReference()
-        source.ImportFromEPSG(4326)
-        # Berechnung des EPSG-Codes des Zielkoordinatensystems
-        zone = math.ceil((b+180)/6)
-        if b >= 0:
-            epsg = zone + 32600
-        else:
-            epsg = zone + 32700
-        return epsg
+    def getModelContext(self):
+        project = self.ifc.by_type("IfcProject")[0]
+        for context in project.RepresentationContexts:
+            if context.ContextType == "Model":
+                return context
 
     def georeferencePoint(self, point):
         a = [point[0], point[1], point[2]]

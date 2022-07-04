@@ -107,6 +107,7 @@ class IfcAnalyzer:
             self.parent.dlg.log(self.tr(u'There are no buildings in the IFC file!'))
             return
 
+        # Prüfung, ob Georeferenzierung vorhanden
         site = self.ifc.by_type("IfcSite")[0]
         if site.RefLatitude is None or site.RefLongitude is None:
             self.parent.valid = False
@@ -115,26 +116,28 @@ class IfcAnalyzer:
             self.parent.dlg.log(self.tr(u'There is no georeferencing in the IFC file!'))
             return
 
+        # Prüfung, ob Northing vorhanden
         project = self.ifc.by_type("IfcProject")[0]
         for context in project.RepresentationContexts:
             if context.ContextType == "Model":
-                if context.TrueNorth is not None:
-                    # Validierung über einen QgsTask, der asynchron ausgeführt wird
-                    # Wichtig, da sonst die QGIS-Oberfläche einfriert
-                    if val:
-                        self.parent.dlg.log(
-                            self.tr(u'IFC file') + " '" + self.fileName + "' " + self.tr(u'is validated'))
-                        # Muss über Klassenmethode geschehen, da der Task sonst 'vergessen' und deswegen nicht ausgeführt wird
-                        self.valTask = QgsTask.fromFunction(self.tr(u'Validation of IFC file'), self.validate,
-                                                            on_finished=self.valCompleted)
-                        QgsApplication.taskManager().addTask(self.valTask)
-                    else:
-                        self.valCompleted()
+                if context.TrueNorth is None:
+                    self.parent.valid = False
+                    self.parent.checkEnable()
+                    self.parent.dlg.setIfcMsg("<p style='color:red'>" + self.tr(u'not valid') + "</p>")
+                    self.parent.dlg.log(self.tr(u'There is no northing in the IFC file!'))
                     return
-        self.parent.valid = False
-        self.parent.checkEnable()
-        self.parent.dlg.setIfcMsg("<p style='color:red'>" + self.tr(u'not valid') + "</p>")
-        self.parent.dlg.log(self.tr(u'There is no northing in the IFC file!'))
+
+        # Validierung über einen QgsTask, der asynchron ausgeführt wird
+        # Wichtig, da sonst die QGIS-Oberfläche einfriert
+        if val:
+            self.parent.dlg.log(
+                self.tr(u'IFC file') + " '" + self.fileName + "' " + self.tr(u'is validated'))
+            # Muss über Klassenmethode geschehen, da der Task sonst 'vergessen' und deswegen nicht ausgeführt wird
+            self.valTask = QgsTask.fromFunction(self.tr(u'Validation of IFC file'), self.validate,
+                                                on_finished=self.valCompleted)
+            QgsApplication.taskManager().addTask(self.valTask)
+        else:
+            self.valCompleted()
         return
 
     # noinspection PyUnusedLocal

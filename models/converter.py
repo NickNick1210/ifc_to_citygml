@@ -202,6 +202,7 @@ class Converter(QgsTask):
         chBldgCrDate.text = datetime.now().strftime("%Y-%m-%d")
 
         # Typ & Funktion
+        type = None
         if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"].lower()
             if any(char.isdigit() for char in occType):
@@ -299,7 +300,8 @@ class Converter(QgsTask):
             height = 0
             if Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["GrossHeight"]
-            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "GrossHeight") is not None:
+            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
+                                    "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["GrossHeight"]
             elif Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "Height") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["Height"]
@@ -307,7 +309,8 @@ class Converter(QgsTask):
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["Height"]
             elif Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["NetHeight"]
-            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "NetHeight") is not None:
+            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
+                                    "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["NetHeight"]
             else:
                 if ag:
@@ -321,13 +324,13 @@ class Converter(QgsTask):
 
         # Relative
         chBldgRelTerr = etree.SubElement(chBldg, QName(XmlNs.core, "relativeToTerrain"))
-        if missingBG == 0:
+        if storeysBG == 0:
             chBldgRelTerr.text = "entirelyAboveTerrain"
-        elif missingAG == 0:
+        elif storeysAG == 0:
             chBldgRelTerr.text = "entirelyBelowTerrain"
-        elif missingAG == missingBG:
+        elif storeysBG == storeysAG:
             chBldgRelTerr.text = "substaintiallyAboveAndBelowTerrain"
-        elif missingAG > missingBG:
+        elif storeysAG > storeysBG:
             chBldgRelTerr.text = "substaintiallyAboveTerrain"
         else:
             chBldgRelTerr.text = "substaintiallyBelowTerrain"
@@ -345,12 +348,19 @@ class Converter(QgsTask):
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["NetHeight"]
         elif Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities", "NetHeight") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetHeight"]
-        else:
-            if missingAG > 0 or missingBG > 0:
-                height = (storeysHeightsAG + missingAG*(storeysHeightsAG/storeysAG) + storeysHeightsBG + missingBG*(storeysHeightsBG/storeysBG))
+        elif storeysHeightsAG > 0 or storeysHeightsBG > 0:
+            if storeysAG == 0 and storeysBG != 0:
+                height = storeysHeightsBG + missingBG * (storeysHeightsBG / storeysBG)
+            elif storeysBG == 0 and storeysAG != 0:
+                height = storeysHeightsAG + missingAG * (storeysHeightsAG / storeysAG)
             else:
-                height = storeysHeightsAG + storeysHeightsBG
-        if height != 0:
+                height = (storeysHeightsAG + missingAG * (
+                            storeysHeightsAG / storeysAG) + storeysHeightsBG + missingBG * (
+                                      storeysHeightsBG / storeysBG))
+        else:
+            height = self.calcHeight(ifcBuilding)
+
+        if height != 0 and height is not None:
             chBldgHeight = etree.SubElement(chBldg, QName(XmlNs.bldg, "measuredHeight"))
             chBldgHeight.set("uom", "m")
             chBldgHeight.text = str(height)
@@ -360,12 +370,54 @@ class Converter(QgsTask):
         chBldgStoreysAG.text = str(storeysAG)
         chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
         chBldgStoreysBG.text = str(storeysBG)
-        if (storeysAG-missingAG) > 0:
+        if (storeysAG - missingAG) > 0:
             chBldgStoreysHeightAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsAboveGround"))
-            chBldgStoreysHeightAG.text = str(storeysHeightsAG/(storeysAG-missingAG))
-        if (storeysBG-missingBG) > 0:
+            chBldgStoreysHeightAG.text = str(storeysHeightsAG / (storeysAG - missingAG))
+        if (storeysBG - missingBG) > 0:
             chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
-            chBldgStoreysHeightBG.text = str(storeysHeightsBG/(storeysBG-missingBG))
+            chBldgStoreysHeightBG.text = str(storeysHeightsBG / (storeysBG - missingBG))
+
+    def calcHeight(self, ifcBuilding):
+        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        if len(ifcSlabs) == 0:
+            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            if len(ifcSlabs) == 0:
+                self.parent.dlg.log(
+                    u"Due to the missing baseslab and building/storey attributes, no building height can be calculated")
+                return
+
+        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        if len(ifcRoofs) == 0:
+            ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+            if len(ifcRoofs) == 0:
+                self.parent.dlg.log(
+                    u"Due to the missing roof and building/storey attributes, no building height can be calculated")
+                return
+
+        minHeight = sys.maxsize
+        for ifcSlab in ifcSlabs:
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
+            verts = shape.geometry.verts
+            grVerts = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
+            for vert in grVerts:
+                if vert[2] < minHeight:
+                    minHeight = vert[2]
+
+        maxHeight = -sys.maxsize
+        for ifcRoof in ifcRoofs:
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
+            verts = shape.geometry.verts
+            grVerts = [[verts[i], verts[i + 1], verts[i + 2]] for i in range(0, len(verts), 3)]
+            for vert in grVerts:
+                if vert[2] > maxHeight:
+                    maxHeight = vert[2]
+
+        height = maxHeight - minHeight
+        return height
 
     def convertFootPrint(self, ifcBuilding, chBldg):
         """ Konvertieren der Grundfläche von IFC zu CityGML
@@ -379,7 +431,7 @@ class Converter(QgsTask):
         if len(ifcSlabs) == 0:
             ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             if len(ifcSlabs) == 0:
-                self.parent.dlg.log(u"Due to the missing baseslab, no FootPrint geometry can to be calculated")
+                self.parent.dlg.log(u"Due to the missing baseslab, no FootPrint geometry can be calculated")
                 return
 
         # Geometrie
@@ -403,7 +455,7 @@ class Converter(QgsTask):
         if len(ifcRoofs) == 0:
             ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
             if len(ifcRoofs) == 0:
-                self.parent.dlg.log(u"Due to the missing roof, no RoofEdge geometry can to be calculated")
+                self.parent.dlg.log(u"Due to the missing roof, no RoofEdge geometry can be calculated")
                 return
 
         # Geometrie
@@ -431,14 +483,19 @@ class Converter(QgsTask):
         for ifcElement in ifcElements:
             i += 1
             settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcElement)
             verts = shape.geometry.verts
             faces = shape.geometry.faces
-            grVertsCurr = [[round(verts[i],5), round(verts[i + 1]), round(verts[i + 2])] for i in range(0, len(verts), 3)]
+            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1]), round(verts[i + 2])] for i in
+                           range(0, len(verts), 3)]
             grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
             for face in grFacesCurr:
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
-                points = self.trans.placePoints(ifcElement, facePoints)
+                points = []
+                for facePoint in facePoints:
+                    point = self.trans.georeferencePoint(facePoint)
+                    points.append(point)
                 grVertsList.append(points)
 
         # Höhe berechnen
@@ -447,6 +504,7 @@ class Converter(QgsTask):
             for grVert in grVerts:
                 if grVert[2] < height:
                     height = grVert[2]
+        print(height)
 
         # Ring aus Punkten erstellen
         geometries = ogr.Geometry(ogr.wkbMultiPolygon)
@@ -472,6 +530,7 @@ class Converter(QgsTask):
         if geometries.GetGeometryCount() != 1:
             geometry = geometries.UnionCascaded()
             if geometry.GetGeometryCount() > 1:
+                print("Multi!")
                 geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                 for i in range(0, geometries.GetGeometryCount()):
                     g = geometries.GetGeometryRef(i)
@@ -487,8 +546,8 @@ class Converter(QgsTask):
                 else:
                     geometry.Set3D(True)
                     wkt = geometry.ExportToWkt()
+                    wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                     geometry = ogr.CreateGeometryFromWkt(wkt)
-
 
         self.geom.AddGeometry(geometry)
         geomXML = Utilities.geomToGml(geometry)
@@ -524,11 +583,11 @@ class Converter(QgsTask):
         chBldgAdrLoc.set("Type", "Town")
 
         # Eintragen der Adresse
-        if ifcAddress.Town is not None:
+        if ifcAddress.Town is not None and ifcAddress.Town != "":
             chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
             chBldgAdrLocName.text = ifcAddress.Town
 
-        if ifcAddress.AddressLines is not None:
+        if ifcAddress.AddressLines is not None and ifcAddress.AddressLines != "":
             chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
             chBldgAdrLocTh.set("Type", "Street")
             chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
@@ -549,7 +608,7 @@ class Converter(QgsTask):
             chBldgAdrLocThName.text = street
             chBldgAdrLocThNr.text = nr
 
-        if ifcAddress.PostalCode is not None:
+        if ifcAddress.PostalCode is not None and ifcAddress.PostalCode != "":
             chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
             chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
             chBldgAdrLocPCNr.text = ifcAddress.PostalCode

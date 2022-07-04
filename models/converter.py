@@ -94,7 +94,7 @@ class Converter(QgsTask):
         elif self.lod == 1:
             root = self.convertLoD1(root, self.eade)
         elif self.lod == 2:
-            # TODO LoD2
+            root = self.convertLoD2(root, self.eade)
             pass
         elif self.lod == 3:
             # TODO LoD3
@@ -223,6 +223,42 @@ class Converter(QgsTask):
 
         return root
 
+    def convertLoD2(self, root, eade):
+        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 2
+
+        Args:
+            root: Das vorbereitete XML-Schema
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+        """
+        # IFC-Grundelemente
+        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcBuildings = self.ifc.by_type("IfcBuilding")
+
+        # XML-Struktur
+        chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
+        chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
+
+        # Über alle enthaltenen Gebäude iterieren
+        for ifcBuilding in ifcBuildings:
+            chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
+            chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
+
+            # Konvertierung
+            self.convertBldgAttr(ifcBuilding, chBldg)
+            links = self.convertBldgBound(ifcBuilding, chBldg)
+            self.convertLoD2Solid(chBldg, links)
+            self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.convertBound(self.geom, chBound)
+
+            # EnergyADE
+            if eade:
+                # TODO: EnergyADE
+                pass
+
+        return root
+
+
     def convertBound(self, geometry, chBound):
         """ Konvertierung der Bounding Box
 
@@ -257,7 +293,7 @@ class Converter(QgsTask):
             chBldg: XML-Objekt, an das die Gebäudeattribute angehängt werden soll
         """
         # ID
-        chBldg.set("id", "UUID_" + str(uuid.uuid4()))
+        chBldg.set(QName(XmlNs.gml, "id"), "UUID_" + str(uuid.uuid4()))
 
         # Name
         if ifcBuilding.Name is not None:
@@ -737,6 +773,43 @@ class Converter(QgsTask):
             geometries.append(geomWall)
 
         return geometries
+
+    def convertBldgBound(self, ifcBuilding, chBldg):
+        """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML
+
+        Args:
+            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
+            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+        """
+
+        geometries = None
+        # Geometrie
+        if geometries is not None and len(geometries) > 0:
+            # XML-Struktur
+            chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
+
+            for geometry in geometries:
+                self.geom.AddGeometry(geometry)
+                #chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
+                geomXML = Utilities.geomToGml(geometry)
+                #chBldgSolidSM.append(geomXML)
+
+    def convertLoD2Solid(self, chBldg, links):
+        """ Angabe der Gebäudegeometrie als XLinks zu den Bounds
+
+        Args:
+            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+            links: Zu nutzende XLinks
+        """
+        if links is not None and len(links) > 0:
+            # XML-Struktur
+            chBldgSolid = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod2Solid"))
+            chBldgSolidSol = etree.SubElement(chBldgSolid, QName(XmlNs.gml, "Solid"))
+            chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
+            chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
+            for link in links:
+                chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
+                chBldgSolidSM.set(QName(XmlNs.xlink, "href"), link)
 
     def convertAddress(self, ifcBuilding, ifcSite, chBldg):
         """ Konvertieren der Adresse von IFC zu CityGML

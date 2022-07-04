@@ -92,8 +92,7 @@ class Converter(QgsTask):
         if self.lod == 0:
             root = self.convertLoD0(root, self.eade)
         elif self.lod == 1:
-            # TODO LoD1
-            pass
+            root = self.convertLoD1(root, self.eade)
         elif self.lod == 2:
             # TODO LoD2
             pass
@@ -190,6 +189,40 @@ class Converter(QgsTask):
 
         return root
 
+    def convertLoD1(self, root, eade):
+        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 1
+
+        Args:
+            root: Das vorbereitete XML-Schema
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+        """
+        # IFC-Grundelemente
+        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcBuildings = self.ifc.by_type("IfcBuilding")
+
+        # XML-Struktur
+        chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
+        chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
+
+        # Über alle enthaltenen Gebäude iterieren
+        for ifcBuilding in ifcBuildings:
+            chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
+            chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
+
+            # Konvertierung
+            self.convertBldgAttr(ifcBuilding, chBldg)
+            # TODO: Geometrie
+            self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.convertBound(self.geom, chBound)
+
+            # EnergyADE
+            if eade:
+                # TODO: EnergyADE
+                pass
+
+        return root
+
     def convertBound(self, geometry, chBound):
         """ Konvertierung der Bounding Box
 
@@ -262,7 +295,7 @@ class Converter(QgsTask):
             chBldgUsage.text = str(type)
 
         # Baujahr
-        if Utilities.findPset(self.ifc, ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction") is not None:
+        if Utilities.findPset(ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction") is not None:
             chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
             chBldgYearConstr.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["YearOfConstruction"]
 
@@ -291,7 +324,7 @@ class Converter(QgsTask):
         # über alle Geschosse iterieren
         for ifcBldgStorey in ifcBldgStoreys:
             # Herausfinden, ob über oder unter Grund
-            if Utilities.findPset(self.ifc, ifcBldgStorey, "Pset_BuildingStoreyCommon") is not None and \
+            if Utilities.findPset(ifcBldgStorey, "Pset_BuildingStoreyCommon") is not None and \
                     element.get_psets(ifcBldgStorey)["Pset_BuildingStoreyCommon"]["AboveGround"] is not None:
                 ag = element.get_psets(ifcBldgStorey)["Pset_BuildingStoreyCommon"]["AboveGround"]
             elif ifcBldgStorey.Elevation is not None:
@@ -305,18 +338,18 @@ class Converter(QgsTask):
 
             # Herausfinden der Geschosshöhe
             height = 0
-            if Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "GrossHeight") is not None:
+            if Utilities.findPset(ifcBldgStorey, "BaseQuantities", "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["GrossHeight"]
-            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
+            elif Utilities.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
                                     "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["GrossHeight"]
-            elif Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "Height") is not None:
+            elif Utilities.findPset(ifcBldgStorey, "BaseQuantities", "Height") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["Height"]
-            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "Height") is not None:
+            elif Utilities.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "Height") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["Height"]
-            elif Utilities.findPset(self.ifc, ifcBldgStorey, "BaseQuantities", "NetHeight") is not None:
+            elif Utilities.findPset(ifcBldgStorey, "BaseQuantities", "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["NetHeight"]
-            elif Utilities.findPset(self.ifc, ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
+            elif Utilities.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
                                     "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["NetHeight"]
             else:
@@ -343,17 +376,17 @@ class Converter(QgsTask):
             chBldgRelTerr.text = "substaintiallyBelowTerrain"
 
         # Gebäudehöhe
-        if Utilities.findPset(self.ifc, ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
+        if Utilities.findPset(ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["GrossHeight"]
-        elif Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities", "GrossHeight") is not None:
+        elif Utilities.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "GrossHeight") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossHeight"]
-        elif Utilities.findPset(self.ifc, ifcBuilding, "BaseQuantities", "Height") is not None:
+        elif Utilities.findPset(ifcBuilding, "BaseQuantities", "Height") is not None:
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["Height"]
-        elif Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities", "Height") is not None:
+        elif Utilities.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "Height") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
-        elif Utilities.findPset(self.ifc, ifcBuilding, "BaseQuantities", "NetHeight") is not None:
+        elif Utilities.findPset(ifcBuilding, "BaseQuantities", "NetHeight") is not None:
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["NetHeight"]
-        elif Utilities.findPset(self.ifc, ifcBuilding, "Qto_BuildingBaseQuantities", "NetHeight") is not None:
+        elif Utilities.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetHeight") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetHeight"]
         elif storeysHeightsAG > 0 or storeysHeightsBG > 0:
             if storeysAG == 0 and storeysBG != 0:
@@ -630,12 +663,12 @@ class Converter(QgsTask):
         # Prüfen, wo Addresse vorhanden
         if ifcBuilding.BuildingAddress is not None:
             ifcAddress = ifcBuilding.BuildingAddress
-        elif Utilities.findPset(self.ifc, ifcBuilding, "Pset_Address") is not None:
-            ifcAddress = Utilities.findPset(self.ifc, ifcBuilding, "Pset_Address")
+        elif Utilities.findPset(ifcBuilding, "Pset_Address") is not None:
+            ifcAddress = Utilities.findPset(ifcBuilding, "Pset_Address")
         elif ifcSite.SiteAddress is not None:
             ifcAddress = ifcSite.SiteAddress
-        elif Utilities.findPset(self.ifc, ifcSite, "Pset_Address") is not None:
-            ifcAddress = Utilities.findPset(self.ifc, ifcSite, "Pset_Address")
+        elif Utilities.findPset(ifcSite, "Pset_Address") is not None:
+            ifcAddress = Utilities.findPset(ifcSite, "Pset_Address")
         else:
             self.parent.dlg.log(u'No address details existing')
             return

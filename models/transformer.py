@@ -17,7 +17,6 @@ import numpy as np
 # Geo-Bibliotheken
 import osgeo.osr as osr
 
-
 #####
 
 
@@ -98,20 +97,32 @@ class Transformer:
         return degree
 
     def getTransformMatrix(self):
-        contextForModel = self.getModelContext()
+        """ Berechnungs der Transformationsmatrix zwischen dem lokalen und dem übergeordneten Koordinatensystem
+
+        Returns:
+            Die Transformationsmatrix
+        """
+        # Northing
+        project = self.ifc.by_type("IfcProject")[0]
+        for context in project.RepresentationContexts:
+            if context.ContextType == "Model":
+                contextForModel = context
         a = contextForModel.TrueNorth.DirectionRatios[0]
         b = contextForModel.TrueNorth.DirectionRatios[1]
+
+        # Matrix
         transformMatrix = [[b, -a, 0], [a, b, 0], [0, 0, 1]]
         transformMatrix = np.mat(transformMatrix).I
         return transformMatrix
 
-    def getModelContext(self):
-        project = self.ifc.by_type("IfcProject")[0]
-        for context in project.RepresentationContexts:
-            if context.ContextType == "Model":
-                return context
-
     def georeferencePoint(self, point):
-        a = [point[0], point[1], point[2]]
-        result = np.mat(a) * np.mat(self.trans) + np.mat(self.originShift)
+        """ Georeferenziert einen Punkt
+
+        Args:
+            point: Der zu georeferenzierende Punkt als Vektor
+
+        Returns:
+            Der georeferenzierte Punkt als Vektor
+        """
+        result = np.mat(point) * np.mat(self.trans) + np.mat(self.originShift)
         return np.array(result)[0]

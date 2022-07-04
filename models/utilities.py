@@ -11,16 +11,12 @@
 #####
 
 # IFC-Bibliotheken
-import ifcopenshell
-from ifcopenshell import util
-import ifcopenshell.util.pset
+from ifcopenshell.util import element
 
 # XML-Bibliotheken
-from ifcopenshell.util import element
 from lxml import etree
 # noinspection PyUnresolvedReferences
 from lxml.etree import QName
-
 
 #####
 
@@ -44,21 +40,25 @@ class Utilities:
         return xml
 
     @staticmethod
-    def findPset(ifc, ifcElement, psetName, attrName=None):
-        """ Finden eines PropertySets eines IFC-Elements
+    def findPset(ifcElement, psetName, attrName=None):
+        """ Finden eines Attributs bzw. eines PropertySets eines IFC-Elements
 
         Args:
-            ifc: Das IFC-Objekt
             ifcElement: Das IFC-Element, für das das PropertySet gesucht werden soll
             psetName: Name des PropertySets, das gesucht werden soll
+            attrName: Name des Attributs im PropertySet, das gesucht werden soll, falls es gesucht werden soll
+                Default: None
 
         Returns:
             Das gesuchte PropertySet, falls gefunden. Ansonsten None
         """
         psets = element.get_psets(ifcElement)
+        # Suche nach PropertySet
         if psetName in psets:
             if attrName is None:
                 return psets[psetName]
+
+            # Suche nach Attribut
             else:
                 pset = element.get_psets(ifcElement)[psetName]
                 if attrName in pset.keys():
@@ -116,6 +116,7 @@ class Utilities:
                                     result.append(obj)
                         else:
                             Utilities.findElement(ifc, obj, outElement, result, type)
+
             # Bei räumlichen Enthaltungen
             elif rel.is_a("IfcRelContainedInSpatialStructure"):
                 if rel.RelatingStructure == inElement:

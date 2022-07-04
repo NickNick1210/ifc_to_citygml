@@ -665,6 +665,9 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
             height: Die Gebäudehöhe
         """
+        if height is None or height == 0:
+            self.parent.dlg.log(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
+
         # IFC-Elemente der Grundfläche
         ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
         if len(ifcSlabs) == 0:

@@ -4,34 +4,44 @@
 <context>
     <name>Converter</name>
     <message>
-        <location filename="../models/converter.py" line="191"/>
+        <location filename="../models/converter.py" line="235"/>
         <source>Due to the missing geometries, no bounding box can be calculated</source>
         <translation>Wegen fehlender Geometrien kann keine Bounding Box berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="401"/>
+        <location filename="../models/converter.py" line="479"/>
         <source>Due to the missing baseslab and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlender Grundfläche und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="409"/>
+        <location filename="../models/converter.py" line="489"/>
         <source>Due to the missing roof and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlenden Daches und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="450"/>
+        <location filename="../models/converter.py" line="529"/>
         <source>Due to the missing baseslab, no FootPrint geometry can be calculated</source>
         <translation>Wegen fehlender Grundfläche kann keine Grundflächengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="474"/>
+        <location filename="../models/converter.py" line="556"/>
         <source>Due to the missing roof, no RoofEdge geometry can be calculated</source>
         <translation>Wegen fehlenden Dachs kann keine Dachkantengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="556"/>
+        <location filename="../models/converter.py" line="645"/>
         <source>Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated</source>
         <translation>Wegen nicht-metrischen Einheiten oder fehlender Topologie kann keine LoD0-Geometrie berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="669"/>
+        <source>Due to the missing height and roof, no building geometry can be calculated</source>
+        <translation>Wegen fehlender Höhe und Dach kann keine Gebäudegeometrie berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="677"/>
+        <source>Due to the missing baseslab, no building geometry can be calculated</source>
+        <translation>Wegen fehlender Grundfläche kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
 </context>
 <context>
@@ -113,7 +123,7 @@
 <context>
     <name>IfcAnalyzer</name>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="125"/>
+        <location filename="../models/ifc_analyzer.py" line="133"/>
         <source>IFC file</source>
         <translation>IFC-Datei</translation>
     </message>
@@ -143,7 +153,7 @@
         <translation>Anz. Gebäude</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="136"/>
+        <location filename="../models/ifc_analyzer.py" line="126"/>
         <source>not valid</source>
         <translation>nicht valide</translation>
     </message>
@@ -153,42 +163,42 @@
         <translation>Die IFC-Datei enthält keine Gebäude!</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="115"/>
+        <location filename="../models/ifc_analyzer.py" line="116"/>
         <source>There is no georeferencing in the IFC file!</source>
         <translation>Die IFC-Datei ist nicht georeferenziert!</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="125"/>
+        <location filename="../models/ifc_analyzer.py" line="133"/>
         <source>is validated</source>
         <translation>wird validiert</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="128"/>
+        <location filename="../models/ifc_analyzer.py" line="136"/>
         <source>Validation of IFC file</source>
         <translation>Validierung der IFC-Datei</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="137"/>
+        <location filename="../models/ifc_analyzer.py" line="127"/>
         <source>There is no northing in the IFC file!</source>
         <translation>Die IFC-Datei ist nicht genordet!</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="174"/>
+        <location filename="../models/ifc_analyzer.py" line="177"/>
         <source>errors found</source>
         <translation>Fehler gefunden</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="176"/>
+        <location filename="../models/ifc_analyzer.py" line="179"/>
         <source>conditionally valid</source>
         <translation>bedingt valide</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="184"/>
+        <location filename="../models/ifc_analyzer.py" line="187"/>
         <source>Error</source>
         <translation>Fehler</translation>
     </message>
     <message>
-        <location filename="../models/ifc_analyzer.py" line="188"/>
+        <location filename="../models/ifc_analyzer.py" line="191"/>
         <source>valid</source>
         <translation>valide</translation>
     </message>

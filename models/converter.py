@@ -11,9 +11,11 @@
 #####
 
 # Standard-Bibliotheken
+import math
 import sys
 import uuid
 from datetime import datetime
+import numpy as np
 
 # IFC-Bibliotheken
 import ifcopenshell
@@ -245,8 +247,8 @@ class Converter(QgsTask):
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Konvertierung
-            self.convertBldgAttr(ifcBuilding, chBldg)
-            links = self.convertBldgBound(ifcBuilding, chBldg)
+            height = self.convertBldgAttr(ifcBuilding, chBldg)
+            links = self.convertBldgBound(ifcBuilding, chBldg, height)
             self.convertLoD2Solid(chBldg, links)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
@@ -257,7 +259,6 @@ class Converter(QgsTask):
                 pass
 
         return root
-
 
     def convertBound(self, geometry, chBound):
         """ Konvertierung der Bounding Box
@@ -752,21 +753,21 @@ class Converter(QgsTask):
         # Dachfläche
         geomRoof = ogr.Geometry(ogr.wkbPolygon)
         ringRoof = ogr.Geometry(ogr.wkbLinearRing)
-        for i in range(ringBase.GetPointCount()-1, -1, -1):
+        for i in range(ringBase.GetPointCount() - 1, -1, -1):
             pt = ringBase.GetPoint(i)
-            ringRoof.AddPoint(pt[0], pt[1], pt[2]+height)
+            ringRoof.AddPoint(pt[0], pt[1], pt[2] + height)
         geomRoof.AddGeometry(ringRoof)
         geometries.append(geomRoof)
 
         # Wandflächen
-        for i in range(0, ringBase.GetPointCount()-1):
+        for i in range(0, ringBase.GetPointCount() - 1):
             geomWall = ogr.Geometry(ogr.wkbPolygon)
             ringWall = ogr.Geometry(ogr.wkbLinearRing)
             pt1 = ringBase.GetPoint(i)
-            pt2 = ringBase.GetPoint(i+1)
+            pt2 = ringBase.GetPoint(i + 1)
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
-            ringWall.AddPoint(pt1[0], pt1[1], pt1[2]+height)
-            ringWall.AddPoint(pt2[0], pt2[1], pt2[2]+height)
+            ringWall.AddPoint(pt1[0], pt1[1], pt1[2] + height)
+            ringWall.AddPoint(pt2[0], pt2[1], pt2[2] + height)
             ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
             ringWall.CloseRings()
             geomWall.AddGeometry(ringWall)
@@ -774,13 +775,40 @@ class Converter(QgsTask):
 
         return geometries
 
-    def convertBldgBound(self, ifcBuilding, chBldg):
+    def convertBldgBound(self, ifcBuilding, chBldg, height):
         """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML
 
         Args:
             ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
         """
+        # Prüfung, ob die Höhe unbekannt ist
+        if height is None or height == 0:
+            self.parent.dlg.log(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
+
+        # IFC-Elemente der Grundfläche
+        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        if len(ifcSlabs) == 0:
+            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            # Wenn keine Grundfläche vorhanden
+            if len(ifcSlabs) == 0:
+                self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
+                return
+
+        # Berechnung Grundfläche
+        geomBase = self.calcPlane(ifcSlabs)
+
+        # IFC-Elemente des Daches
+        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        ifcRoofs += Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+        if len(ifcRoofs) == 0:
+            self.parent.dlg.log(self.tr(
+                u"Due to the missing roof, no building geometry can be calculated"))
+            return None
+
+        geomRoofs = self.extractRoofs(ifcRoofs)
+
+        geomWalls = self.calcWalls(geomBase, geomRoofs)
 
         geometries = None
         # Geometrie
@@ -790,9 +818,121 @@ class Converter(QgsTask):
 
             for geometry in geometries:
                 self.geom.AddGeometry(geometry)
-                #chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
+                # chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
                 geomXML = Utilities.geomToGml(geometry)
-                #chBldgSolidSM.append(geomXML)
+                # chBldgSolidSM.append(geomXML)
+
+        return None
+
+    def extractRoofs(self, ifcRoofs):
+        roofs = []
+        for ifcRoof in ifcRoofs:
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            settings.set(settings.SEW_SHELLS, True)
+            shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
+            # Vertizes
+            verts = shape.geometry.verts
+            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
+                           range(0, len(verts), 3)]
+            # Flächen
+            faces = shape.geometry.faces
+            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
+            # Vertizes der Flächen
+            grVertsList = []
+            for face in grFacesCurr:
+                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
+                if not ((facePoints[0][0] == facePoints[1][0] and facePoints[0][1] == facePoints[1][1]) or (
+                        facePoints[0][0] == facePoints[2][0] and facePoints[0][1] == facePoints[2][1]) or (
+                                facePoints[1][0] == facePoints[2][0] and facePoints[1][1] == facePoints[2][1])):
+                    points = []
+                    for facePoint in facePoints:
+                        point = self.trans.georeferencePoint(facePoint)
+                        points.append(point)
+                    grVertsList.append(points)
+
+            # Geometrien erstellen
+            geometries = ogr.Geometry(ogr.wkbMultiPolygon)
+            for grVerts in grVertsList:
+                # Polygon aus Ring aus Punkten erstellen
+                geometry = ogr.Geometry(ogr.wkbPolygon)
+                ring = ogr.Geometry(ogr.wkbLinearRing)
+                for grVert in grVerts:
+                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
+                ring.CloseRings()
+                geometry.AddGeometry(ring)
+                geometries.AddGeometry(geometry)
+            print(geometries)
+
+            geometriesRefList = []
+            checkList = []
+            for i in range(0, geometries.GetGeometryCount()):
+                if i not in checkList:
+                    geometry = geometries.GetGeometryRef(i)
+                    geometriesRef = ogr.Geometry(ogr.wkbMultiPolygon)
+                    geometriesRef.AddGeometry(geometry)
+                    ring = geometry.GetGeometryRef(0)
+                    apv = np.array(ring.GetPoint(0))
+                    r1 = np.array(ring.GetPoint(1)) - np.array(ring.GetPoint(0))
+                    r2 = np.array(ring.GetPoint(2)) - np.array(ring.GetPoint(0))
+                    nv = np.cross(r1, r2)
+                    checkList.append(i)
+
+                    for j in range(i+1, geometries.GetGeometryCount()):
+                        ogeometry = geometries.GetGeometryRef(j)
+                        oring = ogeometry.GetGeometryRef(0)
+                        oapv = np.array(oring.GetPoint(0))
+                        or1 = np.array(oring.GetPoint(1)) - np.array(oring.GetPoint(0))
+                        or2 = np.array(oring.GetPoint(2)) - np.array(oring.GetPoint(0))
+                        onv = np.cross(or1, or2)
+                        cos = np.linalg.norm(np.dot(nv, onv)) / (np.linalg.norm(nv) * np.linalg.norm(onv))
+                        angle = np.arccos(cos)
+
+                        if angle < 0.001 or math.isnan(angle):
+                            dist = (np.linalg.norm(np.dot(oapv-apv, nv)))/(np.linalg.norm(nv))
+                            if dist < 0.001:
+                                print("Passt: " + str(ogeometry))
+                                geometriesRef.AddGeometry(ogeometry)
+                                checkList.append(j)
+                    geometriesRefList.append(geometriesRef)
+
+            heights = []
+            areas = []
+            geometriesRefUnionList = []
+            for geometriesRef in geometriesRefList:
+                print(geometriesRef)
+                geometriesRefUnion = geometriesRef.UnionCascaded()
+                print("Union: " + str(geometriesRefUnion))
+                print(geometriesRefUnion.GetGeometryCount())
+                area = geometriesRefUnion.GetArea()
+                print("2D-Fläche: " + str(area))
+                ring = geometriesRefUnion.GetGeometryRef(0)
+                minHeight = sys.maxsize
+                maxHeight = -sys.maxsize
+                for i in range(0, ring.GetPointCount()):
+                    point = ring.GetPoint(i)
+                    if point[2] > maxHeight:
+                        maxHeight = point[2]
+                    if point[2] < minHeight:
+                        minHeight = point[2]
+                height = maxHeight-minHeight
+                area3d = height*height + area
+                print("3D-Fläche: " + str(area3d))
+                print("maxHeight: " + str(maxHeight))
+                heights.append(maxHeight)
+                areas.append(area3d)
+                geometriesRefUnionList.append(geometriesRefUnion)
+
+            finalRoof = None
+            for i in range(0, len(areas)):
+                if areas[i] > 0.9*max(areas) and round(heights[i], 2) >= round(max(heights)-0.01, 2):
+                    finalRoof = geometriesRefUnionList[i]
+            roofs.append(finalRoof)
+            print("FinalRoof: " + str(finalRoof))
+
+            print("##########")
+
+        return roofs
 
     def convertLoD2Solid(self, chBldg, links):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds

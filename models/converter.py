@@ -807,22 +807,35 @@ class Converter(QgsTask):
             return None
 
         geomRoofs = self.extractRoofs(ifcRoofs)
+        geomWalls = self.calcWalls(geomBase, geomRoofs, height)
 
-        geomWalls = self.calcWalls(geomBase, geomRoofs)
-
-        geometries = None
         # Geometrie
-        if geometries is not None and len(geometries) > 0:
-            # XML-Struktur
-            chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
+        links = []
+        if geomWalls is not None and len(geomRoofs) > 0 and geomRoofs is not None and len(geomRoofs) > 0:
+            link = self.setElement(chBldg, geomBase, "GroundSurface")
+            links.append(link)
+            for geomRoof in geomRoofs:
+                link = self.setElement(chBldg, geomRoof, "RoofSurface")
+                links.append(link)
+            for geomWall in geomWalls:
+                link = self.setElement(chBldg, geomWall, "WallSurface")
+                links.append(link)
+        return links
 
-            for geometry in geometries:
-                self.geom.AddGeometry(geometry)
-                # chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
-                geomXML = Utilities.geomToGml(geometry)
-                # chBldgSolidSM.append(geomXML)
-
-        return None
+    def setElement(self, chBldg, geometry, type):
+        self.geom.AddGeometry(geometry)
+        chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
+        chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
+        chBldgS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod2MultiSurface"))
+        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
+        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
+        geomXML = Utilities.geomToGml(geometry)
+        chBldgSM.append(geomXML)
+        chBldgPol = chBldgSM[0]
+        gmlId = "PolyID" + str(uuid.uuid4())
+        chBldgPol.set(QName(XmlNs.gml, "id"), gmlId)
+        return gmlId
 
     def extractRoofs(self, ifcRoofs):
         roofs = []
@@ -862,7 +875,6 @@ class Converter(QgsTask):
                 ring.CloseRings()
                 geometry.AddGeometry(ring)
                 geometries.AddGeometry(geometry)
-            print(geometries)
 
             geometriesRefList = []
             checkList = []
@@ -878,7 +890,7 @@ class Converter(QgsTask):
                     nv = np.cross(r1, r2)
                     checkList.append(i)
 
-                    for j in range(i+1, geometries.GetGeometryCount()):
+                    for j in range(i + 1, geometries.GetGeometryCount()):
                         ogeometry = geometries.GetGeometryRef(j)
                         oring = ogeometry.GetGeometryRef(0)
                         oapv = np.array(oring.GetPoint(0))
@@ -889,9 +901,8 @@ class Converter(QgsTask):
                         angle = np.arccos(cos)
 
                         if angle < 0.001 or math.isnan(angle):
-                            dist = (np.linalg.norm(np.dot(oapv-apv, nv)))/(np.linalg.norm(nv))
+                            dist = (np.linalg.norm(np.dot(oapv - apv, nv))) / (np.linalg.norm(nv))
                             if dist < 0.001:
-                                print("Passt: " + str(ogeometry))
                                 geometriesRef.AddGeometry(ogeometry)
                                 checkList.append(j)
                     geometriesRefList.append(geometriesRef)
@@ -900,12 +911,8 @@ class Converter(QgsTask):
             areas = []
             geometriesRefUnionList = []
             for geometriesRef in geometriesRefList:
-                print(geometriesRef)
                 geometriesRefUnion = geometriesRef.UnionCascaded()
-                print("Union: " + str(geometriesRefUnion))
-                print(geometriesRefUnion.GetGeometryCount())
                 area = geometriesRefUnion.GetArea()
-                print("2D-Fläche: " + str(area))
                 ring = geometriesRefUnion.GetGeometryRef(0)
                 minHeight = sys.maxsize
                 maxHeight = -sys.maxsize
@@ -915,24 +922,103 @@ class Converter(QgsTask):
                         maxHeight = point[2]
                     if point[2] < minHeight:
                         minHeight = point[2]
-                height = maxHeight-minHeight
-                area3d = height*height + area
-                print("3D-Fläche: " + str(area3d))
-                print("maxHeight: " + str(maxHeight))
+                height = maxHeight - minHeight
+                area3d = height * height + area
                 heights.append(maxHeight)
                 areas.append(area3d)
                 geometriesRefUnionList.append(geometriesRefUnion)
 
             finalRoof = None
             for i in range(0, len(areas)):
-                if areas[i] > 0.9*max(areas) and round(heights[i], 2) >= round(max(heights)-0.01, 2):
+                if areas[i] > 0.9 * max(areas) and round(heights[i], 2) >= round(max(heights) - 0.01, 2):
                     finalRoof = geometriesRefUnionList[i]
             roofs.append(finalRoof)
-            print("FinalRoof: " + str(finalRoof))
-
-            print("##########")
 
         return roofs
+
+    def calcWalls(self, base, roofs, height):
+        walls = []
+
+        ringBase = base.GetGeometryRef(0)
+        for i in range(0, ringBase.GetPointCount() - 1):
+            geomWall = ogr.Geometry(ogr.wkbPolygon)
+            ringWall = ogr.Geometry(ogr.wkbLinearRing)
+            pt1 = ringBase.GetPoint(i)
+            pt2 = ringBase.GetPoint(i + 1)
+            ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
+            ringWall.AddPoint(pt1[0], pt1[1], pt1[2] + height)
+            ringWall.AddPoint(pt2[0], pt2[1], pt2[2] + height)
+            ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
+            ringWall.CloseRings()
+            geomWall.AddGeometry(ringWall)
+
+            for roof in roofs:
+                intersect = geomWall.Intersection(roof)
+                print(intersect)
+                if not intersect.IsEmpty():
+                    ipt1 = intersect.GetPoint(0)
+                    ipt2 = intersect.GetPoint(1)
+
+                    wapv = np.array(pt1)
+                    wr1 = np.array([0, 0, 1])
+                    wr2 = np.array(np.array(pt2) - np.array(pt1))
+                    wnv = np.cross(wr1, wr2)
+                    wa = wnv[0] * wapv[0] + wnv[1] * wapv[1] + wnv[2] * wapv[2]
+                    w = [wnv[0], wnv[1], wnv[2], wa]
+
+                    rring = roof.GetGeometryRef(0)
+                    rapv = np.array(rring.GetPoint(0))
+                    rr1 = np.array(rring.GetPoint(1)) - np.array(rring.GetPoint(0))
+                    rr2 = np.array(rring.GetPoint(2)) - np.array(rring.GetPoint(0))
+                    rnv = np.cross(rr1, rr2)
+                    ra = rnv[0] * rapv[0] + rnv[1] * rapv[1] + rnv[2] * rapv[2]
+                    r = [rnv[0], rnv[1], rnv[2], ra]
+
+                    res = self.plane_intersect(w, r)
+
+                    pt1Height, pt2Height = pt1[2] + height, pt2[2] + height
+                    if (ipt1[0] == pt1[0] and ipt1[1] == ipt1[1] and ipt2[0] == pt2[0] and ipt2[1] == pt2[1]) or (
+                            ipt1[0] == pt2[0] and ipt1[1] == ipt2[1] and ipt2[0] == pt1[0] and ipt2[1] == pt1[1]):
+                        geomWall = ogr.Geometry(ogr.wkbPolygon)
+                        ringWall = ogr.Geometry(ogr.wkbLinearRing)
+                        pt1 = ringBase.GetPoint(i)
+                        pt2 = ringBase.GetPoint(i + 1)
+                        ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
+                        ringWall.AddPoint(pt1[0], pt1[1], abs(res[0][2]))
+                        ringWall.AddPoint(pt2[0], pt2[1], abs(res[0][2]))
+                        ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
+                        ringWall.CloseRings()
+                        geomWall.AddGeometry(ringWall)
+
+                    print(ipt1)
+                    print(ipt2)
+
+                    # TODO: Wände mit mehreren Dachbegrenzungen
+
+            walls.append(geomWall)
+
+        return walls
+
+    def plane_intersect(self, a, b):
+        """
+        a, b   4-tuples/lists
+               Ax + By +Cz + D = 0
+               A,B,C,D in order
+
+        output: 2 points on line of intersection, np.arrays, shape (3,)
+        """
+        a_vec, b_vec = np.array(a[:3]), np.array(b[:3])
+
+        aXb_vec = np.cross(a_vec, b_vec)
+
+        A = np.array([a_vec, b_vec, aXb_vec])
+        d = np.array([-a[3], -b[3], 0.]).reshape(3, 1)
+
+        # could add np.linalg.det(A) == 0 test to prevent linalg.solve throwing error
+
+        p_inter = np.linalg.solve(A, d).T
+
+        return p_inter[0], (p_inter + aXb_vec)[0]
 
     def convertLoD2Solid(self, chBldg, links):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds

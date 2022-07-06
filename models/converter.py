@@ -20,6 +20,7 @@ import numpy as np
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
+import sympy
 from ifcopenshell.util import element
 
 # XML-Bibliotheken
@@ -877,7 +878,8 @@ class Converter(QgsTask):
                     ring.AddPoint(grVert[0], grVert[1], grVert[2])
                 ring.CloseRings()
                 geometry.AddGeometry(ring)
-                geometries.AddGeometry(geometry)
+                if geometry.IsSimple():
+                    geometries.AddGeometry(geometry)
 
             geometriesRefList = []
             checkList = []
@@ -990,8 +992,19 @@ class Converter(QgsTask):
                     z2x = sLine.p1[2] + r2x * (sLine.p2[2] - sLine.p1[2])
                     z1y = sLine.p1[2] + r1y * (sLine.p2[2] - sLine.p1[2])
                     z2y = sLine.p1[2] + r2y * (sLine.p2[2] - sLine.p1[2])
-                    z1 = float((z1x + z1y) / 2)
-                    z2 = float((z2x + z2y) / 2)
+
+                    if type(z1x) == sympy.core.numbers.ComplexInfinity or type(z1x) == sympy.core.numbers.NaN:
+                        z1 = float(z1y)
+                    elif type(z1y) == sympy.core.numbers.ComplexInfinity or type(z1y) == sympy.core.numbers.NaN:
+                        z1 = float(z1x)
+                    else:
+                        z1 = float((z1x + z1y) / 2)
+                    if type(z2x) == sympy.core.numbers.ComplexInfinity or type(z2x) == sympy.core.numbers.NaN:
+                        z2 = float(z2y)
+                    elif type(z2y) == sympy.core.numbers.ComplexInfinity or type(z2y) == sympy.core.numbers.NaN:
+                        z2 = float(z2x)
+                    else:
+                        z2 = float((z2x + z2y) / 2)
 
                     # Einsetzen des Z-Werts in 2D-Schnitt
                     ipt1 = [ipt1[0], ipt1[1], z1]
@@ -1010,6 +1023,14 @@ class Converter(QgsTask):
             pt2 = ringBase.GetPoint(i + 1)
             intPoints = self.sortPoints(intPoints, pt1, pt2)
 
+            # TODO: Übereinander liegende Punkte
+            lastPoint = None
+            for intPoint in intPoints:
+                if lastPoint is not None:
+                    if lastPoint[0] - 0.01 < intPoint[0] < lastPoint[0] + 0.01 and lastPoint[1] - 0.01 < intPoint[1] < lastPoint[1] + 0.01:
+                        print("PROBLEM: " + str(intPoint) + " und " + str(lastPoint))
+                        lastPoint = intPoint
+
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
             for intPoint in intPoints:
                 ringWall.AddPoint(intPoint[0], intPoint[1], intPoint[2])
@@ -1021,19 +1042,24 @@ class Converter(QgsTask):
 
             walls.append(geomWall)
 
-        print(roofPoints)
         return walls, roofPoints
 
     def sortPoints(self, points, fromPoint, toPoint):
-        if toPoint[0] - fromPoint[0] > 0.01:
-            points.sort(key=lambda elem: elem[0])
-        elif toPoint[0] - fromPoint[0] < -0.01:
-            points.sort(key=lambda elem: elem[0], reverse=True)
+        if toPoint[0] - fromPoint[0] > 0.001:
+            if toPoint[1] - fromPoint[1] > 0:
+                points.sort(key=lambda elem: (elem[0], elem[1], elem[2]))
+            else:
+                points.sort(key=lambda elem: (elem[0], -elem[1], elem[2]))
+        elif toPoint[0] - fromPoint[0] < -0.001:
+            if toPoint[1] - fromPoint[1] > 0:
+                points.sort(key=lambda elem: (-elem[0], elem[1], elem[2]))
+            else:
+                points.sort(key=lambda elem: (-elem[0], -elem[1], elem[2]))
         else:
             if toPoint[1] - fromPoint[1] > 0:
-                points.sort(key=lambda elem: elem[1])
+                points.sort(key=lambda elem: (elem[1], elem[0], elem[2]))
             else:
-                points.sort(key=lambda elem: elem[1], reverse=True)
+                points.sort(key=lambda elem: (-elem[1], elem[0], elem[2]))
         return points
 
     def calcRoofs(self, roofsIn, base, roofPoints):
@@ -1041,7 +1067,6 @@ class Converter(QgsTask):
 
         for roofIn in roofsIn:
             intersection = roofIn.Intersection(base)
-            print(intersection)
 
             if not intersection.IsEmpty():
                 ringInt = intersection.GetGeometryRef(0)
@@ -1049,18 +1074,23 @@ class Converter(QgsTask):
                 # Dachfläche
                 geomRoof = ogr.Geometry(ogr.wkbPolygon)
                 ringRoof = ogr.Geometry(ogr.wkbLinearRing)
-                for i in range(0, ringInt.GetPointCount()):
+                for i in range(ringInt.GetPointCount() - 1, -1, -1):
                     ptInt = ringInt.GetPoint(i)
                     z = None
                     for roofPoint in roofPoints:
                         if ptInt[0] == roofPoint[0] and ptInt[1] == roofPoint[1]:
                             z = roofPoint[2]
+                    if z is None:
+                        ringIn = roofIn.GetGeometryRef(0)
+                        for j in range(0, ringIn.GetPointCount()):
+                            ptIn = ringIn.GetPoint(j)
+                            if ptInt[0] == ptIn[0] and ptInt[1] == ptIn[1]:
+                                z = ptIn[2]
                     ringRoof.AddPoint(ptInt[0], ptInt[1], z)
                 ringRoof.CloseRings()
                 geomRoof.AddGeometry(ringRoof)
 
                 roofs.append(geomRoof)
-                print(geomRoof)
         return roofs
 
     def convertLoD2Solid(self, chBldg, links):

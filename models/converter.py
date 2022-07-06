@@ -35,6 +35,8 @@ from qgis.PyQt.QtCore import QCoreApplication
 from osgeo import ogr
 
 # Plugin
+from sympy import Point3D, Plane
+
 from .xmlns import XmlNs
 from .mapper import Mapper
 from .transformer import Transformer
@@ -941,6 +943,8 @@ class Converter(QgsTask):
 
         ringBase = base.GetGeometryRef(0)
         for i in range(0, ringBase.GetPointCount() - 1):
+
+            # Wand ohne Dachbegrenzung
             geomWall = ogr.Geometry(ogr.wkbPolygon)
             ringWall = ogr.Geometry(ogr.wkbLinearRing)
             pt1 = ringBase.GetPoint(i)
@@ -952,73 +956,80 @@ class Converter(QgsTask):
             ringWall.CloseRings()
             geomWall.AddGeometry(ringWall)
 
+            intPoints = []
             for roof in roofs:
+                # 2D-Schnitt
                 intersect = geomWall.Intersection(roof)
-                print(intersect)
                 if not intersect.IsEmpty():
+
+                    # Schnittlinie
                     ipt1 = intersect.GetPoint(0)
                     ipt2 = intersect.GetPoint(1)
 
-                    wapv = np.array(pt1)
-                    wr1 = np.array([0, 0, 1])
-                    wr2 = np.array(np.array(pt2) - np.array(pt1))
-                    wnv = np.cross(wr1, wr2)
-                    wa = wnv[0] * wapv[0] + wnv[1] * wapv[1] + wnv[2] * wapv[2]
-                    w = [wnv[0], wnv[1], wnv[2], wa]
-
+                    # Dachgeometrie
                     rring = roof.GetGeometryRef(0)
-                    rapv = np.array(rring.GetPoint(0))
-                    rr1 = np.array(rring.GetPoint(1)) - np.array(rring.GetPoint(0))
-                    rr2 = np.array(rring.GetPoint(2)) - np.array(rring.GetPoint(0))
-                    rnv = np.cross(rr1, rr2)
-                    ra = rnv[0] * rapv[0] + rnv[1] * rapv[1] + rnv[2] * rapv[2]
-                    r = [rnv[0], rnv[1], rnv[2], ra]
 
-                    res = self.plane_intersect(w, r)
+                    # Ebenen
+                    wPlane = Plane(Point3D(pt1[0], pt1[1], pt1[2]), Point3D(pt1[0], pt1[1], pt1[2] + 1),
+                                   Point3D(pt2[0], pt2[1], pt2[2]))
+                    rPlane = Plane(Point3D(rring.GetPoint(0)[0], rring.GetPoint(0)[1], rring.GetPoint(0)[2]),
+                                   Point3D(rring.GetPoint(1)[0], rring.GetPoint(1)[1], rring.GetPoint(1)[2]),
+                                   Point3D(rring.GetPoint(2)[0], rring.GetPoint(2)[1], rring.GetPoint(2)[2]))
 
-                    pt1Height, pt2Height = pt1[2] + height, pt2[2] + height
-                    if (ipt1[0] == pt1[0] and ipt1[1] == ipt1[1] and ipt2[0] == pt2[0] and ipt2[1] == pt2[1]) or (
-                            ipt1[0] == pt2[0] and ipt1[1] == ipt2[1] and ipt2[0] == pt1[0] and ipt2[1] == pt1[1]):
-                        geomWall = ogr.Geometry(ogr.wkbPolygon)
-                        ringWall = ogr.Geometry(ogr.wkbLinearRing)
-                        pt1 = ringBase.GetPoint(i)
-                        pt2 = ringBase.GetPoint(i + 1)
-                        ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
-                        ringWall.AddPoint(pt1[0], pt1[1], abs(res[0][2]))
-                        ringWall.AddPoint(pt2[0], pt2[1], abs(res[0][2]))
-                        ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
-                        ringWall.CloseRings()
-                        geomWall.AddGeometry(ringWall)
+                    # Ebenenschnitt: Schnittgerade
+                    sLine = wPlane.intersection(rPlane)[0]
 
-                    print(ipt1)
-                    print(ipt2)
+                    # Einsetzen in Schnittgerade
+                    r1x = (ipt1[0] - sLine.p1[0]) / (sLine.p2[0] - sLine.p1[0])
+                    r2x = (ipt2[0] - sLine.p1[0]) / (sLine.p2[0] - sLine.p1[0])
+                    r1y = (ipt1[1] - sLine.p1[1]) / (sLine.p2[1] - sLine.p1[1])
+                    r2y = (ipt2[1] - sLine.p1[1]) / (sLine.p2[1] - sLine.p1[1])
+                    z1x = sLine.p1[2] + r1x * (sLine.p2[2] - sLine.p1[2])
+                    z2x = sLine.p1[2] + r2x * (sLine.p2[2] - sLine.p1[2])
+                    z1y = sLine.p1[2] + r1y * (sLine.p2[2] - sLine.p1[2])
+                    z2y = sLine.p1[2] + r2y * (sLine.p2[2] - sLine.p1[2])
+                    z1 = float((z1x + z1y) / 2)
+                    z2 = float((z2x + z2y) / 2)
 
-                    # TODO: Wände mit mehreren Dachbegrenzungen
+                    # Einsetzen des Z-Werts in 2D-Schnitt
+                    ipt1 = [ipt1[0], ipt1[1], z1]
+                    ipt2 = [ipt2[0], ipt2[1], z2]
+
+                    # Merken der Schnittpunkte
+                    if ipt1 not in intPoints:
+                        intPoints.append(ipt1)
+                    if ipt2 not in intPoints:
+                        intPoints.append(ipt2)
+
+            # Wand mit Dachbegrenzung
+            geomWall = ogr.Geometry(ogr.wkbPolygon)
+            ringWall = ogr.Geometry(ogr.wkbLinearRing)
+            pt1 = ringBase.GetPoint(i)
+            pt2 = ringBase.GetPoint(i + 1)
+            intPoints = self.sortPoints(intPoints, pt1, pt2)
+
+            ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
+            for intPoint in intPoints:
+                ringWall.AddPoint(intPoint[0], intPoint[1], intPoint[2])
+            ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
+            ringWall.CloseRings()
+            geomWall.AddGeometry(ringWall)
 
             walls.append(geomWall)
 
         return walls
 
-    def plane_intersect(self, a, b):
-        """
-        a, b   4-tuples/lists
-               Ax + By +Cz + D = 0
-               A,B,C,D in order
-
-        output: 2 points on line of intersection, np.arrays, shape (3,)
-        """
-        a_vec, b_vec = np.array(a[:3]), np.array(b[:3])
-
-        aXb_vec = np.cross(a_vec, b_vec)
-
-        A = np.array([a_vec, b_vec, aXb_vec])
-        d = np.array([-a[3], -b[3], 0.]).reshape(3, 1)
-
-        # could add np.linalg.det(A) == 0 test to prevent linalg.solve throwing error
-
-        p_inter = np.linalg.solve(A, d).T
-
-        return p_inter[0], (p_inter + aXb_vec)[0]
+    def sortPoints(self, points, fromPoint, toPoint):
+        if toPoint[0] - fromPoint[0] > 0.01:
+            points.sort(key=lambda elem: elem[0])
+        elif toPoint[0] - fromPoint[0] < -0.01:
+            points.sort(key=lambda elem: elem[0], reverse=True)
+        else:
+            if toPoint[1] - fromPoint[1] > 0:
+                points.sort(key=lambda elem: elem[1])
+            else:
+                points.sort(key=lambda elem: elem[1], reverse=True)
+        return points
 
     def convertLoD2Solid(self, chBldg, links):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds

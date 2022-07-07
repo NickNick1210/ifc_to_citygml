@@ -695,7 +695,7 @@ class Converter(QgsTask):
                     wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                     geometry = ogr.CreateGeometryFromWkt(wkt)
 
-        # Zur Geometrieliste hinzufügen und in GML konvertieren
+        geometry = geometry.Simplify(0.0)
         return geometry
 
     def convertLoD1Solid(self, ifcBuilding, chBldg, height):
@@ -943,6 +943,7 @@ class Converter(QgsTask):
     def calcWalls(self, base, roofs, height):
         walls = []
         roofPoints = []
+        wallsWORoof = []
 
         ringBase = base.GetGeometryRef(0)
         for i in range(0, ringBase.GetPointCount() - 1):
@@ -1009,10 +1010,6 @@ class Converter(QgsTask):
                     # Einsetzen des Z-Werts in 2D-Schnitt
                     ipt1 = [ipt1[0], ipt1[1], z1]
                     ipt2 = [ipt2[0], ipt2[1], z2]
-                    if 11.32 < z1 < 11.33:
-                        print("Gefunden: " + ipt1)
-                    if 11.32 < z2 < 11.33:
-                        print("Gefunden: " + ipt2)
 
                     # Merken der Schnittpunkte
                     if ipt1 not in intPoints:
@@ -1038,16 +1035,15 @@ class Converter(QgsTask):
                 ix1 = intPoints.index(ipt1)
                 ix2 = intPoints.index(ipt2)
 
-                if len(intLines) == 3:
-                    print(sortIntLine)
-                    print("ix1: " + str(ix1) + ", ix2: " + str(ix2))
-                    print("lastIx1: " + str(lastIx1) + ", lastIx2: " + str(lastIx2))
-
                 if not (lastIx2 is not None and ix1 < lastIx2 and ix2 < lastIx2):
                     if lastIx2 is not None and ix1 < lastIx2:
                         if ix2 > lastIx2:
                             ringWall.AddPoint(intPoints[lastIx2][0], intPoints[lastIx2][1], ipt1[2])
                     else:
+                        if ix1 == 0 and (ipt1[0] != pt1[0] or ipt1[1] != pt1[1]):
+                            self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
+                            ringWall.AddPoint(pt1[0], pt1[1], ipt1[2])
+                            roofPoints.append([pt1[0], pt1[1], ipt1[2]])
                         ringWall.AddPoint(ipt1[0], ipt1[1], ipt1[2])
 
                     if ix2 - ix1 > 2 or (ix2 - ix1 == 2 and ix1+1 != lastIx2):
@@ -1069,8 +1065,16 @@ class Converter(QgsTask):
                                     ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
                     else:
                         ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
-                    lastIx1 = ix1
                     lastIx2 = ix2
+
+            lastPoint = ringWall.GetPoint(ringWall.GetPointCount()-1)
+            if lastPoint[0] != pt2[0] or lastPoint[1] != pt2[1]:
+                self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
+                ringWall.AddPoint(pt2[0], pt2[1], lastPoint[2])
+                roofPoints.append([pt2[0], pt2[1], lastPoint[2]])
+
+            if len(intLines) == 0:
+                wallsWORoof.append([pt1, pt2])
 
             ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
             ringWall.CloseRings()
@@ -1081,6 +1085,27 @@ class Converter(QgsTask):
             for k in range(0, len(intPoints)):
                 if intPoints[k] not in roofPoints:
                     roofPoints.append(intPoints[k])
+
+        # Wenn über keinen Teil der Wand ein Dach ist
+        for wall in wallsWORoof:
+            self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
+            geomWall = ogr.Geometry(ogr.wkbPolygon)
+            ringWall = ogr.Geometry(ogr.wkbLinearRing)
+            pt1 = wall[0]
+            pt2 = wall[1]
+            ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
+            z1, z2 = height, height
+            for roofPoint in roofPoints:
+                if roofPoint[0] == pt1[0] and roofPoint[1] == pt1[1]:
+                    z1 = roofPoint[2]
+                if roofPoint[0] == pt2[0] and roofPoint[1] == pt2[1]:
+                    z2 = roofPoint[2]
+            ringWall.AddPoint(pt1[0], pt1[1], z1)
+            ringWall.AddPoint(pt2[0], pt2[1], z2)
+            ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
+            ringWall.CloseRings()
+            geomWall.AddGeometry(ringWall)
+            walls.append(geomWall)
 
         return walls, roofPoints
 

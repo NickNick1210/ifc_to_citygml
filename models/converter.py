@@ -811,7 +811,7 @@ class Converter(QgsTask):
 
         geomRoofs = self.extractRoofs(ifcRoofs)
         geomWalls, roofPoints = self.calcWalls(geomBase, geomRoofs, height)
-        #geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
+        geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
 
         # Geometrie
         links = []
@@ -1039,6 +1039,7 @@ class Converter(QgsTask):
                     if lastIx2 is not None and ix1 < lastIx2:
                         if ix2 > lastIx2:
                             ringWall.AddPoint(intPoints[lastIx2][0], intPoints[lastIx2][1], ipt1[2])
+                            roofPoints.append([intPoints[lastIx2][0], intPoints[lastIx2][1], ipt1[2]])
                     else:
                         if ix1 == 0 and (ipt1[0] != pt1[0] or ipt1[1] != pt1[1]):
                             self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
@@ -1061,6 +1062,7 @@ class Converter(QgsTask):
                                 z = ipt1[2] + proz * zDiff
                                 if z > intPoints[j][2]:
                                     ringWall.AddPoint(intPoints[j][0], intPoints[j][1], z)
+                                    roofPoints.append([intPoints[j][0], intPoints[j][1], z])
                                 else:
                                     ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
                     else:
@@ -1101,7 +1103,9 @@ class Converter(QgsTask):
                 if roofPoint[0] == pt2[0] and roofPoint[1] == pt2[1]:
                     z2 = roofPoint[2]
             ringWall.AddPoint(pt1[0], pt1[1], z1)
+            roofPoints.append([pt1[0], pt1[1], z1])
             ringWall.AddPoint(pt2[0], pt2[1], z2)
+            roofPoints.append([pt2[0], pt2[1], z2])
             ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
             ringWall.CloseRings()
             geomWall.AddGeometry(ringWall)
@@ -1154,30 +1158,39 @@ class Converter(QgsTask):
 
         for roofIn in roofsIn:
             intersection = roofIn.Intersection(base)
+            print(intersection)
 
             if not intersection.IsEmpty():
-                ringInt = intersection.GetGeometryRef(0)
+                print(intersection.GetGeometryCount())
+                for intGeometry in intersection:
+                    if intersection.GetGeometryCount() == 1:
+                        ringInt = intersection.GetGeometryRef(0)
+                    else:
+                        ringInt = intGeometry.GetGeometryRef(0)
+                        if ringInt is None:
+                            continue
 
-                # Dachfläche
-                geomRoof = ogr.Geometry(ogr.wkbPolygon)
-                ringRoof = ogr.Geometry(ogr.wkbLinearRing)
-                for i in range(ringInt.GetPointCount() - 1, -1, -1):
-                    ptInt = ringInt.GetPoint(i)
-                    z = None
-                    for roofPoint in roofPoints:
-                        if ptInt[0] == roofPoint[0] and ptInt[1] == roofPoint[1]:
-                            z = roofPoint[2]
-                    if z is None:
-                        ringIn = roofIn.GetGeometryRef(0)
-                        for j in range(0, ringIn.GetPointCount()):
-                            ptIn = ringIn.GetPoint(j)
-                            if ptInt[0] == ptIn[0] and ptInt[1] == ptIn[1]:
-                                z = ptIn[2]
-                    ringRoof.AddPoint(ptInt[0], ptInt[1], z)
-                ringRoof.CloseRings()
-                geomRoof.AddGeometry(ringRoof)
+                    # Dachfläche
+                    geomRoof = ogr.Geometry(ogr.wkbPolygon)
+                    ringRoof = ogr.Geometry(ogr.wkbLinearRing)
+                    for i in range(ringInt.GetPointCount() - 1, -1, -1):
+                        ptInt = ringInt.GetPoint(i)
+                        z = None
+                        for roofPoint in roofPoints:
+                            if ptInt[0] == roofPoint[0] and ptInt[1] == roofPoint[1]:
+                                if z is None or roofPoint[2] < z:
+                                    z = roofPoint[2]
+                        if z is None:
+                            ringIn = roofIn.GetGeometryRef(0)
+                            for j in range(0, ringIn.GetPointCount()):
+                                ptIn = ringIn.GetPoint(j)
+                                if ptInt[0] == ptIn[0] and ptInt[1] == ptIn[1]:
+                                    z = ptIn[2]
+                        ringRoof.AddPoint(ptInt[0], ptInt[1], z)
+                    ringRoof.CloseRings()
+                    geomRoof.AddGeometry(ringRoof)
 
-                roofs.append(geomRoof)
+                    roofs.append(geomRoof)
         return roofs
 
     def convertLoD2Solid(self, chBldg, links):

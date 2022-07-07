@@ -1032,10 +1032,7 @@ class Converter(QgsTask):
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
             lastIx1, lastIx2 = None, None
             for intLine in intLines:
-                print("sort from: " + str(pt1) + " to: " + str(pt2))
-                print("linesIn: " + str(intLine))
                 sortIntLine = self.sortPoints(intLine, pt1, pt2)
-                print("linesOut: " + str(sortIntLine))
                 ipt1 = sortIntLine[0]
                 ipt2 = sortIntLine[1]
                 ix1 = intPoints.index(ipt1)
@@ -1053,26 +1050,27 @@ class Converter(QgsTask):
                     else:
                         ringWall.AddPoint(ipt1[0], ipt1[1], ipt1[2])
 
-                    if ix2 - ix1 != 1:
+                    if ix2 - ix1 > 2 or (ix2 - ix1 == 2 and ix1+1 != lastIx2):
                         for j in range(ix1 + 1, ix2):
-                            if abs(ipt2[0] - ipt1[0]) > abs(ipt2[1] - ipt1[1]):
-                                xDiff = ipt2[0] - ipt1[0]
-                                xPart = intPoints[j][0] - ipt1[0]
-                                proz = xPart / xDiff
-                            else:
-                                yDiff = ipt2[1] - ipt1[1]
-                                yPart = intPoints[j][1] - ipt1[1]
-                                proz = yPart / yDiff
-                            zDiff = ipt2[2] - ipt1[2]
-                            z = ipt1[2] + proz * zDiff
-                            if z > intPoints[j][2]:
-                                ringWall.AddPoint(intPoints[j][0], intPoints[j][1], z)
-                            else:
-                                ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
+                            if j != lastIx2:
+                                if abs(ipt2[0] - ipt1[0]) > abs(ipt2[1] - ipt1[1]):
+                                    xDiff = ipt2[0] - ipt1[0]
+                                    xPart = intPoints[j][0] - ipt1[0]
+                                    proz = xPart / xDiff
+                                else:
+                                    yDiff = ipt2[1] - ipt1[1]
+                                    yPart = intPoints[j][1] - ipt1[1]
+                                    proz = yPart / yDiff
+                                zDiff = ipt2[2] - ipt1[2]
+                                z = ipt1[2] + proz * zDiff
+                                if z > intPoints[j][2]:
+                                    ringWall.AddPoint(intPoints[j][0], intPoints[j][1], z)
+                                else:
+                                    ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
                     else:
                         ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
-                lastIx1 = ix1
-                lastIx2 = ix2
+                    lastIx1 = ix1
+                    lastIx2 = ix2
 
             ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
             ringWall.CloseRings()

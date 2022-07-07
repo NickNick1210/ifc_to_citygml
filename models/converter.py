@@ -811,7 +811,7 @@ class Converter(QgsTask):
 
         geomRoofs = self.extractRoofs(ifcRoofs)
         geomWalls, roofPoints = self.calcWalls(geomBase, geomRoofs, height)
-        geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
+        #geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
 
         # Geometrie
         links = []
@@ -846,7 +846,6 @@ class Converter(QgsTask):
         for ifcRoof in ifcRoofs:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            settings.set(settings.SEW_SHELLS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             # Vertizes
             verts = shape.geometry.verts
@@ -961,6 +960,7 @@ class Converter(QgsTask):
             geomWall.AddGeometry(ringWall)
 
             intPoints = []
+            intLines = []
             for roof in roofs:
                 # 2D-Schnitt
                 intersect = geomWall.Intersection(roof)
@@ -1009,12 +1009,17 @@ class Converter(QgsTask):
                     # Einsetzen des Z-Werts in 2D-Schnitt
                     ipt1 = [ipt1[0], ipt1[1], z1]
                     ipt2 = [ipt2[0], ipt2[1], z2]
+                    if 11.32 < z1 < 11.33:
+                        print("Gefunden: " + ipt1)
+                    if 11.32 < z2 < 11.33:
+                        print("Gefunden: " + ipt2)
 
                     # Merken der Schnittpunkte
                     if ipt1 not in intPoints:
                         intPoints.append(ipt1)
                     if ipt2 not in intPoints:
                         intPoints.append(ipt2)
+                    intLines.append([ipt1, ipt2])
 
             # Wand mit Dachbegrenzung
             geomWall = ogr.Geometry(ogr.wkbPolygon)
@@ -1022,45 +1027,104 @@ class Converter(QgsTask):
             pt1 = ringBase.GetPoint(i)
             pt2 = ringBase.GetPoint(i + 1)
             intPoints = self.sortPoints(intPoints, pt1, pt2)
-
-            # TODO: Übereinander liegende Punkte
-            lastPoint = None
-            for intPoint in intPoints:
-                if lastPoint is not None:
-                    if lastPoint[0] - 0.01 < intPoint[0] < lastPoint[0] + 0.01 and lastPoint[1] - 0.01 < intPoint[1] < lastPoint[1] + 0.01:
-                        print("PROBLEM: " + str(intPoint) + " und " + str(lastPoint))
-                        lastPoint = intPoint
+            intLines = self.sortLines(intLines, pt1, pt2)
 
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
-            for intPoint in intPoints:
-                ringWall.AddPoint(intPoint[0], intPoint[1], intPoint[2])
-                if intPoint not in roofPoints:
-                    roofPoints.append(intPoint)
+            lastIx1, lastIx2 = None, None
+            for intLine in intLines:
+                print("sort from: " + str(pt1) + " to: " + str(pt2))
+                print("linesIn: " + str(intLine))
+                sortIntLine = self.sortPoints(intLine, pt1, pt2)
+                print("linesOut: " + str(sortIntLine))
+                ipt1 = sortIntLine[0]
+                ipt2 = sortIntLine[1]
+                ix1 = intPoints.index(ipt1)
+                ix2 = intPoints.index(ipt2)
+
+                if len(intLines) == 3:
+                    print(sortIntLine)
+                    print("ix1: " + str(ix1) + ", ix2: " + str(ix2))
+                    print("lastIx1: " + str(lastIx1) + ", lastIx2: " + str(lastIx2))
+
+                if not (lastIx2 is not None and ix1 < lastIx2 and ix2 < lastIx2):
+                    if lastIx2 is not None and ix1 < lastIx2:
+                        if ix2 > lastIx2:
+                            ringWall.AddPoint(intPoints[lastIx2][0], intPoints[lastIx2][1], ipt1[2])
+                    else:
+                        ringWall.AddPoint(ipt1[0], ipt1[1], ipt1[2])
+
+                    if ix2 - ix1 != 1:
+                        for j in range(ix1 + 1, ix2):
+                            if abs(ipt2[0] - ipt1[0]) > abs(ipt2[1] - ipt1[1]):
+                                xDiff = ipt2[0] - ipt1[0]
+                                xPart = intPoints[j][0] - ipt1[0]
+                                proz = xPart / xDiff
+                            else:
+                                yDiff = ipt2[1] - ipt1[1]
+                                yPart = intPoints[j][1] - ipt1[1]
+                                proz = yPart / yDiff
+                            zDiff = ipt2[2] - ipt1[2]
+                            z = ipt1[2] + proz * zDiff
+                            if z > intPoints[j][2]:
+                                ringWall.AddPoint(intPoints[j][0], intPoints[j][1], z)
+                            else:
+                                ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
+                    else:
+                        ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
+                lastIx1 = ix1
+                lastIx2 = ix2
+
             ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
             ringWall.CloseRings()
             geomWall.AddGeometry(ringWall)
 
             walls.append(geomWall)
 
+            for k in range(0, len(intPoints)):
+                if intPoints[k] not in roofPoints:
+                    roofPoints.append(intPoints[k])
+
         return walls, roofPoints
 
     def sortPoints(self, points, fromPoint, toPoint):
-        if toPoint[0] - fromPoint[0] > 0.001:
-            if toPoint[1] - fromPoint[1] > 0:
+        if toPoint[0] > fromPoint[0]:
+            if toPoint[1] > fromPoint[1]:
                 points.sort(key=lambda elem: (elem[0], elem[1], elem[2]))
             else:
                 points.sort(key=lambda elem: (elem[0], -elem[1], elem[2]))
-        elif toPoint[0] - fromPoint[0] < -0.001:
-            if toPoint[1] - fromPoint[1] > 0:
+        elif toPoint[0] < fromPoint[0]:
+            if toPoint[1] > fromPoint[1]:
                 points.sort(key=lambda elem: (-elem[0], elem[1], elem[2]))
             else:
                 points.sort(key=lambda elem: (-elem[0], -elem[1], elem[2]))
         else:
-            if toPoint[1] - fromPoint[1] > 0:
-                points.sort(key=lambda elem: (elem[1], elem[0], elem[2]))
+            if toPoint[1] > fromPoint[1]:
+                points.sort(key=lambda elem: (elem[1], elem[2]))
             else:
-                points.sort(key=lambda elem: (-elem[1], elem[0], elem[2]))
+                points.sort(key=lambda elem: (-elem[1], elem[2]))
         return points
+
+    def sortLines(self, lines, fromPoint, toPoint):
+        if toPoint[0] > fromPoint[0]:
+            if toPoint[1] > fromPoint[1]:
+                lines.sort(key=lambda elem: (
+                min(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+            else:
+                lines.sort(key=lambda elem: (
+                min(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+        elif toPoint[0] < fromPoint[0]:
+            if toPoint[1] > fromPoint[1]:
+                lines.sort(key=lambda elem: (
+                -max(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+            else:
+                lines.sort(key=lambda elem: (
+                -max(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+        else:
+            if toPoint[1] > fromPoint[1]:
+                lines.sort(key=lambda elem: (min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+            else:
+                lines.sort(key=lambda elem: (-max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+        return lines
 
     def calcRoofs(self, roofsIn, base, roofPoints):
         roofs = []

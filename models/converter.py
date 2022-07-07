@@ -812,6 +812,7 @@ class Converter(QgsTask):
         geomRoofs = self.extractRoofs(ifcRoofs)
         geomWalls, roofPoints = self.calcWalls(geomBase, geomRoofs, height)
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
+        geomWalls += self.calcRoofWalls(geomRoofs)
 
         # Geometrie
         links = []
@@ -1047,7 +1048,7 @@ class Converter(QgsTask):
                             roofPoints.append([pt1[0], pt1[1], ipt1[2]])
                         ringWall.AddPoint(ipt1[0], ipt1[1], ipt1[2])
 
-                    if ix2 - ix1 > 2 or (ix2 - ix1 == 2 and ix1+1 != lastIx2):
+                    if ix2 - ix1 > 2 or (ix2 - ix1 == 2 and ix1 + 1 != lastIx2):
                         for j in range(ix1 + 1, ix2):
                             if j != lastIx2:
                                 if abs(ipt2[0] - ipt1[0]) > abs(ipt2[1] - ipt1[1]):
@@ -1069,7 +1070,7 @@ class Converter(QgsTask):
                         ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
                     lastIx2 = ix2
 
-            lastPoint = ringWall.GetPoint(ringWall.GetPointCount()-1)
+            lastPoint = ringWall.GetPoint(ringWall.GetPointCount() - 1)
             if lastPoint[0] != pt2[0] or lastPoint[1] != pt2[1]:
                 self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
                 ringWall.AddPoint(pt2[0], pt2[1], lastPoint[2])
@@ -1135,17 +1136,17 @@ class Converter(QgsTask):
         if toPoint[0] > fromPoint[0]:
             if toPoint[1] > fromPoint[1]:
                 lines.sort(key=lambda elem: (
-                min(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+                    min(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
             else:
                 lines.sort(key=lambda elem: (
-                min(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+                    min(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
         elif toPoint[0] < fromPoint[0]:
             if toPoint[1] > fromPoint[1]:
                 lines.sort(key=lambda elem: (
-                -max(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+                    -max(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
             else:
                 lines.sort(key=lambda elem: (
-                -max(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+                    -max(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
         else:
             if toPoint[1] > fromPoint[1]:
                 lines.sort(key=lambda elem: (min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
@@ -1158,10 +1159,8 @@ class Converter(QgsTask):
 
         for roofIn in roofsIn:
             intersection = roofIn.Intersection(base)
-            print(intersection)
 
             if not intersection.IsEmpty():
-                print(intersection.GetGeometryCount())
                 for intGeometry in intersection:
                     if intersection.GetGeometryCount() == 1:
                         ringInt = intersection.GetGeometryRef(0)
@@ -1192,6 +1191,98 @@ class Converter(QgsTask):
 
                     roofs.append(geomRoof)
         return roofs
+
+    def calcRoofWalls(self, roofs):
+        walls = []
+        for i in range(0, len(roofs)):
+            roof1 = roofs[i]
+            for j in range(i + 1, len(roofs)):
+                roof2 = roofs[j]
+                if roof1.Intersects(roof2):
+                    intersect = roof1.Intersection(roof2)
+                    if intersect.GetGeometryName() == "POLYGON":
+                        ringInt = intersect.GetGeometryRef(0)
+                        ringRoof1 = roof1.GetGeometryRef(0)
+                        ringRoof2 = roof2.GetGeometryRef(0)
+                        print(intersect)
+                        z1, z2 = None, None
+                        pt1, pt2 = [], []
+                        for k in range(0, ringInt.GetPointCount()-1):
+                            point = ogr.Geometry(ogr.wkbPoint)
+                            point.AddPoint(ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1])
+                            if roof1.Contains(point):
+                                for l in range(0, ringRoof2.GetPointCount()):
+                                    if (ringRoof2.GetPoint(l)[0]-0.001 <= ringInt.GetPoint(k)[0] <= ringRoof2.GetPoint(l)[0] + 0.001) and (ringRoof2.GetPoint(l)[1] - 0.001 <= ringInt.GetPoint(k)[1] <= \
+                                            ringRoof2.GetPoint(l)[1] + 0.001):
+                                        pt1.append(point)
+                                        z2 = ringRoof2.GetPoint(l)[2]
+                            elif roof2.Contains(point):
+                                for m in range(0, ringRoof1.GetPointCount()):
+                                    if ringRoof1.GetPoint(m)[0]-0.001 <= ringInt.GetPoint(k)[0] <= ringRoof1.GetPoint(m)[0]+0.001 and ringRoof1.GetPoint(m)[1]-0.001 <= ringInt.GetPoint(k)[1] <= \
+                                            ringRoof1.GetPoint(m)[1]+0.001:
+                                        z1 = ringRoof1.GetPoint(m)[2]
+                                        pt2.append(point)
+                        last = None
+                        wallsInt = []
+                        for n in range(0, ringInt.GetPointCount()):
+                            point = ogr.Geometry(ogr.wkbPoint)
+                            point.AddPoint(ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1])
+                            if z1 <= z2 and point not in pt2:
+                                if last is not None:
+                                    geomWall = ogr.Geometry(ogr.wkbPolygon)
+                                    ringWall = ogr.Geometry(ogr.wkbLinearRing)
+                                    p1, p2, p3, p4 = None, None, None, None
+                                    for o in range(0, ringRoof1.GetPointCount()):
+                                        if (last[0]-0.001 <= ringRoof1.GetPoint(o)[0] <= last[0]+0.001) and (last[1]-0.001 <= ringRoof1.GetPoint(o)[1] <= last[1]+0.001):
+                                            p1 = [last[0], last[1], ringRoof1.GetPoint(o)[2]]
+                                        if (ringInt.GetPoint(k)[0]-0.001 <= ringRoof1.GetPoint(o)[0] <= ringInt.GetPoint(k)[0]+0.001) and (ringInt.GetPoint(k)[1]-0.001 <= ringRoof1.GetPoint(o)[1] <= ringInt.GetPoint(k)[1]-0.001):
+                                            p4 = [ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1], ringRoof1.GetPoint(o)[2]]
+                                    for o in range(0, ringRoof2.GetPointCount()):
+                                        if (last[0]-0.001 <= ringRoof2.GetPoint(o)[0] <= last[0]+0.001) and (last[1]-0.001 <= ringRoof2.GetPoint(o)[1] <= last[1]+0.001):
+                                            p2 = [last[0], last[1], ringRoof2.GetPoint(o)[2]]
+                                        if (ringInt.GetPoint(k)[0]-0.001 <= ringRoof2.GetPoint(o)[0] <= ringInt.GetPoint(k)[0]+0.001) and (ringInt.GetPoint(k)[1]-0.001 <= ringRoof2.GetPoint(o)[1] <= ringInt.GetPoint(k)[1]-0.001):
+                                            p3 = [ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1],
+                                                  ringRoof2.GetPoint(o)[2]]
+
+                                    # TODO: Z-Koordinate berechnen, wenn Punkt kein Eckpunkt des Daches
+                                    # Über einen Schnitt von Ebene (Dach) und Linie (Punkt-Achse)
+
+                                    ringWall.AddPoint(p1[0], p1[1], p1[2])
+                                    ringWall.AddPoint(p2[0], p2[1], p2[2])
+                                    ringWall.AddPoint(p3[0], p3[1], p3[2])
+                                    ringWall.AddPoint(p4[0], p4[1], p4[2])
+                                    ringWall.CloseRings()
+                                    geomWall.AddGeometry(ringWall)
+                                    wallsInt.append(geomWall)
+                                last = [ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1]]
+                            elif z2 < z1 and point not in pt1:
+                                if last is not None:
+                                    geomWall = ogr.Geometry(ogr.wkbPolygon)
+                                    ringWall = ogr.Geometry(ogr.wkbLinearRing)
+                                    for o in range(0, ringRoof2.GetPointCount()):
+                                        if (last[0] - 0.001 <= ringRoof2.GetPoint(o)[0] <= last[0] + 0.001) and (last[1] - 0.001 <= ringRoof2.GetPoint(o)[1] <= last[1] + 0.001):
+                                            p1 = [last[0], last[1], ringRoof2.GetPoint(o)[2]]
+                                        if (ringInt.GetPoint(k)[0]-0.001 <= ringRoof2.GetPoint(o)[0] <= ringInt.GetPoint(k)[0]+0.001) and (ringInt.GetPoint(k)[1]-0.001 <= ringRoof2.GetPoint(o)[1] <= ringInt.GetPoint(k)[1]-0.001):
+                                            p4 = [ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1], ringRoof2.GetPoint(o)[2]]
+                                    for o in range(0, ringRoof1.GetPointCount()):
+                                        if (last[0] - 0.001 <= ringRoof2.GetPoint(o)[0] <= last[0] + 0.001) and (last[1] - 0.001 <= ringRoof2.GetPoint(o)[1] <= last[1] + 0.001):
+                                            p2 = [last[0], last[1], ringRoof1.GetPoint(o)[2]]
+                                        if (ringInt.GetPoint(k)[0]-0.001 <= ringRoof2.GetPoint(o)[0] <= ringInt.GetPoint(k)[0]+0.001) and (ringInt.GetPoint(k)[1]-0.001 <= ringRoof2.GetPoint(o)[1] <= ringInt.GetPoint(k)[1]-0.001):
+                                            p3 = [ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1],
+                                                  ringRoof1.GetPoint(o)[2]]
+                                    ringWall.addPoint(p1[0], p1[1], p1[2])
+                                    ringWall.addPoint(p2[0], p2[1], p2[2])
+                                    ringWall.addPoint(p3[0], p3[1], p3[2])
+                                    ringWall.addPoint(p4[0], p4[1], p4[2])
+                                    ringWall.CloseRings()
+                                    wallsInt.append(geomWall)
+                                last = [ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1]]
+
+                        walls += wallsInt
+
+                        print("----------")
+
+        return walls
 
     def convertLoD2Solid(self, chBldg, links):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds

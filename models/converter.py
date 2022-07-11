@@ -815,7 +815,6 @@ class Converter(QgsTask):
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
 
-        # TODO: Löcher stopfen
         # TODO: Union von RoofWalls
         # TODO: Dach für Wände ohne Dach
         # TODO: Wände ohne Dach mit richtiger Höhe nach Dachschnitt
@@ -1216,6 +1215,7 @@ class Converter(QgsTask):
                     ringRoof.AddPoint(ptInt[0], ptInt[1], z)
                 ringRoof.CloseRings()
                 geomRoof.AddGeometry(ringRoof)
+                geomRoof = geomRoof.Simplify(0.00)
 
                 roofs.append(geomRoof)
         return roofs
@@ -1423,7 +1423,7 @@ class Converter(QgsTask):
                             ringRoofOut.CloseRings()
                             geomRoofOut.AddGeometry(ringRoofOut)
 
-                            roofsOut[j] = geomRoofOut
+                            roofsOut[j] = geomRoofOut.Simplify(0.0)
                         else:
                             roofInt = roofsOut[i].Difference(intersect).Simplify(0.0)
                             ringInt = roofInt.GetGeometryRef(0)
@@ -1451,7 +1451,7 @@ class Converter(QgsTask):
                             ringRoofOut.CloseRings()
                             geomRoofOut.AddGeometry(ringRoofOut)
 
-                            roofsOut[i] = geomRoofOut
+                            roofsOut[i] = geomRoofOut.Simplify(0.00)
 
         wallsCheck = walls.copy()
         for o in range(0, len(wallsCheck)):
@@ -1470,10 +1470,23 @@ class Converter(QgsTask):
             for roof in roofs:
                 intersect = wall.Intersection(roof)
                 if not intersect.IsEmpty():
-                    print(intersect)
-                    print(wallsIn)
-                    print("----------")
-                    anyInt = True
+                    if intersect.GetGeometryCount() > 1:
+                        startPt = intersect.GetGeometryRef(0).GetPoint(0)
+                        endPt = intersect.GetGeometryRef(intersect.GetGeometryCount()-1).GetPoint(1)
+                        intersect2 = ogr.Geometry(ogr.wkbLineString)
+                        intersect2.AddPoint(startPt[0], startPt[1], startPt[2])
+                        intersect2.AddPoint(endPt[0], endPt[1], endPt[2])
+                        intersect = intersect2
+                    wallRing = wall.GetGeometryRef(0)
+                    pt1Check, pt2Check = False, False
+                    for i in range(0, wallRing.GetPointCount()):
+                        pt = wallRing.GetPoint(i)
+                        if pt[0] == intersect.GetPoint(0)[0] and pt[1] == intersect.GetPoint(0)[1]:
+                            pt1Check = True
+                        elif pt[0] == intersect.GetPoint(1)[0] and pt[1] == intersect.GetPoint(1)[1]:
+                            pt2Check = True
+                    if pt1Check and pt2Check:
+                        anyInt = True
             if anyInt:
                 wallsOut.append(wall)
         return wallsOut

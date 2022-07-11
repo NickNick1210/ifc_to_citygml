@@ -816,7 +816,6 @@ class Converter(QgsTask):
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
 
         # TODO: Dach für Wände ohne Dach
-        # TODO: Wände ohne Dach mit richtiger Höhe nach Dachschnitt
 
         # Geometrie
         links = []
@@ -1042,7 +1041,7 @@ class Converter(QgsTask):
 
                 if not (lastIx2 is not None and ix1 < lastIx2 and ix2 < lastIx2):
                     if lastIx2 is not None and ix1 < lastIx2:
-                        if ix2 > lastIx2:
+                        if ix2 > lastIx2 and not (intPoints[ix2][0] == intPoints[lastIx2][0] and intPoints[ix2][1] == intPoints[lastIx2][1]):
                             if abs(ipt2[0] - ipt1[0]) > abs(ipt2[1] - ipt1[1]):
                                 xDiff = ipt2[0] - ipt1[0]
                                 xPart = intPoints[lastIx2][0] - ipt1[0]
@@ -1080,7 +1079,7 @@ class Converter(QgsTask):
                                     roofPoints.append([intPoints[j][0], intPoints[j][1], z])
                                 else:
                                     ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
-                    else:
+                    elif lastIx2 is None or (lastIx2 is not None and not (intPoints[ix2][0] == intPoints[lastIx2][0] and intPoints[ix2][1] == intPoints[lastIx2][1])):
                         ringWall.AddPoint(ipt2[0], ipt2[1], ipt2[2])
                     lastIx2 = ix2
 
@@ -1545,7 +1544,6 @@ class Converter(QgsTask):
                             ring.AddPoint(point1[0], point1[1], point1[2])
                     ring.CloseRings()
                     geometry.AddGeometry(ring)
-                    geometry = geometry.Simplify(0.0)
                     geomsOut.append(geometry)
                     done.append(i)
                     done.append(j)

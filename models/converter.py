@@ -815,7 +815,6 @@ class Converter(QgsTask):
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
 
-        # TODO: Union von RoofWalls
         # TODO: Dach für Wände ohne Dach
         # TODO: Wände ohne Dach mit richtiger Höhe nach Dachschnitt
 
@@ -1465,6 +1464,8 @@ class Converter(QgsTask):
 
     def checkRoofWalls(self, wallsIn, roofs):
         wallsOut = []
+        wallsChecked = []
+
         for wall in wallsIn:
             anyInt = False
             for roof in roofs:
@@ -1488,8 +1489,76 @@ class Converter(QgsTask):
                     if pt1Check and pt2Check:
                         anyInt = True
             if anyInt:
-                wallsOut.append(wall)
+                wallsChecked.append(wall)
+
+        wallsOut = self.union3D(wallsChecked)
+
         return wallsOut
+
+    def union3D(self, geomsIn):
+        print("Union-Durchgang")
+        geomsOut = []
+        done = []
+        for i in range(0, len(geomsIn)):
+            if i in done:
+                continue
+            ring1 = geomsIn[i].GetGeometryRef(0)
+            for j in range(i+1, len(geomsIn)):
+                if j in done:
+                    break
+                ring2 = geomsIn[j].GetGeometryRef(0)
+                samePts = []
+                for k in range(0, ring1.GetPointCount()-1):
+                    point1 = ring1.GetPoint(k)
+                    for l in range(0, ring2.GetPointCount()-1):
+                        point2 = ring2.GetPoint(l)
+                        if point1 == point2:
+                            samePts.append(point1)
+                if len(samePts) > 1:
+                    geometry = ogr.Geometry(ogr.wkbPolygon)
+                    ring = ogr.Geometry(ogr.wkbLinearRing)
+                    for k in range(0, ring1.GetPointCount()-1):
+                        point1 = ring1.GetPoint(k)
+                        if point1 in samePts:
+                            ring.AddPoint(point1[0], point1[1], point1[2])
+                            for l in range(0, ring2.GetPointCount()-1):
+                                point2 = ring2.GetPoint(l)
+                                if point2 == point1:
+                                    if ring2.GetPoint(l+1) in samePts:
+                                        break
+                                    else:
+                                        for m in range(l+1, ring2.GetPointCount()-1):
+                                            point3 = ring2.GetPoint(m)
+                                            if point3 in samePts:
+                                                break
+                                            else:
+                                                ring.AddPoint(point3[0], point3[1], point3[2])
+                                        for o in range(0, l):
+                                            point3 = ring2.GetPoint(o)
+                                            if point3 in samePts:
+                                                break
+                                            else:
+                                                ring.AddPoint(point3[0], point3[1], point3[2])
+                                        break
+
+                        else:
+                            ring.AddPoint(point1[0], point1[1], point1[2])
+                    ring.CloseRings()
+                    geometry.AddGeometry(ring)
+                    geometry = geometry.Simplify(0.0)
+                    geomsOut.append(geometry)
+                    done.append(i)
+                    done.append(j)
+                    break
+
+            if i not in done:
+                done.append(i)
+                geomsOut.append(geomsIn[i])
+
+        if len(geomsOut) < len(geomsIn):
+            return self.union3D(geomsOut)
+        else:
+            return geomsOut
 
     def convertLoD2Solid(self, chBldg, links):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds

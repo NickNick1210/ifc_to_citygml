@@ -815,7 +815,6 @@ class Converter(QgsTask):
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
 
-        # TODO: Richtige Orientierung der RoofWalls
         # TODO: Löcher stopfen
         # TODO: Union von RoofWalls
         # TODO: Dach für Wände ohne Dach
@@ -1046,8 +1045,18 @@ class Converter(QgsTask):
                 if not (lastIx2 is not None and ix1 < lastIx2 and ix2 < lastIx2):
                     if lastIx2 is not None and ix1 < lastIx2:
                         if ix2 > lastIx2:
-                            ringWall.AddPoint(intPoints[lastIx2][0], intPoints[lastIx2][1], ipt1[2])
-                            roofPoints.append([intPoints[lastIx2][0], intPoints[lastIx2][1], ipt1[2]])
+                            if abs(ipt2[0] - ipt1[0]) > abs(ipt2[1] - ipt1[1]):
+                                xDiff = ipt2[0] - ipt1[0]
+                                xPart = intPoints[lastIx2][0] - ipt1[0]
+                                proz = xPart / xDiff
+                            else:
+                                yDiff = ipt2[1] - ipt1[1]
+                                yPart = intPoints[lastIx2][1] - ipt1[1]
+                                proz = yPart / yDiff
+                            zDiff = ipt2[2] - ipt1[2]
+                            z = ipt1[2] + proz * zDiff
+                            ringWall.AddPoint(intPoints[lastIx2][0], intPoints[lastIx2][1], z)
+                            roofPoints.append([intPoints[lastIx2][0], intPoints[lastIx2][1], z])
                     else:
                         if ix1 == 0 and (ipt1[0] != pt1[0] or ipt1[1] != pt1[1]):
                             self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
@@ -1320,10 +1329,10 @@ class Converter(QgsTask):
                                         sPoint = rPlane.intersection(wLine)[0]
                                         p4 = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint[2])]
 
-                                    ringWall.AddPoint(p1[0], p1[1], p1[2])
-                                    ringWall.AddPoint(p2[0], p2[1], p2[2])
-                                    ringWall.AddPoint(p3[0], p3[1], p3[2])
                                     ringWall.AddPoint(p4[0], p4[1], p4[2])
+                                    ringWall.AddPoint(p3[0], p3[1], p3[2])
+                                    ringWall.AddPoint(p2[0], p2[1], p2[2])
+                                    ringWall.AddPoint(p1[0], p1[1], p1[2])
                                     ringWall.CloseRings()
                                     geomWall.AddGeometry(ringWall)
                                     wallsInt.append(geomWall)
@@ -1375,10 +1384,10 @@ class Converter(QgsTask):
                                                      Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
                                         sPoint = rPlane.intersection(wLine)[0]
                                         p4 = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint[2])]
-                                    ringWall.AddPoint(p1[0], p1[1], p1[2])
-                                    ringWall.AddPoint(p2[0], p2[1], p2[2])
-                                    ringWall.AddPoint(p3[0], p3[1], p3[2])
                                     ringWall.AddPoint(p4[0], p4[1], p4[2])
+                                    ringWall.AddPoint(p3[0], p3[1], p3[2])
+                                    ringWall.AddPoint(p2[0], p2[1], p2[2])
+                                    ringWall.AddPoint(p1[0], p1[1], p1[2])
                                     ringWall.CloseRings()
                                     geomWall.AddGeometry(ringWall)
                                     wallsInt.append(geomWall)
@@ -1415,7 +1424,6 @@ class Converter(QgsTask):
                             geomRoofOut.AddGeometry(ringRoofOut)
 
                             roofsOut[j] = geomRoofOut
-                            print("Intersect: " + str(roofsOut[j]))
                         else:
                             roofInt = roofsOut[i].Difference(intersect).Simplify(0.0)
                             ringInt = roofInt.GetGeometryRef(0)
@@ -1444,7 +1452,6 @@ class Converter(QgsTask):
                             geomRoofOut.AddGeometry(ringRoofOut)
 
                             roofsOut[i] = geomRoofOut
-                            print("Intersect: " + str(roofsOut[j]))
 
         wallsCheck = walls.copy()
         for o in range(0, len(wallsCheck)):
@@ -1461,9 +1468,12 @@ class Converter(QgsTask):
         for wall in wallsIn:
             anyInt = False
             for roof in roofs:
-                if wall.Intersects(roof):
-                    if not wall.Intersection(roof).IsEmpty():
-                        anyInt = True
+                intersect = wall.Intersection(roof)
+                if not intersect.IsEmpty():
+                    print(intersect)
+                    print(wallsIn)
+                    print("----------")
+                    anyInt = True
             if anyInt:
                 wallsOut.append(wall)
         return wallsOut

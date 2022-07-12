@@ -1531,16 +1531,136 @@ class Converter(QgsTask):
 
                             roofsOut[i] = geomRoofOut.Simplify(0.00)
 
+        walls += wallsLine
         wallsCheck = walls.copy()
+        wallsMod = {}
         for o in range(0, len(wallsCheck)):
             for p in range(o + 1, len(wallsCheck)):
-                intersect = wallsCheck[o].Intersection(wallsCheck[p])
+                if str(o) in wallsMod:
+                    wallO = wallsMod[str(o)]
+                else:
+                    wallO = wallsCheck[o]
+                if str(p) in wallsMod:
+                    wallP = wallsMod[str(p)]
+                else:
+                    wallP = wallsCheck[p]
+                intersect = wallO.Intersection(wallP)
                 if not intersect.IsEmpty():
-                    walls.remove(wallsCheck[o])
-                    if wallsCheck[p] in walls:
-                        walls.remove(wallsCheck[p])
+                    print(intersect)
+                    print(wallO)
 
-        walls += wallsLine
+                    ipt1 = intersect.GetPoint(0)
+                    ipt2 = intersect.GetPoint(1)
+                    wallCheckORing = wallO.GetGeometryRef(0)
+                    ptO1 = wallCheckORing.GetPoint(1)
+                    ptO2 = wallCheckORing.GetPoint(2)
+                    wallCheckPRing = wallP.GetGeometryRef(0)
+                    ptP1 = wallCheckPRing.GetPoint(1)
+                    ptP2 = wallCheckPRing.GetPoint(2)
+
+                    if (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1] and ipt2[0] == ptO2[0] and ipt2[1] == ptO2[1]) or (
+                            ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1] and ipt2[0] == ptO1[0] and ipt2[1] == ptO1[1]):
+                        walls.remove(wallO)
+                        print("Ja")
+                    elif (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1]) or (ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1]) or (
+                            ipt2[0] == ptO1[0] and ipt2[1] == ptO1[1]) or (ipt2[0] == ptO2[0] and ipt2[1] == ptO2[1]):
+                        print("Teilweise")
+                        diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
+                        diffOPt = np.sqrt(np.square(ptO2[0] - ptO1[0]) + np.square(ptO2[1] - ptO1[1]))
+                        if diffIPt > diffOPt:
+                            print("I enthält O")
+                            walls.remove(wallO)
+                        else:
+                            print("O enthält I")
+                            geomWallCut = ogr.Geometry(ogr.wkbPolygon)
+                            ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
+                            if (ptP1[0] == ipt1[0] and ptP1[1] == ipt1[1]) or (
+                                    ptP1[0] == ipt2[0] and ptP1[1] == ipt2[1]):
+                                zU = wallCheckPRing.GetPoint(0)[0]
+                                zO = ptP1[2]
+                            else:
+                                zU = wallCheckPRing.GetPoint(3)[0]
+                                zO = ptP2[2]
+                            if ptO1[0] == ipt1[0] and ptO1[1] == ipt1[1]:
+                                ringWallCut.AddPoint(ipt2[0], ipt2[1], zU)
+                                ringWallCut.AddPoint(ipt2[0], ipt2[1], zO)
+                                ringWallCut.AddPoint(ptO2[0], ptO2[1], ptO2[2])
+                                ringWallCut.AddPoint(ptO2[0], ptO2[1], wallCheckORing.GetPoint(3)[2])
+                            elif ptO1[0] == ipt2[0] and ptO1[1] == ipt2[1]:
+                                ringWallCut.AddPoint(ipt1[0], ipt1[1], zU)
+                                ringWallCut.AddPoint(ipt1[0], ipt1[1], zO)
+                                ringWallCut.AddPoint(ptO2[0], ptO2[1], ptO2[2])
+                                ringWallCut.AddPoint(ptO2[0], ptO2[1], wallCheckORing.GetPoint(3)[2])
+                            else:
+                                ringWallCut.AddPoint(ptO1[0], ptO1[1], ptO1[2])
+                                ringWallCut.AddPoint(ptO1[0], ptO1[1], wallCheckORing.GetPoint(0)[2])
+                                if ptO2[0] == ipt1[0] and ptO2[1] == ipt1[1]:
+                                    ringWallCut.AddPoint(ipt2[0], ipt2[1], zO)
+                                    ringWallCut.AddPoint(ipt2[0], ipt2[1], zU)
+                                elif ptO2[0] == ipt2[0] and ptO2[1] == ipt2[1]:
+                                    ringWallCut.AddPoint(ipt1[0], ipt1[1], zO)
+                                    ringWallCut.AddPoint(ipt1[0], ipt1[1], zU)
+                            ringWallCut.CloseRings()
+                            geomWallCut.AddGeometry(ringWallCut)
+
+                            wallsMod[str(o)] = geomWallCut
+                            ix = walls.index(wallO)
+                            walls[ix] = geomWallCut
+                    else:
+                        print("Nein")
+
+                    print(wallP)
+                    if (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1] and ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]) or (
+                            ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1] and ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]):
+                        walls.remove(wallP)
+                        print("Ja")
+                    elif (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1]) or (ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1]) or (
+                            ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]) or (ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]):
+                        print("Teilweise")
+                        diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
+                        diffPPt = np.sqrt(np.square(ptP2[0] - ptP1[0]) + np.square(ptP2[1] - ptP1[1]))
+                        if diffIPt > diffPPt:
+                            print("I enthält P")
+                            walls.remove(wallP)
+                        else:
+                            print("P enthält I")
+                            geomWallCut = ogr.Geometry(ogr.wkbPolygon)
+                            ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
+                            if (ptO1[0] == ipt1[0] and ptO1[1] == ipt1[1]) or (
+                                    ptO1[0] == ipt2[0] and ptO1[1] == ipt2[1]):
+                                zU = wallCheckORing.GetPoint(0)[2]
+                                zO = ptO1[2]
+                            else:
+                                zU = wallCheckORing.GetPoint(3)[2]
+                                zO = ptO2[2]
+                            if ptP1[0] == ipt1[0] and ptP1[1] == ipt1[1]:
+                                ringWallCut.AddPoint(ipt2[0], ipt2[1], zU)
+                                ringWallCut.AddPoint(ipt2[0], ipt2[1], zO)
+                                ringWallCut.AddPoint(ptP2[0], ptP2[1], ptP2[2])
+                                ringWallCut.AddPoint(ptP2[0], ptP2[1], wallCheckPRing.GetPoint(3)[2])
+                            elif ptP1[0] == ipt2[0] and ptP1[1] == ipt2[1]:
+                                ringWallCut.AddPoint(ipt1[0], ipt1[1], zU)
+                                ringWallCut.AddPoint(ipt1[0], ipt1[1], zO)
+                                ringWallCut.AddPoint(ptP2[0], ptP2[1], ptP2[2])
+                                ringWallCut.AddPoint(ptP2[0], ptP2[1], wallCheckPRing.GetPoint(3)[2])
+                            else:
+                                ringWallCut.AddPoint(ptP1[0], ptP1[1], wallCheckPRing.GetPoint(0)[2])
+                                ringWallCut.AddPoint(ptP1[0], ptP1[1], ptP1[2])
+                                if ptP2[0] == ipt1[0] and ptP2[1] == ipt1[1]:
+                                    ringWallCut.AddPoint(ipt2[0], ipt2[1], zO)
+                                    ringWallCut.AddPoint(ipt2[0], ipt2[1], zU)
+                                elif ptP2[0] == ipt2[0] and ptP2[1] == ipt2[1]:
+                                    ringWallCut.AddPoint(ipt1[0], ipt1[1], zO)
+                                    ringWallCut.AddPoint(ipt1[0], ipt1[1], zU)
+                            ringWallCut.CloseRings()
+                            geomWallCut.AddGeometry(ringWallCut)
+
+                            wallsMod[str(p)] = geomWallCut
+                            ix = walls.index(wallP)
+                            walls[ix] = geomWallCut
+                    else:
+                        print("Nein")
+                    print("----------")
 
         return walls, roofsOut
 
@@ -1596,40 +1716,47 @@ class Converter(QgsTask):
                         if point1 == point2:
                             samePts.append(point1)
                 if len(samePts) > 1:
-                    geometry = ogr.Geometry(ogr.wkbPolygon)
-                    ring = ogr.Geometry(ogr.wkbLinearRing)
-                    for k in range(0, ring1.GetPointCount() - 1):
-                        point1 = ring1.GetPoint(k)
-                        if point1 in samePts:
-                            ring.AddPoint(point1[0], point1[1], point1[2])
-                            for l in range(0, ring2.GetPointCount() - 1):
-                                point2 = ring2.GetPoint(l)
-                                if point2 == point1:
-                                    if ring2.GetPoint(l + 1) in samePts:
-                                        break
-                                    else:
-                                        for m in range(l + 1, ring2.GetPointCount() - 1):
-                                            point3 = ring2.GetPoint(m)
-                                            if point3 in samePts:
-                                                break
-                                            else:
-                                                ring.AddPoint(point3[0], point3[1], point3[2])
-                                        for o in range(0, l):
-                                            point3 = ring2.GetPoint(o)
-                                            if point3 in samePts:
-                                                break
-                                            else:
-                                                ring.AddPoint(point3[0], point3[1], point3[2])
-                                        break
+                    plane1 = Plane(Point3D(ring1.GetPoint(0)[0], ring1.GetPoint(0)[1], ring1.GetPoint(0)[2]),
+                                   Point3D(ring1.GetPoint(1)[0], ring1.GetPoint(1)[1], ring1.GetPoint(1)[2]),
+                                   Point3D(ring1.GetPoint(2)[0], ring1.GetPoint(2)[1], ring1.GetPoint(2)[2]))
+                    plane2 = Plane(Point3D(ring2.GetPoint(0)[0], ring2.GetPoint(0)[1], ring2.GetPoint(0)[2]),
+                                   Point3D(ring2.GetPoint(1)[0], ring2.GetPoint(1)[1], ring2.GetPoint(1)[2]),
+                                   Point3D(ring2.GetPoint(2)[0], ring2.GetPoint(2)[1], ring2.GetPoint(2)[2]))
+                    if plane1.is_parallel(plane2):
+                        geometry = ogr.Geometry(ogr.wkbPolygon)
+                        ring = ogr.Geometry(ogr.wkbLinearRing)
+                        for k in range(0, ring1.GetPointCount() - 1):
+                            point1 = ring1.GetPoint(k)
+                            if point1 in samePts:
+                                ring.AddPoint(point1[0], point1[1], point1[2])
+                                for l in range(0, ring2.GetPointCount() - 1):
+                                    point2 = ring2.GetPoint(l)
+                                    if point2 == point1:
+                                        if ring2.GetPoint(l + 1) in samePts:
+                                            break
+                                        else:
+                                            for m in range(l + 1, ring2.GetPointCount() - 1):
+                                                point3 = ring2.GetPoint(m)
+                                                if point3 in samePts:
+                                                    break
+                                                else:
+                                                    ring.AddPoint(point3[0], point3[1], point3[2])
+                                            for o in range(0, l):
+                                                point3 = ring2.GetPoint(o)
+                                                if point3 in samePts:
+                                                    break
+                                                else:
+                                                    ring.AddPoint(point3[0], point3[1], point3[2])
+                                            break
 
-                        else:
-                            ring.AddPoint(point1[0], point1[1], point1[2])
-                    ring.CloseRings()
-                    geometry.AddGeometry(ring)
-                    geomsOut.append(geometry)
-                    done.append(i)
-                    done.append(j)
-                    break
+                            else:
+                                ring.AddPoint(point1[0], point1[1], point1[2])
+                        ring.CloseRings()
+                        geometry.AddGeometry(ring)
+                        geomsOut.append(geometry)
+                        done.append(i)
+                        done.append(j)
+                        break
 
             if i not in done:
                 done.append(i)

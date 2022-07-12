@@ -1211,6 +1211,9 @@ class Converter(QgsTask):
         roofs = []
 
         for roofIn in roofsIn:
+            roofIn = self.simplify(roofIn)
+            if roofIn is None:
+                continue
             intersection = roofIn.Intersection(base)
 
             for intGeometry in intersection:
@@ -1237,6 +1240,7 @@ class Converter(QgsTask):
                             if ptInt[0] == ptIn[0] and ptInt[1] == ptIn[1]:
                                 z = ptIn[2]
                     elif len(zList) > 1:
+                        print(roofIn)
                         ringIn = roofIn.GetGeometryRef(0)
                         rPlane = Plane(Point3D(ringIn.GetPoint(0)[0], ringIn.GetPoint(0)[1],
                                                ringIn.GetPoint(0)[2]),
@@ -1268,7 +1272,7 @@ class Converter(QgsTask):
                 roof2 = roofs[j]
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
-                    if intersect is not None and intersect.GetGeometryName() == "LINESTRING":
+                    if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not intersect.IsEmpty():
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
 
@@ -1303,9 +1307,11 @@ class Converter(QgsTask):
                             ringWall.CloseRings()
                             geomWall.AddGeometry(ringWall)
                             wallsLine.append(geomWall)
-                        # TODO: Zu breite Wand verhindern
 
-                    elif intersect is not None and intersect.GetGeometryName() == "POLYGON":
+                    elif intersect is not None and intersect.GetGeometryName() == "POLYGON" and not intersect.IsEmpty():
+                        intersect = self.simplify(intersect)
+                        if intersect is None:
+                            continue
                         ringInt = intersect.GetGeometryRef(0)
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
@@ -1546,9 +1552,6 @@ class Converter(QgsTask):
                     wallP = wallsCheck[p]
                 intersect = wallO.Intersection(wallP)
                 if not intersect.IsEmpty():
-                    print(intersect)
-                    print(wallO)
-
                     ipt1 = intersect.GetPoint(0)
                     ipt2 = intersect.GetPoint(1)
                     wallCheckORing = wallO.GetGeometryRef(0)
@@ -1561,17 +1564,13 @@ class Converter(QgsTask):
                     if (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1] and ipt2[0] == ptO2[0] and ipt2[1] == ptO2[1]) or (
                             ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1] and ipt2[0] == ptO1[0] and ipt2[1] == ptO1[1]):
                         walls.remove(wallO)
-                        print("Ja")
                     elif (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1]) or (ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1]) or (
                             ipt2[0] == ptO1[0] and ipt2[1] == ptO1[1]) or (ipt2[0] == ptO2[0] and ipt2[1] == ptO2[1]):
-                        print("Teilweise")
                         diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
                         diffOPt = np.sqrt(np.square(ptO2[0] - ptO1[0]) + np.square(ptO2[1] - ptO1[1]))
                         if diffIPt > diffOPt:
-                            print("I enthält O")
                             walls.remove(wallO)
                         else:
-                            print("O enthält I")
                             geomWallCut = ogr.Geometry(ogr.wkbPolygon)
                             ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
                             if (ptP1[0] == ipt1[0] and ptP1[1] == ipt1[1]) or (
@@ -1606,24 +1605,17 @@ class Converter(QgsTask):
                             wallsMod[str(o)] = geomWallCut
                             ix = walls.index(wallO)
                             walls[ix] = geomWallCut
-                    else:
-                        print("Nein")
 
-                    print(wallP)
                     if (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1] and ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]) or (
                             ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1] and ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]):
                         walls.remove(wallP)
-                        print("Ja")
                     elif (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1]) or (ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1]) or (
                             ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]) or (ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]):
-                        print("Teilweise")
                         diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
                         diffPPt = np.sqrt(np.square(ptP2[0] - ptP1[0]) + np.square(ptP2[1] - ptP1[1]))
                         if diffIPt > diffPPt:
-                            print("I enthält P")
                             walls.remove(wallP)
                         else:
-                            print("P enthält I")
                             geomWallCut = ogr.Geometry(ogr.wkbPolygon)
                             ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
                             if (ptO1[0] == ipt1[0] and ptO1[1] == ipt1[1]) or (
@@ -1658,11 +1650,70 @@ class Converter(QgsTask):
                             wallsMod[str(p)] = geomWallCut
                             ix = walls.index(wallP)
                             walls[ix] = geomWallCut
-                    else:
-                        print("Nein")
-                    print("----------")
 
         return walls, roofsOut
+
+    def simplify(self, geom):
+        if geom is None or geom.IsEmpty():
+            return geom
+        elif geom.GetGeometryName() == "POLYGON":
+            print("Alt: " + str(geom))
+            ring = geom.GetGeometryRef(0)
+
+            geomNew = ogr.Geometry(ogr.wkbPolygon)
+            ringNew = ogr.Geometry(ogr.wkbLinearRing)
+            ringNew.AddPoint(ring.GetPoint(0)[0], ring.GetPoint(0)[1], ring.GetPoint(0)[2])
+
+            skip = False
+            for i in range(2, ring.GetPointCount()):
+                if skip:
+                    skip = False
+                    continue
+                ptEnd = ring.GetPoint(i)
+                ptMid = ring.GetPoint(i-1)
+                ptStart = ring.GetPoint(i-2)
+                if (ptMid[0]-0.001 < ptStart[0] < ptMid[0]+0.001) and (ptMid[1]-0.001 < ptStart[1] < ptMid[1]+0.001) and (ptMid[2]-0.001 < ptStart[2] < ptMid[2]+0.001):
+                    continue
+                if (ptMid[0]-0.001 < ptEnd[0] < ptMid[0]+0.001) and (ptMid[1]-0.001 < ptEnd[1] < ptMid[1]+0.001) and (ptMid[2]-0.001 < ptEnd[2] < ptMid[2]+0.001):
+                    skip = True
+                    continue
+                if (ptStart[0]-0.001 < ptEnd[0] < ptStart[0]+0.001) and (ptStart[1]-0.001 < ptEnd[1] < ptStart[1]+0.001) and (ptStart[2]-0.001 < ptEnd[2] < ptStart[2]+0.001):
+                    return None
+                if ptMid[0]-ptStart[0] == 0:
+                    gradYStart = -1
+                else:
+                    gradYStart = ((ptMid[1]-ptStart[1])/(ptMid[0]-ptStart[0]))
+                if ptEnd[0]-ptMid[0] == 0:
+                    gradYEnd = -1
+                else:
+                    gradYEnd = ((ptEnd[1]-ptMid[1])/(ptEnd[0]-ptMid[0]))
+                print(str(gradYStart) + " : " + str(gradYEnd))
+                if gradYStart-0.001 < gradYEnd < gradYStart+0.001:
+                    if ptMid[0] - ptStart[0] == 0:
+                        gradZStart = -1
+                    else:
+                        gradZStart = ((ptMid[2] - ptStart[2]) / (ptMid[0] - ptStart[0]))
+                    if ptEnd[0] - ptMid[0] == 0:
+                        gradZEnd = -1
+                    else:
+                        gradZEnd = ((ptEnd[2] - ptMid[2]) / (ptEnd[0] - ptMid[0]))
+                    print(str(gradZStart) + " : " + str(gradZEnd))
+                    if gradZStart - 0.001 < gradZEnd < gradZStart + 0.001:
+                        continue
+                ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+            ringNew.CloseRings()
+            geomNew.AddGeometry(ringNew)
+            print("Neu: " + str(geomNew))
+            if geomNew.GetGeometryRef(0).GetPointCount() < 4:
+                return None
+            else:
+                return geomNew
+        elif geom.GetGeometryName() == "LINESTRING":
+            # TODO: Simplify LineString
+            return geom
+        else:
+            return geom
+        # TODO: Simplify nutzen statt OGR-Methode
 
     def checkRoofWalls(self, wallsIn, roofs):
         wallsOut = []
@@ -1703,6 +1754,7 @@ class Converter(QgsTask):
         for i in range(0, len(geomsIn)):
             if i in done:
                 continue
+            # TODO: Simplify einbauen
             ring1 = geomsIn[i].GetGeometryRef(0)
             for j in range(i + 1, len(geomsIn)):
                 if j in done:

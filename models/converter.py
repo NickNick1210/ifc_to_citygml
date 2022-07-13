@@ -675,18 +675,51 @@ class Converter(QgsTask):
 
             # Wenn immer noch mehr als eine Geometrie: Buffer und dann Union
             if geometry.GetGeometryCount() > 1:
+                print("BUFFER!")
                 geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                 for i in range(0, geometries.GetGeometryCount()):
                     g = geometries.GetGeometryRef(i)
-                    gBuffer = g.Buffer(0.1, quadsecs=2)
+                    gBuffer = g.Buffer(0.01, quadsecs=0)
                     geometriesBuffer.AddGeometry(gBuffer)
                 geometry = geometriesBuffer.UnionCascaded()
 
                 # Wenn immer noch mehr als eine Geometrie: Fehlermeldung
                 if geometry.GetGeometryName() != "POLYGON":
-                    self.parent.dlg.log(self.tr(
-                        u'Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated'))
-                    return None
+                    print("BUFFER2!")
+                    geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
+                    for i in range(0, geometries.GetGeometryCount()):
+                        g = geometries.GetGeometryRef(i)
+                        gBuffer = g.Buffer(0.05, quadsecs=0)
+                        geometriesBuffer.AddGeometry(gBuffer)
+                    geometry = geometriesBuffer.UnionCascaded()
+
+                    if geometry.GetGeometryName() != "POLYGON":
+                        print("BUFFER3!")
+                        geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
+                        for i in range(0, geometries.GetGeometryCount()):
+                            g = geometries.GetGeometryRef(i)
+                            gBuffer = g.Buffer(0.1, quadsecs=0)
+                            geometriesBuffer.AddGeometry(gBuffer)
+                        geometry = geometriesBuffer.UnionCascaded()
+
+                        if geometry.GetGeometryName() != "POLYGON":
+                            self.parent.dlg.log(self.tr(
+                                u'Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated'))
+                            return None
+
+                        # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
+                        else:
+                            geometry.Set3D(True)
+                            wkt = geometry.ExportToWkt()
+                            wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
+                            geometry = ogr.CreateGeometryFromWkt(wkt)
+
+                    # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
+                    else:
+                        geometry.Set3D(True)
+                        wkt = geometry.ExportToWkt()
+                        wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
+                        geometry = ogr.CreateGeometryFromWkt(wkt)
 
                 # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
                 else:
@@ -695,7 +728,7 @@ class Converter(QgsTask):
                     wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                     geometry = ogr.CreateGeometryFromWkt(wkt)
 
-        geometry = geometry.Simplify(0.0)
+        geometry = self.simplify(geometry)
         return geometry
 
     def convertLoD1Solid(self, ifcBuilding, chBldg, height):
@@ -814,8 +847,6 @@ class Converter(QgsTask):
         geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
-
-        # TODO: Dach für Wände ohne Dach
 
         # Geometrie
         links = []
@@ -1240,7 +1271,6 @@ class Converter(QgsTask):
                             if ptInt[0] == ptIn[0] and ptInt[1] == ptIn[1]:
                                 z = ptIn[2]
                     elif len(zList) > 1:
-                        print(roofIn)
                         ringIn = roofIn.GetGeometryRef(0)
                         rPlane = Plane(Point3D(ringIn.GetPoint(0)[0], ringIn.GetPoint(0)[1],
                                                ringIn.GetPoint(0)[2]),
@@ -1657,8 +1687,8 @@ class Converter(QgsTask):
         if geom is None or geom.IsEmpty():
             return geom
         elif geom.GetGeometryName() == "POLYGON":
-            print("Alt: " + str(geom))
             ring = geom.GetGeometryRef(0)
+            count = ring.GetPointCount()
 
             geomNew = ogr.Geometry(ogr.wkbPolygon)
             ringNew = ogr.Geometry(ogr.wkbLinearRing)
@@ -1672,10 +1702,8 @@ class Converter(QgsTask):
                 ptEnd = ring.GetPoint(i)
                 ptMid = ring.GetPoint(i-1)
                 ptStart = ring.GetPoint(i-2)
-                if (ptMid[0]-0.001 < ptStart[0] < ptMid[0]+0.001) and (ptMid[1]-0.001 < ptStart[1] < ptMid[1]+0.001) and (ptMid[2]-0.001 < ptStart[2] < ptMid[2]+0.001):
-                    continue
-                if (ptMid[0]-0.001 < ptEnd[0] < ptMid[0]+0.001) and (ptMid[1]-0.001 < ptEnd[1] < ptMid[1]+0.001) and (ptMid[2]-0.001 < ptEnd[2] < ptMid[2]+0.001):
-                    skip = True
+                dist = np.sqrt(np.square(ptMid[0]-ptStart[0])+np.square(ptMid[1]-ptStart[1])+np.square(ptMid[2]-ptStart[2]))
+                if dist < 0.1:
                     continue
                 if (ptStart[0]-0.001 < ptEnd[0] < ptStart[0]+0.001) and (ptStart[1]-0.001 < ptEnd[1] < ptStart[1]+0.001) and (ptStart[2]-0.001 < ptEnd[2] < ptStart[2]+0.001):
                     return None
@@ -1687,8 +1715,7 @@ class Converter(QgsTask):
                     gradYEnd = -1
                 else:
                     gradYEnd = ((ptEnd[1]-ptMid[1])/(ptEnd[0]-ptMid[0]))
-                print(str(gradYStart) + " : " + str(gradYEnd))
-                if gradYStart-0.001 < gradYEnd < gradYStart+0.001:
+                if gradYStart-0.01 < gradYEnd < gradYStart+0.01:
                     if ptMid[0] - ptStart[0] == 0:
                         gradZStart = -1
                     else:
@@ -1697,15 +1724,15 @@ class Converter(QgsTask):
                         gradZEnd = -1
                     else:
                         gradZEnd = ((ptEnd[2] - ptMid[2]) / (ptEnd[0] - ptMid[0]))
-                    print(str(gradZStart) + " : " + str(gradZEnd))
-                    if gradZStart - 0.001 < gradZEnd < gradZStart + 0.001:
+                    if gradZStart - 0.01 < gradZEnd < gradZStart + 0.01:
                         continue
                 ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
             ringNew.CloseRings()
             geomNew.AddGeometry(ringNew)
-            print("Neu: " + str(geomNew))
             if geomNew.GetGeometryRef(0).GetPointCount() < 4:
                 return None
+            elif geomNew.GetGeometryRef(0).GetPointCount() < count:
+                return self.simplify(geomNew)
             else:
                 return geomNew
         elif geom.GetGeometryName() == "LINESTRING":

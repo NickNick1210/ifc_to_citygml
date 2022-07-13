@@ -648,6 +648,7 @@ class Converter(QgsTask):
 
         # Geometrien erstellen
         geometry = None
+        geometries = []
         geometries = ogr.Geometry(ogr.wkbMultiPolygon)
         for grVerts in grVertsList:
             # Polygon aus Ring aus Punkten erstellen
@@ -681,7 +682,7 @@ class Converter(QgsTask):
                     g = geometries.GetGeometryRef(i)
                     gBuffer = g.Buffer(0.01, quadsecs=0)
                     geometriesBuffer.AddGeometry(gBuffer)
-                geometry = geometriesBuffer.UnionCascaded()
+                geometry = geometries.UnionCascaded()
 
                 # Wenn immer noch mehr als eine Geometrie: Fehlermeldung
                 if geometry.GetGeometryName() != "POLYGON":
@@ -691,7 +692,7 @@ class Converter(QgsTask):
                         g = geometries.GetGeometryRef(i)
                         gBuffer = g.Buffer(0.05, quadsecs=0)
                         geometriesBuffer.AddGeometry(gBuffer)
-                    geometry = geometriesBuffer.UnionCascaded()
+                    geometry = geometries.UnionCascaded()
 
                     if geometry.GetGeometryName() != "POLYGON":
                         print("BUFFER3!")
@@ -700,7 +701,7 @@ class Converter(QgsTask):
                             g = geometries.GetGeometryRef(i)
                             gBuffer = g.Buffer(0.1, quadsecs=0)
                             geometriesBuffer.AddGeometry(gBuffer)
-                        geometry = geometriesBuffer.UnionCascaded()
+                        geometry = geometries.UnionCascaded()
 
                         if geometry.GetGeometryName() != "POLYGON":
                             self.parent.dlg.log(self.tr(
@@ -730,6 +731,51 @@ class Converter(QgsTask):
 
         geometry = self.simplify(geometry)
         return geometry
+
+    def buffer2D(self, geom, dist):
+        if geom is None or geom.IsEmpty() or geom.GetGeometryName() != "POLYGON":
+            return geom
+        else:
+            ring = geom.GetGeometryRef(0)
+
+            geomBuffer = ogr.Geometry(ogr.wkbPolygon)
+            ringBuffer = ogr.Geometry(ogr.wkbLinearRing)
+
+            for i in range(1, ring.GetPointCount()):
+                if i == 1:
+                    ptStart = ring.GetPoint(ring.GetPointCount()-2)
+                else:
+                    ptStart = ring.GetPoint(i - 2)
+                ptEnd = ring.GetPoint(i)
+                ptMid = ring.GetPoint(i-1)
+
+                vStart = [ptMid[0]-ptStart[0], ptMid[1]-ptStart[1]]
+                vStartB = [vStart[1], vStart[0]]
+                vStartBLen = np.sqrt(np.square(vStartB[0]) + np.square(vStartB[1]))
+                vStartBNorm = [vStartB[0]/vStartBLen, vStartB[1]/vStartBLen]
+                vStartBDist = [vStartBNorm[0]*dist, vStartBNorm[1]*dist]
+
+                vEnd = [ptEnd[0]-ptMid[0], ptEnd[1]-ptMid[1]]
+                vEndB = [vEnd[1], vEnd[0]]
+                vEndBLen = np.sqrt(np.square(vEndB[0]) + np.square(vEndB[1]))
+                vEndBNorm = [vEndB[0]/vEndBLen, vEndB[1]/vEndBLen]
+                vEndBDist = [vEndBNorm[0]*dist, vEndBNorm[1]*dist]
+
+                ptMidB1 = [ptMid[0] + vStartBDist[0], ptMid[1] + vStartBDist[1], ptMid[2]]
+                ptMidB2 = [ptMid[0] + vEndBDist[0], ptMid[1] + vEndBDist[1], ptMid[2]]
+
+                b1Line = Line(Point3D(ptMidB1[0], ptMidB1[1], ptMidB1[2]), Point3D(ptMidB1[0]+(ptMid[0]-ptStart[0]), ptMidB1[1]+(ptMid[1]-ptStart[1]), ptMidB1[2]))
+                b2Line = Line(Point3D(ptMidB2[0], ptMidB2[1], ptMidB2[2]), Point3D(ptMidB2[0]+(ptEnd[0]-ptMid[0]), ptMidB2[1]+(ptEnd[1]-ptMid[1]), ptMidB2[2]))
+                sPoint = b1Line.intersection(b2Line)[0]
+                ringBuffer.AddPoint(float(sPoint[0]), float(sPoint[1]), ptMidB1[2])
+
+            ringBuffer.CloseRings()
+            geomBuffer.AddGeometry(ringBuffer)
+            if geomBuffer.GetGeometryRef(0).GetPointCount() < 4:
+                return None
+            else:
+                print(geomBuffer)
+                return geomBuffer
 
     def convertLoD1Solid(self, ifcBuilding, chBldg, height):
         """ Konvertieren des Gebäudeumrisses von IFC zu CityGML
@@ -1781,12 +1827,19 @@ class Converter(QgsTask):
         for i in range(0, len(geomsIn)):
             if i in done:
                 continue
-            # TODO: Simplify einbauen
-            ring1 = geomsIn[i].GetGeometryRef(0)
+            geom1 = self.simplify(geomsIn[i])
+            if geom1 is None:
+                done.append(i)
+                continue
+            ring1 = geom1.GetGeometryRef(0)
             for j in range(i + 1, len(geomsIn)):
                 if j in done:
-                    break
-                ring2 = geomsIn[j].GetGeometryRef(0)
+                    continue
+                geom2 = self.simplify(geomsIn[j])
+                if geom2 is None:
+                    done.append(j)
+                    continue
+                ring2 = geom2.GetGeometryRef(0)
                 samePts = []
                 for k in range(0, ring1.GetPointCount() - 1):
                     point1 = ring1.GetPoint(k)

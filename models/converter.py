@@ -571,14 +571,15 @@ class Converter(QgsTask):
 
         # Geometrie
         geometry = self.calcPlane(ifcSlabs)
-        self.geom.AddGeometry(geometry)
-        geomXML = Utilities.geomToGml(geometry)
-        if geomXML is not None:
-            # XML-Struktur
-            chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
-            chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
-            chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
-            chBldgFootPrintSM.append(geomXML)
+        if geometry is not None:
+            self.geom.AddGeometry(geometry)
+            geomXML = Utilities.geomToGml(geometry)
+            if geomXML is not None:
+                # XML-Struktur
+                chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
+                chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
+                chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
+                chBldgFootPrintSM.append(geomXML)
 
     def convertLoD0RoofEdge(self, ifcBuilding, chBldg):
         """ Konvertieren der Dachkantenfläche von IFC zu CityGML
@@ -676,13 +677,12 @@ class Converter(QgsTask):
 
             # Wenn immer noch mehr als eine Geometrie: Buffer und dann Union
             if geometry.GetGeometryCount() > 1:
-                print("BUFFER!")
                 geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                 for i in range(0, geometries.GetGeometryCount()):
                     g = geometries.GetGeometryRef(i)
                     gBuffer = g.Buffer(0.01, quadsecs=0)
                     geometriesBuffer.AddGeometry(gBuffer)
-                geometry = geometries.UnionCascaded()
+                geometry = geometriesBuffer.UnionCascaded()
 
                 # Wenn immer noch mehr als eine Geometrie: Fehlermeldung
                 if geometry.GetGeometryName() != "POLYGON":
@@ -692,7 +692,7 @@ class Converter(QgsTask):
                         g = geometries.GetGeometryRef(i)
                         gBuffer = g.Buffer(0.05, quadsecs=0)
                         geometriesBuffer.AddGeometry(gBuffer)
-                    geometry = geometries.UnionCascaded()
+                    geometry = geometriesBuffer.UnionCascaded()
 
                     if geometry.GetGeometryName() != "POLYGON":
                         print("BUFFER3!")
@@ -701,7 +701,7 @@ class Converter(QgsTask):
                             g = geometries.GetGeometryRef(i)
                             gBuffer = g.Buffer(0.1, quadsecs=0)
                             geometriesBuffer.AddGeometry(gBuffer)
-                        geometry = geometries.UnionCascaded()
+                        geometry = geometriesBuffer.UnionCascaded()
 
                         if geometry.GetGeometryName() != "POLYGON":
                             self.parent.dlg.log(self.tr(
@@ -714,6 +714,8 @@ class Converter(QgsTask):
                             wkt = geometry.ExportToWkt()
                             wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                             geometry = ogr.CreateGeometryFromWkt(wkt)
+                            geometry = self.simplify(geometry)
+                            geometry = self.buffer2D(geometry, -0.1)
 
                     # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
                     else:
@@ -721,6 +723,8 @@ class Converter(QgsTask):
                         wkt = geometry.ExportToWkt()
                         wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                         geometry = ogr.CreateGeometryFromWkt(wkt)
+                        geometry = self.simplify(geometry)
+                        geometry = self.buffer2D(geometry, -0.05)
 
                 # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
                 else:
@@ -728,8 +732,9 @@ class Converter(QgsTask):
                     wkt = geometry.ExportToWkt()
                     wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                     geometry = ogr.CreateGeometryFromWkt(wkt)
+                    geometry = self.simplify(geometry)
+                    geometry = self.buffer2D(geometry, -0.01)
 
-        geometry = self.simplify(geometry)
         return geometry
 
     def buffer2D(self, geom, dist):
@@ -890,9 +895,13 @@ class Converter(QgsTask):
 
         geomRoofs = self.extractRoofs(ifcRoofs)
         geomWalls, roofPoints, geomRoofsNew = self.calcWalls(geomBase, geomRoofs, height)
+        print("Nach calcWalls(): " + str(len(geomWalls)))
         geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
+        print("Nach calcRoofWalls(): " + str(len(geomWallsR)))
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
-        geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
+        #geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
+        print("Nach checkRoofWalls(): " + str(len(geomWalls)))
+        geomWalls += geomWallsR
 
         # Geometrie
         links = []
@@ -1306,35 +1315,22 @@ class Converter(QgsTask):
                 ringRoof = ogr.Geometry(ogr.wkbLinearRing)
                 for i in range(ringInt.GetPointCount() - 1, -1, -1):
                     ptInt = ringInt.GetPoint(i)
-                    zList = []
-                    for roofPoint in roofPoints:
-                        if ptInt[0] == roofPoint[0] and ptInt[1] == roofPoint[1]:
-                            zList.append(roofPoint[2])
-                    if len(zList) == 0:
-                        ringIn = roofIn.GetGeometryRef(0)
-                        for j in range(0, ringIn.GetPointCount()):
-                            ptIn = ringIn.GetPoint(j)
-                            if ptInt[0] == ptIn[0] and ptInt[1] == ptIn[1]:
-                                z = ptIn[2]
-                    elif len(zList) > 1:
-                        ringIn = roofIn.GetGeometryRef(0)
-                        rPlane = Plane(Point3D(ringIn.GetPoint(0)[0], ringIn.GetPoint(0)[1],
-                                               ringIn.GetPoint(0)[2]),
-                                       Point3D(ringIn.GetPoint(1)[0], ringIn.GetPoint(1)[1],
-                                               ringIn.GetPoint(1)[2]),
-                                       Point3D(ringIn.GetPoint(2)[0], ringIn.GetPoint(2)[1],
-                                               ringIn.GetPoint(2)[2]))
-                        wLine = Line(Point3D(ptInt[0], ptInt[1], 0), Point3D(ptInt[0], ptInt[1], 100))
-                        sPoint = rPlane.intersection(wLine)[0]
-                        z = float(sPoint[2])
-                    else:
-                        z = zList[0]
+
+                    ringIn = roofIn.GetGeometryRef(0)
+                    rPlane = Plane(Point3D(ringIn.GetPoint(0)[0], ringIn.GetPoint(0)[1],
+                                           ringIn.GetPoint(0)[2]),
+                                   Point3D(ringIn.GetPoint(1)[0], ringIn.GetPoint(1)[1],
+                                           ringIn.GetPoint(1)[2]),
+                                   Point3D(ringIn.GetPoint(2)[0], ringIn.GetPoint(2)[1],
+                                           ringIn.GetPoint(2)[2]))
+                    wLine = Line(Point3D(ptInt[0], ptInt[1], 0), Point3D(ptInt[0], ptInt[1], 100))
+                    sPoint = rPlane.intersection(wLine)[0]
+                    z = float(sPoint[2])
 
                     ringRoof.AddPoint(ptInt[0], ptInt[1], z)
                 ringRoof.CloseRings()
                 geomRoof.AddGeometry(ringRoof)
-                geomRoof = geomRoof.Simplify(0.00)
-
+                geomRoof = self.simplify(geomRoof)
                 roofs.append(geomRoof)
         return roofs
 
@@ -1388,6 +1384,9 @@ class Converter(QgsTask):
                         intersect = self.simplify(intersect)
                         if intersect is None:
                             continue
+                        print("Intersect: " + str(intersect))
+                        print("Dach 1: " + str(roof1))
+                        print("Dach 2: " + str(roof2))
                         ringInt = intersect.GetGeometryRef(0)
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
@@ -1553,6 +1552,7 @@ class Converter(QgsTask):
                             else:
                                 last = None
                         walls += wallsInt
+                        print("Durchgekommen")
 
                         if z1 <= z2:
                             roofInt = roofsOut[j].Difference(intersect).Simplify(0.0)
@@ -1611,7 +1611,7 @@ class Converter(QgsTask):
                             ringRoofOut.CloseRings()
                             geomRoofOut.AddGeometry(ringRoofOut)
 
-                            roofsOut[i] = geomRoofOut.Simplify(0.00)
+                            roofsOut[i] = self.simplify(geomRoofOut)
 
         walls += wallsLine
         wallsCheck = walls.copy()
@@ -1727,6 +1727,7 @@ class Converter(QgsTask):
                             ix = walls.index(wallP)
                             walls[ix] = geomWallCut
 
+        print("Ende calcRoofWalls(): " + str(len(walls)))
         return walls, roofsOut
 
     def simplify(self, geom):
@@ -1761,7 +1762,7 @@ class Converter(QgsTask):
                     gradYEnd = -1
                 else:
                     gradYEnd = ((ptEnd[1]-ptMid[1])/(ptEnd[0]-ptMid[0]))
-                if gradYStart-0.01 < gradYEnd < gradYStart+0.01:
+                if gradYStart-0.05 < gradYEnd < gradYStart+0.05:
                     if ptMid[0] - ptStart[0] == 0:
                         gradZStart = -1
                     else:
@@ -1770,7 +1771,7 @@ class Converter(QgsTask):
                         gradZEnd = -1
                     else:
                         gradZEnd = ((ptEnd[2] - ptMid[2]) / (ptEnd[0] - ptMid[0]))
-                    if gradZStart - 0.01 < gradZEnd < gradZStart + 0.01:
+                    if gradZStart - 0.05 < gradZEnd < gradZStart + 0.05:
                         continue
                 ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
             ringNew.CloseRings()
@@ -1789,9 +1790,8 @@ class Converter(QgsTask):
         # TODO: Simplify nutzen statt OGR-Methode
 
     def checkRoofWalls(self, wallsIn, roofs):
-        wallsOut = []
         wallsChecked = []
-
+        print("Anfang checkRoofWalls(): " + str(len(wallsIn)))
         for wall in wallsIn:
             anyInt = False
             for roof in roofs:
@@ -1804,6 +1804,9 @@ class Converter(QgsTask):
                         intersect2.AddPoint(startPt[0], startPt[1], startPt[2])
                         intersect2.AddPoint(endPt[0], endPt[1], endPt[2])
                         intersect = intersect2
+                    print("Wand: " + str(wall))
+                    print("Dach: " + str(roof))
+                    print("Intersect: " + str(intersect))
                     wallRing = wall.GetGeometryRef(0)
                     pt1Check, pt2Check = False, False
                     for i in range(0, wallRing.GetPointCount()):
@@ -1814,11 +1817,15 @@ class Converter(QgsTask):
                             pt2Check = True
                     if pt1Check and pt2Check:
                         anyInt = True
+                        print("Ja")
+                    else:
+                        print("Nein")
             if anyInt:
                 wallsChecked.append(wall)
 
+        print("Vor Union: " + str(len(wallsChecked)))
         wallsOut = self.union3D(wallsChecked)
-
+        print("Ende checkRoofWalls(): " + str(len(wallsOut)))
         return wallsOut
 
     def union3D(self, geomsIn):

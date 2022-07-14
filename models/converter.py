@@ -908,13 +908,13 @@ class Converter(QgsTask):
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
         print("Walls nach checkRoofWalls: " + str(len(geomWalls)))
-        for geomWall in geomWalls:
-            if geomWall.GetGeometryRef(0).GetPoint(0)[2] > 100:
-                print("ALARM 6 !!!")
-        for geomWallR in geomWallsR:
-            if geomWallR.GetGeometryRef(0).GetPoint(0)[2] > 100:
-                print("ALARM 7 !!!")
-        geomWalls += geomWallsR
+        geomRoofsSimple = []
+        for geomRoof in geomRoofs:
+            geomRoofSimple = self.simplify(geomRoof, tol=0.01)
+            if geomRoofSimple is not None and not geomRoofSimple.IsEmpty() and geomRoofSimple.GetGeometryName() == "POLYGON":
+                print(geomRoofSimple)
+                geomRoofsSimple.append(geomRoofSimple)
+        geomRoofs = geomRoofsSimple
 
         # Geometrie
         links = []
@@ -1131,8 +1131,6 @@ class Converter(QgsTask):
                 intPoints = self.sortPoints(intPoints, pt1, pt2)
                 intLines = self.sortLines(intLines, pt1, pt2)
 
-                if pt1[2] > 100:
-                    print("ALARM 5 !!!")
                 ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
                 lastIx1, lastIx2 = None, None
                 for intLine in intLines:
@@ -1221,8 +1219,7 @@ class Converter(QgsTask):
             pt1 = wall[0]
             pt2 = wall[1]
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
-            if pt1[2] > 100:
-                print("ALARM 4 !!!")
+
             z1, z2 = height, height
             for roofPoint in roofPoints:
                 if roofPoint[0] == pt1[0] and roofPoint[1] == pt1[1]:
@@ -1266,8 +1263,7 @@ class Converter(QgsTask):
                     if ringRoof.GetPointCount() > 2:
                         ringRoof.CloseRings()
                         geomRoof.AddGeometry(ringRoof)
-                        geomRoof = self.simplify(geomRoof)
-                        print(geomRoof)
+                        #geomRoof = self.simplify(geomRoof)
                         if not geomRoof.IsEmpty() and geomRoof.GetGeometryName() == "POLYGON":
                             roofsNew.append(geomRoof)
 
@@ -1317,7 +1313,7 @@ class Converter(QgsTask):
         roofs = []
 
         for roofIn in roofsIn:
-            roofIn = self.simplify(roofIn)
+            #roofIn = self.simplify(roofIn)
             if roofIn is None:
                 continue
             intersection = roofIn.Intersection(base)
@@ -1350,7 +1346,7 @@ class Converter(QgsTask):
                     ringRoof.AddPoint(ptInt[0], ptInt[1], z)
                 ringRoof.CloseRings()
                 geomRoof.AddGeometry(ringRoof)
-                geomRoof = self.simplify(geomRoof)
+                #geomRoof = self.simplify(geomRoof)
                 if geomRoof is not None:
                     roofs.append(geomRoof)
         return roofs
@@ -1360,21 +1356,15 @@ class Converter(QgsTask):
         walls = []
         wallsLine = []
         for i in range(0, len(roofs)):
-            print("R1 vorher: " + str(roofs[i]))
             #roof1 = self.simplify(roofs[i])
             roof1 = roofs[i]
-            #print("R1 nachher: " + str(roof1))
-            roof1Buff = self.buffer2D(roof1, 0.001)
+            roof1Buff = self.buffer2D(roof1, 0.0001)
             for j in range(i + 1, len(roofs)):
-                print("R2 vorher: " + str(roofs[j]))
                 roof2 = roofs[j]
                 #roof2 = self.simplify(roofs[j])
-                #print("R2 nachher: " + str(roof2))
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
-                    print("Intersect vorher: " + str(intersect))
-                    intersect = self.simplify(intersect)
-                    print("Intersect nachher: " + str(intersect))
+                    #intersect = self.simplify(intersect)
                     if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not intersect.IsEmpty():
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
@@ -1409,9 +1399,6 @@ class Converter(QgsTask):
                             ringWall.AddPoint(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], min(z21, z22))
                             ringWall.CloseRings()
                             geomWall.AddGeometry(ringWall)
-                            print("Neue WandLine: " + str(geomWall))
-                            if min(z11, z12) > 100:
-                                print("ALARM 3 !!!")
                             wallsLine.append(geomWall)
 
                     elif intersect is not None and intersect.GetGeometryName() == "POLYGON" and not intersect.IsEmpty():
@@ -1521,9 +1508,6 @@ class Converter(QgsTask):
                                     ringWall.CloseRings()
                                     geomWall.AddGeometry(ringWall)
                                     wallsInt.append(geomWall)
-                                    if p4[2] > 100:
-                                        print("ALARM 2 !!!")
-                                    print("Neue Wand: " + str(geomWall))
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
                             elif z2 < z1 and point not in pt2:
                                 if last is not None:
@@ -1579,9 +1563,6 @@ class Converter(QgsTask):
                                     ringWall.CloseRings()
                                     geomWall.AddGeometry(ringWall)
                                     wallsInt.append(geomWall)
-                                    print("Neue Wand: " + str(geomWall))
-                                    if p4[2] > 100:
-                                        print("ALARM 1 !!!")
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
                             else:
                                 last = None
@@ -1722,8 +1703,6 @@ class Converter(QgsTask):
                             wallsMod[str(o)] = geomWallCut
                             ix = walls.index(wallO)
                             walls[ix] = geomWallCut
-                            if geomWallCut.GetGeometryRef(0).GetPoint(0)[2] > 100:
-                                print("ALARM 10 !!!")
 
                     if (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1] and ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]) or (
                             ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1] and ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]):
@@ -1769,12 +1748,10 @@ class Converter(QgsTask):
                             wallsMod[str(p)] = geomWallCut
                             ix = walls.index(wallP)
                             walls[ix] = geomWallCut
-                            if geomWallCut.GetGeometryRef(0).GetPoint(0)[2] > 100:
-                                print("ALARM 9 !!!")
 
         return walls, roofsOut
 
-    def simplify(self, geom, zd=False):
+    def simplify(self, geom, zd=False, tol=0.1):
         if geom is None or geom.IsEmpty():
             return geom
         elif geom.GetGeometryName() == "POLYGON":
@@ -1793,7 +1770,7 @@ class Converter(QgsTask):
                     dist = np.sqrt(np.square(ptMid[0] - ptStart[0]) + np.square(ptMid[1] - ptStart[1]))
                 else:
                     dist = np.sqrt(np.square(ptMid[0]-ptStart[0])+np.square(ptMid[1]-ptStart[1])+np.square(ptMid[2]-ptStart[2]))
-                if dist < 0.1:
+                if dist < tol:
                     continue
                 if ptMid[0]-ptStart[0] == 0:
                     gradYStart = -1
@@ -1917,6 +1894,7 @@ class Converter(QgsTask):
                     if pt1Check and pt2Check:
                         anyInt = True
             if anyInt:
+                wall = self.simplify(wall)
                 wallsChecked.append(wall)
 
         print("Neue Walls mitten in checkRoofWalls: " + str(len(wallsChecked)))
@@ -1934,20 +1912,26 @@ class Converter(QgsTask):
             # TODO: Simplify einbauen
             #ring1 = geomsIn[i].GetGeometryRef(0)
             geom1 = self.simplify(geomsIn[i])
-            if geom1 is None:
+            if geom1 is None or geom1.GetGeometryName() != "POLYGON":
                 done.append(i)
                 continue
             ring1 = geom1.GetGeometryRef(0)
+            if ring1 is None:
+                done.append(i)
+                continue
             for j in range(i + 1, len(geomsIn)):
                 if j in done:
                     #break
                     continue
                 #ring2 = geomsIn[j].GetGeometryRef(0)
                 geom2 = self.simplify(geomsIn[j])
-                if geom2 is None:
+                if geom2 is None or geom2.GetGeometryName() != "POLYGON":
                     done.append(j)
                     continue
                 ring2 = geom2.GetGeometryRef(0)
+                if ring2 is None:
+                    done.append(j)
+                    continue
                 samePts = []
                 for k in range(0, ring1.GetPointCount() - 1):
                     point1 = ring1.GetPoint(k)

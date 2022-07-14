@@ -1350,14 +1350,14 @@ class Converter(QgsTask):
         walls = []
         wallsLine = []
         for i in range(0, len(roofs)):
-            print("1 vorher: " + str(roof1))
+            print("R1 vorher: " + str(roof1))
             roof1 = self.simplify(roofs[i])
-            print("1 nachher: " + str(roof1))
+            print("R1 nachher: " + str(roof1))
             roof1Buff = self.buffer2D(roof1, 0.001)
             for j in range(i + 1, len(roofs)):
-                print("2 vorher: " + str(roof2))
+                print("R2 vorher: " + str(roof2))
                 roof2 = self.simplify(roofs[j])
-                print("2 nachher: " + str(roof2))
+                print("R2 nachher: " + str(roof2))
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
                     intersect = self.simplify(intersect)

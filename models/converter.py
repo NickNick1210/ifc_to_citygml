@@ -1340,10 +1340,11 @@ class Converter(QgsTask):
         wallsLine = []
         for i in range(0, len(roofs)):
             roof1 = roofs[i]
+            roof1Buff = self.buffer2D(roof1, 0.0001)
             for j in range(i + 1, len(roofs)):
                 roof2 = roofs[j]
-                if roof1.Intersects(roof2):
-                    intersect = roof1.Intersection(roof2)
+                if roof1Buff.Intersects(roof2):
+                    intersect = roof1Buff.Intersection(roof2)
                     if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not intersect.IsEmpty():
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
@@ -1772,7 +1773,16 @@ class Converter(QgsTask):
                     else:
                         gradZEnd = ((ptEnd[2] - ptMid[2]) / (ptEnd[0] - ptMid[0]))
                     if gradZStart - 0.05 < gradZEnd < gradZStart + 0.05:
-                        continue
+                        if ptMid[1] - ptStart[1] == 0:
+                            gradYZStart = -1
+                        else:
+                            gradYZStart = ((ptMid[2] - ptStart[2]) / (ptMid[1] - ptStart[1]))
+                        if ptEnd[1] - ptMid[1] == 0:
+                            gradYZEnd = -1
+                        else:
+                            gradYZEnd = ((ptEnd[2] - ptMid[2]) / (ptEnd[0] - ptMid[0]))
+                        if gradYZStart - 0.05 < gradYZEnd < gradYZStart + 0.05:
+                            continue
                 ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
             ringNew.CloseRings()
             geomNew.AddGeometry(ringNew)

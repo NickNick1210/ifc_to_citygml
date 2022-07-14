@@ -906,8 +906,14 @@ class Converter(QgsTask):
         geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
         print("Neue Walls nach calcRoofWalls: " + str(len(geomWallsR)))
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
-        #geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
+        geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
         print("Walls nach checkRoofWalls: " + str(len(geomWalls)))
+        for geomWall in geomWalls:
+            if geomWall.GetGeometryRef(0).GetPoint(0)[2] > 100:
+                print("ALARM 6 !!!")
+        for geomWallR in geomWallsR:
+            if geomWallR.GetGeometryRef(0).GetPoint(0)[2] > 100:
+                print("ALARM 7 !!!")
         geomWalls += geomWallsR
 
         # Geometrie
@@ -1125,6 +1131,8 @@ class Converter(QgsTask):
                 intPoints = self.sortPoints(intPoints, pt1, pt2)
                 intLines = self.sortLines(intLines, pt1, pt2)
 
+                if pt1[2] > 100:
+                    print("ALARM 5 !!!")
                 ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
                 lastIx1, lastIx2 = None, None
                 for intLine in intLines:
@@ -1213,6 +1221,8 @@ class Converter(QgsTask):
             pt1 = wall[0]
             pt2 = wall[1]
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
+            if pt1[2] > 100:
+                print("ALARM 4 !!!")
             z1, z2 = height, height
             for roofPoint in roofPoints:
                 if roofPoint[0] == pt1[0] and roofPoint[1] == pt1[1]:
@@ -1350,17 +1360,21 @@ class Converter(QgsTask):
         walls = []
         wallsLine = []
         for i in range(0, len(roofs)):
-            print("R1 vorher: " + str(roof1))
-            roof1 = self.simplify(roofs[i])
-            print("R1 nachher: " + str(roof1))
+            print("R1 vorher: " + str(roofs[i]))
+            #roof1 = self.simplify(roofs[i])
+            roof1 = roofs[i]
+            #print("R1 nachher: " + str(roof1))
             roof1Buff = self.buffer2D(roof1, 0.001)
             for j in range(i + 1, len(roofs)):
-                print("R2 vorher: " + str(roof2))
-                roof2 = self.simplify(roofs[j])
-                print("R2 nachher: " + str(roof2))
+                print("R2 vorher: " + str(roofs[j]))
+                roof2 = roofs[j]
+                #roof2 = self.simplify(roofs[j])
+                #print("R2 nachher: " + str(roof2))
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
+                    print("Intersect vorher: " + str(intersect))
                     intersect = self.simplify(intersect)
+                    print("Intersect nachher: " + str(intersect))
                     if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not intersect.IsEmpty():
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
@@ -1395,12 +1409,12 @@ class Converter(QgsTask):
                             ringWall.AddPoint(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], min(z21, z22))
                             ringWall.CloseRings()
                             geomWall.AddGeometry(ringWall)
+                            print("Neue WandLine: " + str(geomWall))
+                            if min(z11, z12) > 100:
+                                print("ALARM 3 !!!")
                             wallsLine.append(geomWall)
 
                     elif intersect is not None and intersect.GetGeometryName() == "POLYGON" and not intersect.IsEmpty():
-                        intersect = self.simplify(intersect)
-                        if intersect is None:
-                            continue
                         ringInt = intersect.GetGeometryRef(0)
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
@@ -1507,6 +1521,9 @@ class Converter(QgsTask):
                                     ringWall.CloseRings()
                                     geomWall.AddGeometry(ringWall)
                                     wallsInt.append(geomWall)
+                                    if p4[2] > 100:
+                                        print("ALARM 2 !!!")
+                                    print("Neue Wand: " + str(geomWall))
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
                             elif z2 < z1 and point not in pt2:
                                 if last is not None:
@@ -1562,17 +1579,18 @@ class Converter(QgsTask):
                                     ringWall.CloseRings()
                                     geomWall.AddGeometry(ringWall)
                                     wallsInt.append(geomWall)
+                                    print("Neue Wand: " + str(geomWall))
+                                    if p4[2] > 100:
+                                        print("ALARM 1 !!!")
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
                             else:
                                 last = None
+
                         walls += wallsInt
 
                         if z1 <= z2:
-                            print("if Anfang: " + str(roofsOut[j]))
                             roofInt = roofsOut[j].Difference(intersect)
-                            print("if difference: " + str(roofInt))
                             roofInt = roofInt.Simplify(0.0)
-                            print("if difference simplified: " + str(roofInt))
                             ringInt = roofInt.GetGeometryRef(0)
                             ringRoof = roofsOut[j].GetGeometryRef(0)
                             rPlane = Plane(Point3D(ringRoof.GetPoint(0)[0], ringRoof.GetPoint(0)[1],
@@ -1599,16 +1617,13 @@ class Converter(QgsTask):
                             ringRoofOut.CloseRings()
                             geomRoofOut.AddGeometry(ringRoofOut)
 
-                            print("if vorher: " + str(geomRoofOut))
                             geomRoofOut = geomRoofOut.Simplify(0.00)
-                            print("if nachher: " + str(geomRoofOut))
                             roofsOut[j] = geomRoofOut
                         else:
                             roofInt = roofsOut[i].Difference(intersect).Simplify(0.0)
                             ringInt = roofInt.GetGeometryRef(0)
-                            print("else vorher: " + str(roofsOut[i]))
-                            geomRoof = self.simplify(roofsOut[i])
-                            print("else nachher: " + str(geomRoof))
+                            #geomRoof = self.simplify(roofsOut[i])
+                            geomRoof = roofsOut[i]
                             ringRoof = geomRoof.GetGeometryRef(0)
                             rPlane = Plane(Point3D(ringRoof.GetPoint(0)[0], ringRoof.GetPoint(0)[1],
                                                    ringRoof.GetPoint(0)[2]),
@@ -1635,7 +1650,8 @@ class Converter(QgsTask):
                             geomRoofOut.AddGeometry(ringRoofOut)
 
                             #roofsOut[i] = geomRoofOut.Simplify(0.00)
-                            roofsOut[i] = self.simplify(geomRoofOut)
+                            #roofsOut[i] = self.simplify(geomRoofOut)
+                            roofsOut[i] = geomRoofOut
 
         walls += wallsLine
         print("Neue Walls mitten in calcRoofWalls: " + str(len(walls)))
@@ -1676,10 +1692,10 @@ class Converter(QgsTask):
                             ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
                             if (ptP1[0] == ipt1[0] and ptP1[1] == ipt1[1]) or (
                                     ptP1[0] == ipt2[0] and ptP1[1] == ipt2[1]):
-                                zU = wallCheckPRing.GetPoint(0)[0]
+                                zU = wallCheckPRing.GetPoint(0)[2]
                                 zO = ptP1[2]
                             else:
-                                zU = wallCheckPRing.GetPoint(3)[0]
+                                zU = wallCheckPRing.GetPoint(3)[2]
                                 zO = ptP2[2]
                             if ptO1[0] == ipt1[0] and ptO1[1] == ipt1[1]:
                                 ringWallCut.AddPoint(ipt2[0], ipt2[1], zU)
@@ -1706,6 +1722,8 @@ class Converter(QgsTask):
                             wallsMod[str(o)] = geomWallCut
                             ix = walls.index(wallO)
                             walls[ix] = geomWallCut
+                            if geomWallCut.GetGeometryRef(0).GetPoint(0)[2] > 100:
+                                print("ALARM 10 !!!")
 
                     if (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1] and ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]) or (
                             ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1] and ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]):
@@ -1751,6 +1769,8 @@ class Converter(QgsTask):
                             wallsMod[str(p)] = geomWallCut
                             ix = walls.index(wallP)
                             walls[ix] = geomWallCut
+                            if geomWallCut.GetGeometryRef(0).GetPoint(0)[2] > 100:
+                                print("ALARM 9 !!!")
 
         return walls, roofsOut
 
@@ -1822,7 +1842,6 @@ class Converter(QgsTask):
             geomNew = ogr.Geometry(ogr.wkbLineString)
             geomNew.AddPoint(geom.GetPoint(0)[0], geom.GetPoint(0)[1], geom.GetPoint(0)[2])
 
-            skip = False
             for i in range(2, geom.GetPointCount()):
                 ptEnd = geom.GetPoint(i)
                 ptMid = geom.GetPoint(i - 1)
@@ -1863,6 +1882,7 @@ class Converter(QgsTask):
                         if gradYZStart - 0.05 < gradYZEnd < gradYZStart + 0.05:
                             continue
                 geomNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+            geomNew.AddPoint(geom.GetPoint(geom.GetPointCount()-1)[0], geom.GetPoint(geom.GetPointCount()-1)[1], geom.GetPoint(geom.GetPointCount()-1)[2])
             if geomNew.GetPointCount() < count:
                 return self.simplify(geomNew)
             else:

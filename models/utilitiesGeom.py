@@ -44,6 +44,80 @@ class UtilitiesGeom:
         return xml
 
     @staticmethod
+    def sortPoints( points, fromPoint, toPoint):
+        """ Sortieren von Punkten
+
+        Args:
+            points: Die zu sortierenden Punkte als Liste
+            fromPoint: Punkt, von dessen Richtung aus sortiert werden soll
+            toPoint: Punkt, in dessen Richtung hin sortiert werden soll
+
+        Returns:
+            Die sortierten Punkte als Liste
+        """
+        # Sortierung nach X, dann Y, dann Z
+        # Z-Sortierung immer in positive Richtung
+
+        # in positive X-Richtung
+        if toPoint[0] > fromPoint[0]:
+            # in positive Y-Richtung
+            if toPoint[1] > fromPoint[1]:
+                points.sort(key=lambda elem: (elem[0], elem[1], elem[2]))
+            # in negative Y-Richtung
+            else:
+                points.sort(key=lambda elem: (elem[0], -elem[1], elem[2]))
+
+        # in negative X-Richtung
+        else:
+            # in positive Y-Richtung
+            if toPoint[1] > fromPoint[1]:
+                points.sort(key=lambda elem: (-elem[0], elem[1], elem[2]))
+            # in negative Y-Richtung
+            else:
+                points.sort(key=lambda elem: (-elem[0], -elem[1], elem[2]))
+
+        return points
+
+    @staticmethod
+    def sortLines(lines, fromPoint, toPoint):
+        """ Sortieren von Linien
+
+        Args:
+            lines: Die zu sortierenden Linien als Liste
+            fromPoint: Punkt, von dessen Richtung aus sortiert werden soll
+            toPoint: Punkt, in dessen Richtung hin sortiert werden soll
+
+        Returns:
+            Die sortierten Linien als Liste
+        """
+        # Sortierung nach X, dann Y, dann Z
+        # Z-Sortierung immer in positive Richtung
+
+        # in positive X-Richtung
+        if toPoint[0] > fromPoint[0]:
+            # in positive Y-Richtung
+            if toPoint[1] > fromPoint[1]:
+                lines.sort(key=lambda elem: (
+                    min(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+            # in negative Y-Richtung
+            else:
+                lines.sort(key=lambda elem: (
+                    min(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+
+        # in negative X-Richtung
+        else:
+            # in positive Y-Richtung
+            if toPoint[1] > fromPoint[1]:
+                lines.sort(key=lambda elem: (
+                    -max(elem[0][0], elem[1][0]), min(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+            # in negative Y-Richtung
+            else:
+                lines.sort(key=lambda elem: (
+                    -max(elem[0][0], elem[1][0]), -max(elem[0][1], elem[1][1]), min(elem[0][2], elem[1][2])))
+
+        return lines
+
+    @staticmethod
     def simplify(geom, zd=False, distTol=0.1):
         """ Vereinfachen von OGR-Geometrien (Polygone und LineStrings)
 

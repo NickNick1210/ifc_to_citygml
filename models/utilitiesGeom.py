@@ -44,7 +44,7 @@ class UtilitiesGeom:
         return xml
 
     @staticmethod
-    def sortPoints( points, fromPoint, toPoint):
+    def sortPoints(points, fromPoint, toPoint):
         """ Sortieren von Punkten
 
         Args:
@@ -118,6 +118,20 @@ class UtilitiesGeom:
         return lines
 
     @staticmethod
+    def getPlane(pt1, pt2, pt3):
+        """ Erstellen einer Ebene aus drei Punkten
+
+        Args:
+            pt1: Erster Punkt in der Ebene
+            pt2: Zweiter Punkt in der Ebene
+            pt3: Dritter Punkt in der Ebene
+
+        Returns:
+            Die erstellte Ebene
+        """
+        return Plane(Point3D(pt1[0], pt1[1], pt1[2]), Point3D(pt2[0], pt2[1], pt2[2]), Point3D(pt3[0], pt3[1], pt3[2]))
+
+    @staticmethod
     def simplify(geom, zd=False, distTol=0.1):
         """ Vereinfachen von OGR-Geometrien (Polygone und LineStrings)
 
@@ -175,7 +189,8 @@ class UtilitiesGeom:
                         if gradZSt - tol < gradZEnd < gradZSt + tol:
                             # Z-Steigung in Bezug auf Y-Verlauf
                             gradYZSt = -1 if ptMid[1] - ptSt[1] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[1] - ptSt[1])
-                            gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(ptEnd[1] - ptMid[1])
+                            gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(
+                                ptEnd[1] - ptMid[1])
                             if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
                                 continue
 
@@ -205,6 +220,8 @@ class UtilitiesGeom:
                 # Wenn fertig: Zurückgeben
                 else:
                     simpList.append(geomNew)
+
+        print(simpList)
 
         # Rückgabe
         if len(simpList) == 0:

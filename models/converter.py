@@ -826,7 +826,9 @@ class Converter(QgsTask):
         geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
         geomRoofs = self.calcRoofs(geomRoofs, geomBase)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
-        geomRoofs = UtilitiesGeom.simplify(geomRoofs, distTol=0.01)
+        print("Vorher: " + str(geomRoofs))
+        #geomRoofs = UtilitiesGeom.simplify(geomRoofs, distTol=0.01)
+        print("Nachher: " + str(geomRoofs))
 
         # Geometrie
         links = []
@@ -1320,20 +1322,14 @@ class Converter(QgsTask):
                         ringR1, ringR2 = roof1.GetGeometryRef(0), roof2.GetGeometryRef(0)
 
                         # Z-Koordinaten über Ebenen-Geraden-Schnitte berechnen
-                        r1Plane = Plane(Point3D(ringR1.GetPoint(0)[0], ringR1.GetPoint(0)[1], ringR1.GetPoint(0)[2]),
-                                        Point3D(ringR1.GetPoint(1)[0], ringR1.GetPoint(1)[1], ringR1.GetPoint(1)[2]),
-                                        Point3D(ringR1.GetPoint(2)[0], ringR1.GetPoint(2)[1], ringR1.GetPoint(2)[2]))
-                        r2Plane = Plane(Point3D(ringR2.GetPoint(0)[0], ringR2.GetPoint(0)[1], ringR2.GetPoint(0)[2]),
-                                        Point3D(ringR2.GetPoint(1)[0], ringR2.GetPoint(1)[1], ringR2.GetPoint(1)[2]),
-                                        Point3D(ringR2.GetPoint(2)[0], ringR2.GetPoint(2)[1], ringR2.GetPoint(2)[2]))
+                        r1Plane = UtilitiesGeom.getPlane(ringR1.GetPoint(0), ringR1.GetPoint(1), ringR1.GetPoint(2))
+                        r2Plane = UtilitiesGeom.getPlane(ringR2.GetPoint(0), ringR2.GetPoint(1), ringR2.GetPoint(2))
                         w1Line = Line(Point3D(intersect.GetPoint(0)[0], intersect.GetPoint(0)[1], 0),
                                       Point3D(intersect.GetPoint(0)[0], intersect.GetPoint(0)[1], 100))
                         w2Line = Line(Point3D(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], 0),
                                       Point3D(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], 100))
-                        z11 = float(r1Plane.intersection(w1Line)[0][2])
-                        z12 = float(r2Plane.intersection(w1Line)[0][2])
-                        z21 = float(r1Plane.intersection(w2Line)[0][2])
-                        z22 = float(r2Plane.intersection(w2Line)[0][2])
+                        z11, z12 = float(r1Plane.intersection(w1Line)[0][2]), float(r2Plane.intersection(w1Line)[0][2])
+                        z21, z22 = float(r1Plane.intersection(w2Line)[0][2]), float(r2Plane.intersection(w2Line)[0][2])
 
                         # Wenn die Dächer nicht auf selber Höhe sind: Neue Wand dazwischen
                         if not z11 - 0.001 < z12 < z11 + 0.001:
@@ -1350,226 +1346,153 @@ class Converter(QgsTask):
                     elif intersect is not None and intersect.GetGeometryName() == "POLYGON" and not intersect.IsEmpty():
                         ringInt = intersect.GetGeometryRef(0)
                         ringR1, ringR2 = roof1.GetGeometryRef(0), roof2.GetGeometryRef(0)
+                        r1Plane = UtilitiesGeom.getPlane(ringR1.GetPoint(0), ringR1.GetPoint(1), ringR1.GetPoint(2))
+                        r2Plane = UtilitiesGeom.getPlane(ringR2.GetPoint(0), ringR2.GetPoint(1), ringR2.GetPoint(2))
                         z1, z2 = None, None
                         pt1, pt2 = [], []
+
+                        # Z-Koordinaten der beiden Dächer heraussuchen
                         for k in range(0, ringInt.GetPointCount() - 1):
                             point = ogr.Geometry(ogr.wkbPoint)
                             point.AddPoint(ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1])
                             if roof1.Contains(point):
-                                for l in range(0, ringR2.GetPointCount()):
-                                    if (ringR2.GetPoint(l)[0] - 0.001 <= ringInt.GetPoint(k)[0] <=
-                                        ringR2.GetPoint(l)[0] + 0.001) and (
-                                            ringR2.GetPoint(l)[1] - 0.001 <= ringInt.GetPoint(k)[1] <= \
-                                            ringR2.GetPoint(l)[1] + 0.001):
-                                        z2 = ringR2.GetPoint(l)[2]
-                                        ptz2 = [ringR2.GetPoint(l)[0], ringR2.GetPoint(l)[1]]
+                                for r2PtM in ringR2.GetPoints():
+                                    if (r2PtM[0] - 0.001 <= ringInt.GetPoint(k)[0] <= r2PtM[0] + 0.001) and (
+                                            r2PtM[1] - 0.001 <= ringInt.GetPoint(k)[1] <= r2PtM[1] + 0.001):
+                                        z2, ptz2 = r2PtM[2], [r2PtM[0], r2PtM[1]]
                                         pt1.append([point.GetPoint(0)[0], point.GetPoint(0)[1]])
                             elif roof2.Contains(point):
-                                for m in range(0, ringR1.GetPointCount()):
-                                    if ringR1.GetPoint(m)[0] - 0.001 <= ringInt.GetPoint(k)[0] <= \
-                                            ringR1.GetPoint(m)[0] + 0.001 and ringR1.GetPoint(m)[1] - 0.001 <= \
-                                            ringInt.GetPoint(k)[1] <= \
-                                            ringR1.GetPoint(m)[1] + 0.001:
-                                        z1 = ringR1.GetPoint(m)[2]
-                                        ptz1 = [ringR1.GetPoint(m)[0], ringR1.GetPoint(m)[1]]
+                                for r1PtM in ringR1.GetPoints():
+                                    if (r1PtM[0] - 0.001 <= ringInt.GetPoint(k)[0] <= r1PtM[0] + 0.001) and (
+                                            r1PtM[1] - 0.001 <= ringInt.GetPoint(k)[1] <= r1PtM[1] + 0.001):
+                                        z1, ptz1 = r1PtM[2], [r1PtM[0], r1PtM[1]]
                                         pt2.append([point.GetPoint(0)[0], point.GetPoint(0)[1]])
                         if z1 is None:
-                            rPlane = Plane(Point3D(ringR1.GetPoint(0)[0], ringR1.GetPoint(0)[1],
-                                                   ringR1.GetPoint(0)[2]),
-                                           Point3D(ringR1.GetPoint(1)[0], ringR1.GetPoint(1)[1],
-                                                   ringR1.GetPoint(1)[2]),
-                                           Point3D(ringR1.GetPoint(2)[0], ringR1.GetPoint(2)[1],
-                                                   ringR1.GetPoint(2)[2]))
-                            wLine = Line(Point3D(ptz2[0], ptz2[1], 0), Point3D(ptz2[0], ptz2[1], 100))
-                            sPoint = rPlane.intersection(wLine)[0]
-                            z1 = float(sPoint[2])
+                            wLine1 = Line(Point3D(ptz2[0], ptz2[1], 0), Point3D(ptz2[0], ptz2[1], 100))
+                            sPoint1 = r1Plane.intersection(wLine1)[0]
+                            z1 = float(sPoint1[2])
                         if z2 is None:
-                            rPlane = Plane(Point3D(ringR2.GetPoint(0)[0], ringR2.GetPoint(0)[1], ringR2.GetPoint(0)[2]),
-                                           Point3D(ringR2.GetPoint(1)[0], ringR2.GetPoint(1)[1], ringR2.GetPoint(1)[2]),
-                                           Point3D(ringR2.GetPoint(2)[0], ringR2.GetPoint(2)[1], ringR2.GetPoint(2)[2]))
-                            wLine = Line(Point3D(ptz1[0], ptz1[1], 0), Point3D(ptz1[0], ptz1[1], 100))
-                            sPoint = rPlane.intersection(wLine)[0]
-                            z2 = float(sPoint[2])
+                            wLine2 = Line(Point3D(ptz1[0], ptz1[1], 0), Point3D(ptz1[0], ptz1[1], 100))
+                            sPoint2 = r2Plane.intersection(wLine2)[0]
+                            z2 = float(sPoint2[2])
 
+                        ### NEUE WÄNDE ###
                         last = None
                         wallsInt = []
                         for n in range(0, ringInt.GetPointCount()):
                             point = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
-                            if z1 <= z2 and point not in pt1:
-                                if last is not None:
-                                    geomWall = ogr.Geometry(ogr.wkbPolygon)
-                                    ringWall = ogr.Geometry(ogr.wkbLinearRing)
 
-                                    r1Pt0, r1Pt1, r1Pt2 = ringR1.GetPoint(0), ringR1.GetPoint(1), ringR1.GetPoint(2)
-                                    r1Plane = Plane(Point3D(r1Pt0[0], r1Pt0[1], r1Pt0[2]),
-                                                    Point3D(r1Pt1[0], r1Pt1[1], r1Pt1[2]),
-                                                    Point3D(r1Pt2[0], r1Pt2[1], r1Pt2[2]))
-                                    r2Pt0, r2Pt1, r2Pt2 = ringR2.GetPoint(0), ringR2.GetPoint(1), ringR2.GetPoint(2)
-                                    r2Plane = Plane(Point3D(r2Pt0[0], r2Pt0[1], r2Pt0[2]),
-                                                    Point3D(r2Pt1[0], r2Pt1[1], r2Pt1[2]),
-                                                    Point3D(r2Pt2[0], r2Pt2[1], r2Pt2[2]))
+                            p1, p2, p3, p4 = None, None, None, None
+                            if last is not None and ((z1 <= z2 and point not in pt1) or (z2 < z1 and point not in pt2)):
+                                # Geraden
+                                wLineLast = Line(Point3D(last[0], last[1], 0), Point3D(last[0], last[1], 100))
+                                wLineCurr = Line(Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 0),
+                                                 Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
 
-                                    wLine1 = Line(Point3D(last[0], last[1], 0), Point3D(last[0], last[1], 100))
-                                    sPoint1 = r1Plane.intersection(wLine1)[0]
-                                    p1 = [last[0], last[1], float(sPoint1[2])]
+                                # Schnittpunkte
+                                sPoint1Last = r1Plane.intersection(wLineLast)[0]
+                                p1Last = [last[0], last[1], float(sPoint1Last[2])]
+                                sPoint2Last = r2Plane.intersection(wLineLast)[0]
+                                p2Last = [last[0], last[1], float(sPoint2Last[2])]
+                                sPoint1Curr = r1Plane.intersection(wLineCurr)[0]
+                                p1Curr = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint1Curr[2])]
+                                sPoint2Curr = r2Plane.intersection(wLineCurr)[0]
+                                p2Curr = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint2Curr[2])]
 
-                                    wLine2 = Line(Point3D(last[0], last[1], 0), Point3D(last[0], last[1], 100))
-                                    sPoint2 = r2Plane.intersection(wLine2)[0]
-                                    p2 = [last[0], last[1], float(sPoint2[2])]
+                                # Wandgeometrie
+                                geomWall = ogr.Geometry(ogr.wkbPolygon)
+                                ringWall = ogr.Geometry(ogr.wkbLinearRing)
 
-                                    wLine3 = Line(Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 0),
-                                                  Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
-                                    sPoint3 = r2Plane.intersection(wLine3)[0]
-                                    p3 = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint3[2])]
+                                # Wenn Dach 1 unter Dach 2
+                                if z1 <= z2 and point not in pt1:
+                                    p1, p2, p3, p4 = p1Curr, p2Curr, p2Last, p1Last
+                                # Wenn Dach 1 über Dach 2
+                                elif z2 < z1 and point not in pt2:
+                                    p1, p2, p3, p4 = p2Curr, p1Curr, p1Last, p2Last
 
-                                    wLine4 = Line(Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 0),
-                                                  Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
-                                    sPoint4 = r1Plane.intersection(wLine4)[0]
-                                    p4 = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint4[2])]
+                                # Wandgeometrie
+                                ringWall.AddPoint(p1[0], p1[1], p1[2])
+                                ringWall.AddPoint(p2[0], p2[1], p2[2])
+                                ringWall.AddPoint(p3[0], p3[1], p3[2])
+                                ringWall.AddPoint(p4[0], p4[1], p4[2])
+                                ringWall.CloseRings()
+                                geomWall.AddGeometry(ringWall)
+                                wallsInt.append(geomWall)
 
-                                    ringWall.AddPoint(p4[0], p4[1], p4[2])
-                                    ringWall.AddPoint(p3[0], p3[1], p3[2])
-                                    ringWall.AddPoint(p2[0], p2[1], p2[2])
-                                    ringWall.AddPoint(p1[0], p1[1], p1[2])
-                                    ringWall.CloseRings()
-                                    geomWall.AddGeometry(ringWall)
-                                    wallsInt.append(geomWall)
+                                # Letzten Schnittpunkt für folgenden Durchlauf speichern
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
 
-                            elif z2 < z1 and point not in pt2:
-                                if last is not None:
-                                    geomWall = ogr.Geometry(ogr.wkbPolygon)
-                                    ringWall = ogr.Geometry(ogr.wkbLinearRing)
-
-                                    r1Pt0, r1Pt1, r1Pt2 = ringR1.GetPoint(0), ringR1.GetPoint(1), ringR1.GetPoint(2)
-                                    r1Plane = Plane(Point3D(r1Pt0[0], r1Pt0[1], r1Pt0[2]),
-                                                    Point3D(r1Pt1[0], r1Pt1[1], r1Pt1[2]),
-                                                    Point3D(r1Pt2[0], r1Pt2[1], r1Pt2[2]))
-                                    r2Pt0, r2Pt1, r2Pt2 = ringR2.GetPoint(0), ringR2.GetPoint(1), ringR2.GetPoint(2)
-                                    r2Plane = Plane(Point3D(r2Pt0[0], r2Pt0[1], r2Pt0[2]),
-                                                    Point3D(r2Pt1[0], r2Pt1[1], r2Pt1[2]),
-                                                    Point3D(r2Pt2[0], r2Pt2[1], r2Pt2[2]))
-
-                                    wLine1 = Line(Point3D(last[0], last[1], 0), Point3D(last[0], last[1], 100))
-                                    sPoint1 = r2Plane.intersection(wLine1)[0]
-                                    p1 = [last[0], last[1], float(sPoint1[2])]
-
-                                    wLine2 = Line(Point3D(last[0], last[1], 0), Point3D(last[0], last[1], 100))
-                                    sPoint2 = r1Plane.intersection(wLine2)[0]
-                                    p2 = [last[0], last[1], float(sPoint2[2])]
-
-                                    wLine3 = Line(Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 0),
-                                                 Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
-                                    sPoint3 = r1Plane.intersection(wLine3)[0]
-                                    p3 = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint3[2])]
-
-                                    wLine4 = Line(Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 0),
-                                                 Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
-                                    sPoint4 = r2Plane.intersection(wLine4)[0]
-                                    p4 = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], float(sPoint4[2])]
-
-                                    ringWall.AddPoint(p4[0], p4[1], p4[2])
-                                    ringWall.AddPoint(p3[0], p3[1], p3[2])
-                                    ringWall.AddPoint(p2[0], p2[1], p2[2])
-                                    ringWall.AddPoint(p1[0], p1[1], p1[2])
-                                    ringWall.CloseRings()
-                                    geomWall.AddGeometry(ringWall)
-                                    wallsInt.append(geomWall)
+                            elif last is None:
+                                # Letzten Schnittpunkt für folgenden Durchlauf speichern
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
-                            else:
+
+                            if not (z1 <= z2 and point not in pt1) and not (z2 < z1 and point not in pt2):
                                 last = None
 
                         walls += wallsInt
 
+                        ### ANPASSUNG DER DÄCHER ###
                         if z1 <= z2:
-                            roofInt = roofsOut[j].Difference(intersect)
-                            roofInt = roofInt.Simplify(0.0)
-                            ringInt = roofInt.GetGeometryRef(0)
-                            ringRoof = roofsOut[j].GetGeometryRef(0)
-                            rPlane = Plane(Point3D(ringRoof.GetPoint(0)[0], ringRoof.GetPoint(0)[1],
-                                                   ringRoof.GetPoint(0)[2]),
-                                           Point3D(ringRoof.GetPoint(1)[0], ringRoof.GetPoint(1)[1],
-                                                   ringRoof.GetPoint(1)[2]),
-                                           Point3D(ringRoof.GetPoint(2)[0], ringRoof.GetPoint(2)[1],
-                                                   ringRoof.GetPoint(2)[2]))
-                            geomRoofOut = ogr.Geometry(ogr.wkbPolygon)
-                            ringRoofOut = ogr.Geometry(ogr.wkbLinearRing)
-                            for o in range(0, ringInt.GetPointCount()):
-                                rLine = Line(Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 0),
-                                             Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 100))
-                                z = None
-                                for p in range(0, ringRoof.GetPointCount() - 1):
-                                    if ringInt.GetPoint(o)[0] == ringRoof.GetPoint(p)[0] and ringInt.GetPoint(o)[1] == \
-                                            ringRoof.GetPoint(p)[1]:
-                                        z = ringRoof.GetPoint(p)[2]
-                                        break
-                                if z is None:
-                                    sPoint = rPlane.intersection(rLine)[0]
-                                    z = float(sPoint[2])
-                                ringRoofOut.AddPoint(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], z)
-                            ringRoofOut.CloseRings()
-                            geomRoofOut.AddGeometry(ringRoofOut)
+                            geomRoof = roofsOut[j]
+                        else:
+                            geomRoof = roofsOut[i]
 
-                            geomRoofOut = geomRoofOut.Simplify(0.00)
+                        roofInt = geomRoof.Difference(intersect).Simplify(0.0)
+                        ringInt = roofInt.GetGeometryRef(0)
+                        ringRoof = geomRoof.GetGeometryRef(0)
+                        rPlane = UtilitiesGeom.getPlane(ringRoof.GetPoint(0), ringRoof.GetPoint(1),
+                                                        ringRoof.GetPoint(2))
+
+                        # Neue Geometrie
+                        geomRoofOut = ogr.Geometry(ogr.wkbPolygon)
+                        ringRoofOut = ogr.Geometry(ogr.wkbLinearRing)
+
+                        # Punkte
+                        for o in range(0, ringInt.GetPointCount()):
+                            rLine = Line(Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 0),
+                                         Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 100))
+                            z = None
+                            for p in range(0, ringRoof.GetPointCount() - 1):
+                                if ringInt.GetPoint(o)[0] == ringRoof.GetPoint(p)[0] and ringInt.GetPoint(o)[1] == \
+                                        ringRoof.GetPoint(p)[1]:
+                                    z = ringRoof.GetPoint(p)[2]
+                                    break
+                            if z is None:
+                                sPoint = rPlane.intersection(rLine)[0]
+                                z = float(sPoint[2])
+                            ringRoofOut.AddPoint(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], z)
+
+                        # Geometrie abschließen
+                        ringRoofOut.CloseRings()
+                        geomRoofOut.AddGeometry(ringRoofOut)
+                        if z1 <= z2:
                             roofsOut[j] = geomRoofOut
                         else:
-                            roofInt = roofsOut[i].Difference(intersect).Simplify(0.0)
-                            ringInt = roofInt.GetGeometryRef(0)
-                            geomRoof = roofsOut[i]
-                            ringRoof = geomRoof.GetGeometryRef(0)
-                            rPlane = Plane(Point3D(ringRoof.GetPoint(0)[0], ringRoof.GetPoint(0)[1],
-                                                   ringRoof.GetPoint(0)[2]),
-                                           Point3D(ringRoof.GetPoint(1)[0], ringRoof.GetPoint(1)[1],
-                                                   ringRoof.GetPoint(1)[2]),
-                                           Point3D(ringRoof.GetPoint(2)[0], ringRoof.GetPoint(2)[1],
-                                                   ringRoof.GetPoint(2)[2]))
-                            geomRoofOut = ogr.Geometry(ogr.wkbPolygon)
-                            ringRoofOut = ogr.Geometry(ogr.wkbLinearRing)
-                            for o in range(0, ringInt.GetPointCount()):
-                                rLine = Line(Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 0),
-                                             Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 100))
-                                z = None
-                                for p in range(0, ringRoof.GetPointCount() - 1):
-                                    if ringInt.GetPoint(o)[0] == ringRoof.GetPoint(p)[0] and ringInt.GetPoint(o)[1] == \
-                                            ringRoof.GetPoint(p)[1]:
-                                        z = ringRoof.GetPoint(p)[2]
-                                        break
-                                if z is None:
-                                    sPoint = rPlane.intersection(rLine)[0]
-                                    z = float(sPoint[2])
-                                ringRoofOut.AddPoint(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], z)
-                            ringRoofOut.CloseRings()
-                            geomRoofOut.AddGeometry(ringRoofOut)
-
                             roofsOut[i] = geomRoofOut
 
+        ### ÜBERPRÜFUNG DER WÄNDE ###
         walls += wallsLine
-        wallsCheck = walls.copy()
-        wallsMod = {}
+        wallsCheck, wallsMod = walls.copy(), {}
+
+        # Verschneidung aller neuen Wände miteinander
         for o in range(0, len(wallsCheck)):
             for p in range(o + 1, len(wallsCheck)):
-                if str(o) in wallsMod:
-                    wallO = wallsMod[str(o)]
-                else:
-                    wallO = wallsCheck[o]
-                if str(p) in wallsMod:
-                    wallP = wallsMod[str(p)]
-                else:
-                    wallP = wallsCheck[p]
+                wallO = wallsMod[str(o)] if str(o) in wallsMod else wallsCheck[o]
+                wallP = wallsMod[str(p)] if str(p) in wallsMod else wallsCheck[p]
                 intersect = wallO.Intersection(wallP)
                 if not intersect.IsEmpty():
-                    ipt1 = intersect.GetPoint(0)
-                    ipt2 = intersect.GetPoint(1)
+                    ipt1, ipt2 = intersect.GetPoint(0), intersect.GetPoint(1)
                     wallCheckORing = wallO.GetGeometryRef(0)
-                    ptO1 = wallCheckORing.GetPoint(1)
-                    ptO2 = wallCheckORing.GetPoint(2)
+                    ptO1, ptO2 = wallCheckORing.GetPoint(1), wallCheckORing.GetPoint(2)
                     wallCheckPRing = wallP.GetGeometryRef(0)
-                    ptP1 = wallCheckPRing.GetPoint(1)
-                    ptP2 = wallCheckPRing.GetPoint(2)
+                    ptP1, ptP2 = wallCheckPRing.GetPoint(1), wallCheckPRing.GetPoint(2)
 
+                    # Wenn Verschneidung = Wand: Wand entfernen
                     if (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1] and ipt2[0] == ptO2[0] and ipt2[1] == ptO2[1]) or (
                             ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1] and ipt2[0] == ptO1[0] and ipt2[1] == ptO1[1]):
                         walls.remove(wallO)
+
+                    # Wenn Verschneidung teilweise Wand: Entsprechenden Wandteil entfernen
                     elif (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1]) or (ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1]) or (
                             ipt2[0] == ptO1[0] and ipt2[1] == ptO1[1]) or (ipt2[0] == ptO2[0] and ipt2[1] == ptO2[1]):
                         diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
@@ -1581,11 +1504,9 @@ class Converter(QgsTask):
                             ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
                             if (ptP1[0] == ipt1[0] and ptP1[1] == ipt1[1]) or (
                                     ptP1[0] == ipt2[0] and ptP1[1] == ipt2[1]):
-                                zU = wallCheckPRing.GetPoint(0)[2]
-                                zO = ptP1[2]
+                                zU, zO = wallCheckPRing.GetPoint(0)[2], ptP1[2]
                             else:
-                                zU = wallCheckPRing.GetPoint(3)[2]
-                                zO = ptP2[2]
+                                zU, zO = wallCheckPRing.GetPoint(3)[2], ptP2[2]
                             if ptO1[0] == ipt1[0] and ptO1[1] == ipt1[1]:
                                 ringWallCut.AddPoint(ipt2[0], ipt2[1], zU)
                                 ringWallCut.AddPoint(ipt2[0], ipt2[1], zO)
@@ -1612,9 +1533,12 @@ class Converter(QgsTask):
                             ix = walls.index(wallO)
                             walls[ix] = geomWallCut
 
+                    # Wenn Verschneidung = Wand: Wand entfernen
                     if (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1] and ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]) or (
                             ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1] and ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]):
                         walls.remove(wallP)
+
+                    # Wenn Verschneidung teilweise Wand: Entsprechenden Wandteil entfernen
                     elif (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1]) or (ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1]) or (
                             ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]) or (ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]):
                         diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
@@ -1626,11 +1550,9 @@ class Converter(QgsTask):
                             ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
                             if (ptO1[0] == ipt1[0] and ptO1[1] == ipt1[1]) or (
                                     ptO1[0] == ipt2[0] and ptO1[1] == ipt2[1]):
-                                zU = wallCheckORing.GetPoint(0)[2]
-                                zO = ptO1[2]
+                                zU, zO = wallCheckORing.GetPoint(0)[2], ptO1[2]
                             else:
-                                zU = wallCheckORing.GetPoint(3)[2]
-                                zO = ptO2[2]
+                                zU, zO = wallCheckORing.GetPoint(3)[2], ptO2[2]
                             if ptP1[0] == ipt1[0] and ptP1[1] == ipt1[1]:
                                 ringWallCut.AddPoint(ipt2[0], ipt2[1], zU)
                                 ringWallCut.AddPoint(ipt2[0], ipt2[1], zO)
@@ -1659,14 +1581,27 @@ class Converter(QgsTask):
 
         return walls, roofsOut
 
+    # noinspection PyMethodMayBeStatic
     def checkRoofWalls(self, wallsIn, roofs):
+        """ Überprüfen und ggf. Aussortieren der neu erstellten Wand-Geometrien
+
+        Args:
+            wallsIn: Die Wand-Geometrien, die überprüft werden sollen, als Liste
+            roofs: Die Dach-Geometrien als Liste
+
+        Returns:
+            Die überprüften Wand-Geometrien als Liste
+        """
         wallsChecked = []
 
+        # Wände mit Dächern verschneiden
         for wall in wallsIn:
             anyInt = False
             for roof in roofs:
                 intersect = wall.Intersection(roof)
                 if not intersect.IsEmpty():
+
+                    # Wenn MultiPolygon/MultiLineString als Schnitt: Zusammenführen
                     if intersect.GetGeometryCount() > 1:
                         startPt = intersect.GetGeometryRef(0).GetPoint(0)
                         endPt = intersect.GetGeometryRef(intersect.GetGeometryCount() - 1).GetPoint(1)
@@ -1675,6 +1610,8 @@ class Converter(QgsTask):
                         intersect2.AddPoint(endPt[0], endPt[1], endPt[2])
                         intersect = intersect2
                     wallRing = wall.GetGeometryRef(0)
+
+                    # Prüfen, ob Wand insgesamt unter Dächern
                     pt1Check, pt2Check = False, False
                     for i in range(0, wallRing.GetPointCount()):
                         pt = wallRing.GetPoint(i)

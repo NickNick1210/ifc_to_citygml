@@ -14,30 +14,15 @@
 from ifcopenshell.util import element
 
 # XML-Bibliotheken
-from lxml import etree
 # noinspection PyUnresolvedReferences
 from lxml.etree import QName
+
 
 #####
 
 
-class Utilities:
-    """ Model-Klasse mit nützlichen Tools """
-
-    @staticmethod
-    def geomToGml(geom):
-        """ Umwandeln von Geometrien in ein XML-Objekt
-
-        Args:
-            geom: Die umzuwandelnde Geometrie
-
-        Returns:
-            Das daraus erzeugte XML-Objekt
-        """
-        gmlGeom = geom.ExportToGML()
-        gmlGeom = gmlGeom[0:gmlGeom.find(">")] + " xmlns:gml='http://www.opengis.net/gml'" + gmlGeom[gmlGeom.find(">"):]
-        xml = etree.XML(gmlGeom)
-        return xml
+class UtilitiesIfc:
+    """ Model-Klasse mit nützlichen IFC-Tools """
 
     @staticmethod
     def findPset(ifcElement, psetName, attrName=None):
@@ -99,7 +84,7 @@ class Utilities:
                                 if obj not in result:
                                     result.append(obj)
                         else:
-                            Utilities.findElement(ifc, obj, outElement, result, type)
+                            UtilitiesIfc.findElement(ifc, obj, outElement, result, type)
 
             # Bei räumlichen Begrenzungen
             elif rel.is_a("IfcRelSpaceBoundary"):
@@ -115,7 +100,7 @@ class Utilities:
                                 if obj not in result:
                                     result.append(obj)
                         else:
-                            Utilities.findElement(ifc, obj, outElement, result, type)
+                            UtilitiesIfc.findElement(ifc, obj, outElement, result, type)
 
             # Bei räumlichen Enthaltungen
             elif rel.is_a("IfcRelContainedInSpatialStructure"):
@@ -132,5 +117,5 @@ class Utilities:
                                     if obj not in result:
                                         result.append(obj)
                             else:
-                                Utilities.findElement(ifc, obj, outElement, result, type)
+                                UtilitiesIfc.findElement(ifc, obj, outElement, result, type)
         return result

@@ -12,6 +12,7 @@
 
 # Standard-Bibliotheken
 import math
+import numbers
 import sys
 import uuid
 from datetime import datetime
@@ -20,7 +21,6 @@ import numpy as np
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
-import sympy
 from ifcopenshell.util import element
 
 # XML-Bibliotheken
@@ -34,15 +34,15 @@ from qgis.PyQt.QtCore import QCoreApplication
 
 # Geo-Bibliotheken
 from osgeo import ogr
-
-# Plugin
+import sympy
 from sympy import Point3D, Plane, Line
 
+# Plugin
 from .xmlns import XmlNs
 from .mapper import Mapper
 from .transformer import Transformer
-from .utilities import Utilities
-
+from .utilitiesGeom import UtilitiesGeom
+from .utilitiesIfc import UtilitiesIfc
 
 #####
 
@@ -315,7 +315,7 @@ class Converter(QgsTask):
 
         # Klasse, Typ und Funktion
         # Prüfung des OccupancyType im PropertySet BuildingCommon
-        if Utilities.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
             type = self.convertFunctionUsage(occType)
             if type is None:
@@ -336,12 +336,12 @@ class Converter(QgsTask):
                 chBldgUsage.text = str(type)
 
         # Baujahr
-        if Utilities.findPset(ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction") is not None:
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction") is not None:
             chBldgYearConstr = etree.SubElement(chBldg, QName(XmlNs.bldg, "yearOfConstruction"))
             chBldgYearConstr.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["YearOfConstruction"]
 
         # Dachtyp
-        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
         if ifcRoofs is not None:
             roofTypes = []
             for ifcRoof in ifcRoofs:
@@ -358,14 +358,14 @@ class Converter(QgsTask):
                 chBldgRoofType.text = str(roofCode)
 
         # Höhen und Geschosse
-        ifcBldgStoreys = Utilities.findElement(self.ifc, ifcBuilding, "IfcBuildingStorey", result=[])
+        ifcBldgStoreys = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcBuildingStorey", result=[])
         storeysAG, storeysBG = 0, 0
         storeysHeightsAG, storeysHeightsBG = 0, 0
         missingAG, missingBG = 0, 0
         # über alle Geschosse iterieren
         for ifcBldgStorey in ifcBldgStoreys:
             # Herausfinden, ob über oder unter Grund
-            if Utilities.findPset(ifcBldgStorey, "Pset_BuildingStoreyCommon") is not None and \
+            if UtilitiesIfc.findPset(ifcBldgStorey, "Pset_BuildingStoreyCommon") is not None and \
                     element.get_psets(ifcBldgStorey)["Pset_BuildingStoreyCommon"]["AboveGround"] is not None:
                 ag = element.get_psets(ifcBldgStorey)["Pset_BuildingStoreyCommon"]["AboveGround"]
             elif ifcBldgStorey.Elevation is not None:
@@ -379,18 +379,18 @@ class Converter(QgsTask):
 
             # Herausfinden der Geschosshöhe
             height = 0
-            if Utilities.findPset(ifcBldgStorey, "BaseQuantities", "GrossHeight") is not None:
+            if UtilitiesIfc.findPset(ifcBldgStorey, "BaseQuantities", "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["GrossHeight"]
-            elif Utilities.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
+            elif UtilitiesIfc.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
                                     "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["GrossHeight"]
-            elif Utilities.findPset(ifcBldgStorey, "BaseQuantities", "Height") is not None:
+            elif UtilitiesIfc.findPset(ifcBldgStorey, "BaseQuantities", "Height") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["Height"]
-            elif Utilities.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "Height") is not None:
+            elif UtilitiesIfc.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities", "Height") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["Height"]
-            elif Utilities.findPset(ifcBldgStorey, "BaseQuantities", "NetHeight") is not None:
+            elif UtilitiesIfc.findPset(ifcBldgStorey, "BaseQuantities", "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["NetHeight"]
-            elif Utilities.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
+            elif UtilitiesIfc.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
                                     "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["NetHeight"]
             else:
@@ -420,17 +420,17 @@ class Converter(QgsTask):
         height = self.calcHeight(ifcBuilding)
         if height is not None:
             pass
-        elif Utilities.findPset(ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
+        elif UtilitiesIfc.findPset(ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["GrossHeight"]
-        elif Utilities.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "GrossHeight") is not None:
+        elif UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "GrossHeight") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossHeight"]
-        elif Utilities.findPset(ifcBuilding, "BaseQuantities", "Height") is not None:
+        elif UtilitiesIfc.findPset(ifcBuilding, "BaseQuantities", "Height") is not None:
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["Height"]
-        elif Utilities.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "Height") is not None:
+        elif UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "Height") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["Height"]
-        elif Utilities.findPset(ifcBuilding, "BaseQuantities", "NetHeight") is not None:
+        elif UtilitiesIfc.findPset(ifcBuilding, "BaseQuantities", "NetHeight") is not None:
             height = element.get_psets(ifcBuilding)["BaseQuantities"]["NetHeight"]
-        elif Utilities.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetHeight") is not None:
+        elif UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetHeight") is not None:
             height = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetHeight"]
         elif storeysHeightsAG > 0 or storeysHeightsBG > 0:
             if storeysAG == 0 and storeysBG != 0:
@@ -511,9 +511,9 @@ class Converter(QgsTask):
             Die Gebäudehöhe bzw. None, wenn sie nicht berechnet werden kann
         """
         # Grundfläche
-        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
         if len(ifcSlabs) == 0:
-            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             # Wenn Grundfläche nicht vorhanden
             if len(ifcSlabs) == 0:
                 self.parent.dlg.log(self.tr(
@@ -521,9 +521,9 @@ class Converter(QgsTask):
                 return None
 
         # Dächer
-        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
         if len(ifcRoofs) == 0:
-            ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+            ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
             # Wenn Dach nicht vorhanden
             if len(ifcRoofs) == 0:
                 self.parent.dlg.log(self.tr(
@@ -561,9 +561,9 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem die Grundfläche angefügt werden soll
         """
         # IFC-Elemente
-        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
         if len(ifcSlabs) == 0:
-            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no FootPrint geometry can be calculated"))
@@ -573,7 +573,7 @@ class Converter(QgsTask):
         geometry = self.calcPlane(ifcSlabs)
         if geometry is not None:
             self.geom.AddGeometry(geometry)
-            geomXML = Utilities.geomToGml(geometry)
+            geomXML = UtilitiesGeom.geomToGml(geometry)
             if geomXML is not None:
                 # XML-Struktur
                 chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
@@ -590,9 +590,9 @@ class Converter(QgsTask):
         """
 
         # IFC-Elemente
-        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
         if len(ifcRoofs) == 0:
-            ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+            ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
             # Wenn kein Dach vorhanden
             if len(ifcRoofs) == 0:
                 self.parent.dlg.log(self.tr(u"Due to the missing roof, no RoofEdge geometry can be calculated"))
@@ -601,7 +601,7 @@ class Converter(QgsTask):
         # Geometrie
         geometry = self.calcPlane(ifcRoofs)
         self.geom.AddGeometry(geometry)
-        geomXML = Utilities.geomToGml(geometry)
+        geomXML = UtilitiesGeom.geomToGml(geometry)
         if geomXML is not None:
             # XML-Struktur
             chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
@@ -676,32 +676,26 @@ class Converter(QgsTask):
 
             # Wenn immer noch mehr als eine Geometrie: Buffer und dann Union
             if geometry.GetGeometryCount() > 1:
-                print("BUFFER!")
                 geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                 for i in range(0, geometries.GetGeometryCount()):
                     g = geometries.GetGeometryRef(i)
-                    #gBuffer = self.buffer2D(g, 0.01)
                     gBuffer = g.Buffer(0.01, quadsecs=0)
                     geometriesBuffer.AddGeometry(gBuffer)
                 geometry = geometriesBuffer.UnionCascaded()
 
                 # Wenn immer noch mehr als eine Geometrie: Fehlermeldung
                 if geometry.GetGeometryName() != "POLYGON":
-                    print("BUFFER2!")
                     geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                     for i in range(0, geometries.GetGeometryCount()):
                         g = geometries.GetGeometryRef(i)
-                        #gBuffer = self.buffer2D(g, 0.05)
                         gBuffer = g.Buffer(0.05, quadsecs=0)
                         geometriesBuffer.AddGeometry(gBuffer)
                     geometry = geometriesBuffer.UnionCascaded()
 
                     if geometry.GetGeometryName() != "POLYGON":
-                        print("BUFFER3!")
                         geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                         for i in range(0, geometries.GetGeometryCount()):
                             g = geometries.GetGeometryRef(i)
-                            #gBuffer = self.buffer2D(g, 0.1)
                             gBuffer = g.Buffer(0.1, quadsecs=0)
                             geometriesBuffer.AddGeometry(gBuffer)
                         geometry = geometriesBuffer.UnionCascaded()
@@ -717,8 +711,8 @@ class Converter(QgsTask):
                             wkt = geometry.ExportToWkt()
                             wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                             geometry = ogr.CreateGeometryFromWkt(wkt)
-                            geometry = self.simplify(geometry)
-                            geometry = self.buffer2D(geometry, -0.1)
+                            geometry = UtilitiesGeom.simplify(geometry)
+                            geometry = UtilitiesGeom.buffer2D(geometry, -0.1)
 
                     # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
                     else:
@@ -726,8 +720,8 @@ class Converter(QgsTask):
                         wkt = geometry.ExportToWkt()
                         wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                         geometry = ogr.CreateGeometryFromWkt(wkt)
-                        geometry = self.simplify(geometry)
-                        geometry = self.buffer2D(geometry, -0.05)
+                        geometry = UtilitiesGeom.simplify(geometry)
+                        geometry = UtilitiesGeom.buffer2D(geometry, -0.05)
 
                 # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
                 else:
@@ -735,59 +729,11 @@ class Converter(QgsTask):
                     wkt = geometry.ExportToWkt()
                     wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                     geometry = ogr.CreateGeometryFromWkt(wkt)
-                    geometry = self.simplify(geometry)
-                    geometry = self.buffer2D(geometry, -0.01)
+                    geometry = UtilitiesGeom.simplify(geometry)
+                    geometry = UtilitiesGeom.buffer2D(geometry, -0.01)
 
-        geometry = self.simplify(geometry)
+        geometry = UtilitiesGeom.simplify(geometry)
         return geometry
-
-    def buffer2D(self, geom, dist):
-        if geom is None or geom.IsEmpty() or geom.GetGeometryName() != "POLYGON":
-            return geom
-        else:
-            ring = geom.GetGeometryRef(0)
-
-            geomBuffer = ogr.Geometry(ogr.wkbPolygon)
-            ringBuffer = ogr.Geometry(ogr.wkbLinearRing)
-
-            for i in range(1, ring.GetPointCount()):
-                if i == 1:
-                    ptStart = ring.GetPoint(ring.GetPointCount() - 2)
-                else:
-                    ptStart = ring.GetPoint(i - 2)
-                ptEnd = ring.GetPoint(i)
-                ptMid = ring.GetPoint(i - 1)
-
-                vStart = [ptMid[0] - ptStart[0], ptMid[1] - ptStart[1]]
-                vStartB = [vStart[1], vStart[0]]
-                vStartBLen = np.sqrt(np.square(vStartB[0]) + np.square(vStartB[1]))
-                vStartBNorm = [vStartB[0] / vStartBLen, vStartB[1] / vStartBLen]
-                vStartBDist = [vStartBNorm[0] * dist, vStartBNorm[1] * dist]
-
-                vEnd = [ptEnd[0] - ptMid[0], ptEnd[1] - ptMid[1]]
-                vEndB = [vEnd[1], vEnd[0]]
-                vEndBLen = np.sqrt(np.square(vEndB[0]) + np.square(vEndB[1]))
-                vEndBNorm = [vEndB[0] / vEndBLen, vEndB[1] / vEndBLen]
-                vEndBDist = [vEndBNorm[0] * dist, vEndBNorm[1] * dist]
-
-                ptMidB1 = [ptMid[0] + vStartBDist[0], ptMid[1] + vStartBDist[1], ptMid[2]]
-                ptMidB2 = [ptMid[0] + vEndBDist[0], ptMid[1] + vEndBDist[1], ptMid[2]]
-
-                b1Line = Line(Point3D(ptMidB1[0], ptMidB1[1], ptMidB1[2]),
-                              Point3D(ptMidB1[0] + (ptMid[0] - ptStart[0]), ptMidB1[1] + (ptMid[1] - ptStart[1]),
-                                      ptMidB1[2]))
-                b2Line = Line(Point3D(ptMidB2[0], ptMidB2[1], ptMidB2[2]),
-                              Point3D(ptMidB2[0] + (ptEnd[0] - ptMid[0]), ptMidB2[1] + (ptEnd[1] - ptMid[1]),
-                                      ptMidB2[2]))
-                sPoint = b1Line.intersection(b2Line)[0]
-                ringBuffer.AddPoint(float(sPoint[0]), float(sPoint[1]), ptMidB1[2])
-
-            ringBuffer.CloseRings()
-            geomBuffer.AddGeometry(ringBuffer)
-            if geomBuffer.GetGeometryRef(0).GetPointCount() < 4:
-                return None
-            else:
-                return geomBuffer
 
     def convertLoD1Solid(self, ifcBuilding, chBldg, height):
         """ Konvertieren des Gebäudeumrisses von IFC zu CityGML
@@ -802,9 +748,9 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
 
         # IFC-Elemente der Grundfläche
-        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
         if len(ifcSlabs) == 0:
-            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
@@ -826,7 +772,7 @@ class Converter(QgsTask):
             for geometry in geometries:
                 self.geom.AddGeometry(geometry)
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
-                geomXML = Utilities.geomToGml(geometry)
+                geomXML = UtilitiesGeom.geomToGml(geometry)
                 chBldgSolidSM.append(geomXML)
 
     @staticmethod
@@ -881,9 +827,9 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
 
         # IFC-Elemente der Grundfläche
-        ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
         if len(ifcSlabs) == 0:
-            ifcSlabs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
@@ -893,8 +839,8 @@ class Converter(QgsTask):
         geomBase = self.calcPlane(ifcSlabs)
 
         # IFC-Elemente des Daches
-        ifcRoofs = Utilities.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
-        ifcRoofs += Utilities.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        ifcRoofs += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
         if len(ifcRoofs) == 0:
             self.parent.dlg.log(self.tr(
                 u"Due to the missing roof, no building geometry can be calculated"))
@@ -902,17 +848,13 @@ class Converter(QgsTask):
 
         geomRoofs = self.extractRoofs(ifcRoofs)
         geomWalls, roofPoints, geomRoofsNew = self.calcWalls(geomBase, geomRoofs, height)
-        print("Walls nach calcWalls: " + str(len(geomWalls)))
         geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
-        print("Neue Walls nach calcRoofWalls: " + str(len(geomWallsR)))
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
-        print("Walls nach checkRoofWalls: " + str(len(geomWalls)))
         geomRoofsSimple = []
         for geomRoof in geomRoofs:
-            geomRoofSimple = self.simplify(geomRoof, tol=0.01)
+            geomRoofSimple = UtilitiesGeom.simplify(geomRoof, tol=0.01)
             if geomRoofSimple is not None and not geomRoofSimple.IsEmpty() and geomRoofSimple.GetGeometryName() == "POLYGON":
-                print(geomRoofSimple)
                 geomRoofsSimple.append(geomRoofSimple)
         geomRoofs = geomRoofsSimple
 
@@ -937,7 +879,7 @@ class Converter(QgsTask):
         chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod2MultiSurface"))
         chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
         chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
-        geomXML = Utilities.geomToGml(geometry)
+        geomXML = UtilitiesGeom.geomToGml(geometry)
         chBldgSM.append(geomXML)
         chBldgPol = chBldgSM[0]
         gmlId = "PolyID" + str(uuid.uuid4())
@@ -1263,7 +1205,6 @@ class Converter(QgsTask):
                     if ringRoof.GetPointCount() > 2:
                         ringRoof.CloseRings()
                         geomRoof.AddGeometry(ringRoof)
-                        #geomRoof = self.simplify(geomRoof)
                         if not geomRoof.IsEmpty() and geomRoof.GetGeometryName() == "POLYGON":
                             roofsNew.append(geomRoof)
 
@@ -1313,7 +1254,6 @@ class Converter(QgsTask):
         roofs = []
 
         for roofIn in roofsIn:
-            #roofIn = self.simplify(roofIn)
             if roofIn is None:
                 continue
             intersection = roofIn.Intersection(base)
@@ -1346,7 +1286,6 @@ class Converter(QgsTask):
                     ringRoof.AddPoint(ptInt[0], ptInt[1], z)
                 ringRoof.CloseRings()
                 geomRoof.AddGeometry(ringRoof)
-                #geomRoof = self.simplify(geomRoof)
                 if geomRoof is not None:
                     roofs.append(geomRoof)
         return roofs
@@ -1356,15 +1295,11 @@ class Converter(QgsTask):
         walls = []
         wallsLine = []
         for i in range(0, len(roofs)):
-            #roof1 = self.simplify(roofs[i])
             roof1 = roofs[i]
-            roof1Buff = self.buffer2D(roof1, 0.0001)
             for j in range(i + 1, len(roofs)):
                 roof2 = roofs[j]
-                #roof2 = self.simplify(roofs[j])
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
-                    #intersect = self.simplify(intersect)
                     if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not intersect.IsEmpty():
                         ringRoof1 = roof1.GetGeometryRef(0)
                         ringRoof2 = roof2.GetGeometryRef(0)
@@ -1603,7 +1538,6 @@ class Converter(QgsTask):
                         else:
                             roofInt = roofsOut[i].Difference(intersect).Simplify(0.0)
                             ringInt = roofInt.GetGeometryRef(0)
-                            #geomRoof = self.simplify(roofsOut[i])
                             geomRoof = roofsOut[i]
                             ringRoof = geomRoof.GetGeometryRef(0)
                             rPlane = Plane(Point3D(ringRoof.GetPoint(0)[0], ringRoof.GetPoint(0)[1],
@@ -1630,12 +1564,9 @@ class Converter(QgsTask):
                             ringRoofOut.CloseRings()
                             geomRoofOut.AddGeometry(ringRoofOut)
 
-                            #roofsOut[i] = geomRoofOut.Simplify(0.00)
-                            #roofsOut[i] = self.simplify(geomRoofOut)
                             roofsOut[i] = geomRoofOut
 
         walls += wallsLine
-        print("Neue Walls mitten in calcRoofWalls: " + str(len(walls)))
         wallsCheck = walls.copy()
         wallsMod = {}
         for o in range(0, len(wallsCheck)):
@@ -1751,123 +1682,6 @@ class Converter(QgsTask):
 
         return walls, roofsOut
 
-    def simplify(self, geom, zd=False, tol=0.1):
-        if geom is None or geom.IsEmpty():
-            return geom
-        elif geom.GetGeometryName() == "POLYGON":
-            ring = geom.GetGeometryRef(0)
-            count = ring.GetPointCount()
-
-            geomNew = ogr.Geometry(ogr.wkbPolygon)
-            ringNew = ogr.Geometry(ogr.wkbLinearRing)
-            ringNew.AddPoint(ring.GetPoint(0)[0], ring.GetPoint(0)[1], ring.GetPoint(0)[2])
-
-            for i in range(2, ring.GetPointCount()):
-                ptEnd = ring.GetPoint(i)
-                ptMid = ring.GetPoint(i-1)
-                ptStart = ring.GetPoint(i-2)
-                if zd:
-                    dist = np.sqrt(np.square(ptMid[0] - ptStart[0]) + np.square(ptMid[1] - ptStart[1]))
-                else:
-                    dist = np.sqrt(np.square(ptMid[0]-ptStart[0])+np.square(ptMid[1]-ptStart[1])+np.square(ptMid[2]-ptStart[2]))
-                if dist < tol:
-                    continue
-                if ptMid[0]-ptStart[0] == 0:
-                    gradYStart = -1
-                else:
-                    gradYStart = ((ptMid[1]-ptStart[1])/abs(ptMid[0]-ptStart[0]))
-                if ptEnd[0]-ptMid[0] == 0:
-                    gradYEnd = -1
-                else:
-                    gradYEnd = ((ptEnd[1]-ptMid[1])/abs(ptEnd[0]-ptMid[0]))
-                if gradYStart-0.05 < gradYEnd < gradYStart+0.05:
-                    if ptMid[0] - ptStart[0] == 0:
-                        gradZStart = -1
-                    else:
-                        gradZStart = ((ptMid[2] - ptStart[2]) / abs(ptMid[0] - ptStart[0]))
-                    if ptEnd[0] - ptMid[0] == 0:
-                        gradZEnd = -1
-                    else:
-                        gradZEnd = ((ptEnd[2] - ptMid[2]) / abs(ptEnd[0] - ptMid[0]))
-                    if gradZStart - 0.05 < gradZEnd < gradZStart + 0.05:
-                        if ptMid[1] - ptStart[1] == 0:
-                            gradYZStart = -1
-                        else:
-                            gradYZStart = ((ptMid[2] - ptStart[2]) / abs(ptMid[1] - ptStart[1]))
-                        if ptEnd[1] - ptMid[1] == 0:
-                            gradYZEnd = -1
-                        else:
-                            gradYZEnd = ((ptEnd[2] - ptMid[2]) / abs(ptEnd[1] - ptMid[1]))
-                        if gradYZStart - 0.05 < gradYZEnd < gradYZStart + 0.05:
-                            continue
-                ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
-            ringNew.CloseRings()
-            geomNew.AddGeometry(ringNew)
-            if geomNew.GetGeometryRef(0).GetPointCount() < 4:
-                geomNewLine = ogr.Geometry(ogr.wkbPolygon)
-                geomNewLine.AddPoint(geomNew.GetPoint(0)[0], geomNew.GetPoint(0)[1], geomNew.GetPoint(0)[2])
-                geomNewLine.AddPoint(geomNew.GetPoint(1)[0], geomNew.GetPoint(1)[1], geomNew.GetPoint(1)[2])
-                return geomNewLine
-            elif geomNew.GetGeometryRef(0).GetPointCount() < count:
-                return self.simplify(geomNew)
-            else:
-                return geomNew
-
-        elif geom.GetGeometryName() == "LINESTRING":
-            count = geom.GetPointCount()
-
-            geomNew = ogr.Geometry(ogr.wkbLineString)
-            geomNew.AddPoint(geom.GetPoint(0)[0], geom.GetPoint(0)[1], geom.GetPoint(0)[2])
-
-            for i in range(2, geom.GetPointCount()):
-                ptEnd = geom.GetPoint(i)
-                ptMid = geom.GetPoint(i - 1)
-                ptStart = geom.GetPoint(i - 2)
-                if zd:
-                    dist = np.sqrt(np.square(ptMid[0] - ptStart[0]) + np.square(ptMid[1] - ptStart[1]))
-                else:
-                    dist = np.sqrt(np.square(ptMid[0] - ptStart[0]) + np.square(ptMid[1] - ptStart[1]) + np.square(
-                        ptMid[2] - ptStart[2]))
-                if dist < 0.1:
-                    continue
-                if ptMid[0] - ptStart[0] == 0:
-                    gradYStart = -1
-                else:
-                    gradYStart = ((ptMid[1] - ptStart[1]) / (ptMid[0] - ptStart[0]))
-                if ptEnd[0] - ptMid[0] == 0:
-                    gradYEnd = -1
-                else:
-                    gradYEnd = ((ptEnd[1] - ptMid[1]) / (ptEnd[0] - ptMid[0]))
-                if gradYStart - 0.05 < gradYEnd < gradYStart + 0.05:
-                    if ptMid[0] - ptStart[0] == 0:
-                        gradZStart = -1
-                    else:
-                        gradZStart = ((ptMid[2] - ptStart[2]) / (ptMid[0] - ptStart[0]))
-                    if ptEnd[0] - ptMid[0] == 0:
-                        gradZEnd = -1
-                    else:
-                        gradZEnd = ((ptEnd[2] - ptMid[2]) / (ptEnd[0] - ptMid[0]))
-                    if gradZStart - 0.05 < gradZEnd < gradZStart + 0.05:
-                        if ptMid[1] - ptStart[1] == 0:
-                            gradYZStart = -1
-                        else:
-                            gradYZStart = ((ptMid[2] - ptStart[2]) / (ptMid[1] - ptStart[1]))
-                        if ptEnd[1] - ptMid[1] == 0:
-                            gradYZEnd = -1
-                        else:
-                            gradYZEnd = ((ptEnd[2] - ptMid[2]) / (ptEnd[1] - ptMid[1]))
-                        if gradYZStart - 0.05 < gradYZEnd < gradYZStart + 0.05:
-                            continue
-                geomNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
-            geomNew.AddPoint(geom.GetPoint(geom.GetPointCount()-1)[0], geom.GetPoint(geom.GetPointCount()-1)[1], geom.GetPoint(geom.GetPointCount()-1)[2])
-            if geomNew.GetPointCount() < count:
-                return self.simplify(geomNew)
-            else:
-                return geomNew
-        else:
-            return geom
-        # TODO: Simplify nutzen statt OGR-Methode
-
     def checkRoofWalls(self, wallsIn, roofs):
         wallsChecked = []
 
@@ -1894,102 +1708,11 @@ class Converter(QgsTask):
                     if pt1Check and pt2Check:
                         anyInt = True
             if anyInt:
-                wall = self.simplify(wall)
+                wall = UtilitiesGeom.simplify(wall)
                 wallsChecked.append(wall)
 
-        print("Neue Walls mitten in checkRoofWalls: " + str(len(wallsChecked)))
-        wallsOut = self.union3D(wallsChecked)
-        print("Neue Walls ende in calcRoofWalls: " + str(len(wallsOut)))
-
+        wallsOut = UtilitiesGeom.union3D(wallsChecked)
         return wallsOut
-
-    def union3D(self, geomsIn):
-        geomsOut = []
-        done = []
-        for i in range(0, len(geomsIn)):
-            if i in done:
-                continue
-            # TODO: Simplify einbauen
-            #ring1 = geomsIn[i].GetGeometryRef(0)
-            geom1 = self.simplify(geomsIn[i])
-            if geom1 is None or geom1.GetGeometryName() != "POLYGON":
-                done.append(i)
-                continue
-            ring1 = geom1.GetGeometryRef(0)
-            if ring1 is None:
-                done.append(i)
-                continue
-            for j in range(i + 1, len(geomsIn)):
-                if j in done:
-                    #break
-                    continue
-                #ring2 = geomsIn[j].GetGeometryRef(0)
-                geom2 = self.simplify(geomsIn[j])
-                if geom2 is None or geom2.GetGeometryName() != "POLYGON":
-                    done.append(j)
-                    continue
-                ring2 = geom2.GetGeometryRef(0)
-                if ring2 is None:
-                    done.append(j)
-                    continue
-                samePts = []
-                for k in range(0, ring1.GetPointCount() - 1):
-                    point1 = ring1.GetPoint(k)
-                    for l in range(0, ring2.GetPointCount() - 1):
-                        point2 = ring2.GetPoint(l)
-                        if point1 == point2:
-                            samePts.append(point1)
-                if len(samePts) > 1:
-                    plane1 = Plane(Point3D(ring1.GetPoint(0)[0], ring1.GetPoint(0)[1], ring1.GetPoint(0)[2]),
-                                   Point3D(ring1.GetPoint(1)[0], ring1.GetPoint(1)[1], ring1.GetPoint(1)[2]),
-                                   Point3D(ring1.GetPoint(2)[0], ring1.GetPoint(2)[1], ring1.GetPoint(2)[2]))
-                    plane2 = Plane(Point3D(ring2.GetPoint(0)[0], ring2.GetPoint(0)[1], ring2.GetPoint(0)[2]),
-                                   Point3D(ring2.GetPoint(1)[0], ring2.GetPoint(1)[1], ring2.GetPoint(1)[2]),
-                                   Point3D(ring2.GetPoint(2)[0], ring2.GetPoint(2)[1], ring2.GetPoint(2)[2]))
-                    if plane1.is_parallel(plane2):
-                        geometry = ogr.Geometry(ogr.wkbPolygon)
-                        ring = ogr.Geometry(ogr.wkbLinearRing)
-                        for k in range(0, ring1.GetPointCount() - 1):
-                            point1 = ring1.GetPoint(k)
-                            if point1 in samePts:
-                                ring.AddPoint(point1[0], point1[1], point1[2])
-                                for l in range(0, ring2.GetPointCount() - 1):
-                                    point2 = ring2.GetPoint(l)
-                                    if point2 == point1:
-                                        if ring2.GetPoint(l + 1) in samePts:
-                                            break
-                                        else:
-                                            for m in range(l + 1, ring2.GetPointCount() - 1):
-                                                point3 = ring2.GetPoint(m)
-                                                if point3 in samePts:
-                                                    break
-                                                else:
-                                                    ring.AddPoint(point3[0], point3[1], point3[2])
-                                            for o in range(0, l):
-                                                point3 = ring2.GetPoint(o)
-                                                if point3 in samePts:
-                                                    break
-                                                else:
-                                                    ring.AddPoint(point3[0], point3[1], point3[2])
-                                            break
-
-                            else:
-                                ring.AddPoint(point1[0], point1[1], point1[2])
-                        ring.CloseRings()
-                        geometry.AddGeometry(ring)
-                        geomsOut.append(geometry)
-                        done.append(i)
-                        done.append(j)
-                        break
-
-            if i not in done:
-                done.append(i)
-                geomsOut.append(geomsIn[i])
-
-        if len(geomsOut) < len(geomsIn):
-            return self.union3D(geomsOut)
-        else:
-            return geomsOut
 
     def convertLoD2Solid(self, chBldg, links):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds
@@ -2019,12 +1742,12 @@ class Converter(QgsTask):
         # Prüfen, wo Addresse vorhanden
         if ifcBuilding.BuildingAddress is not None:
             ifcAddress = ifcBuilding.BuildingAddress
-        elif Utilities.findPset(ifcBuilding, "Pset_Address") is not None:
-            ifcAddress = Utilities.findPset(ifcBuilding, "Pset_Address")
+        elif UtilitiesIfc.findPset(ifcBuilding, "Pset_Address") is not None:
+            ifcAddress = UtilitiesIfc.findPset(ifcBuilding, "Pset_Address")
         elif ifcSite.SiteAddress is not None:
             ifcAddress = ifcSite.SiteAddress
-        elif Utilities.findPset(ifcSite, "Pset_Address") is not None:
-            ifcAddress = Utilities.findPset(ifcSite, "Pset_Address")
+        elif UtilitiesIfc.findPset(ifcSite, "Pset_Address") is not None:
+            ifcAddress = UtilitiesIfc.findPset(ifcSite, "Pset_Address")
         else:
             self.parent.dlg.log(self.tr(u'No address details existing'))
             return

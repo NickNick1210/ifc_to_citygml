@@ -826,9 +826,7 @@ class Converter(QgsTask):
         geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
         geomRoofs = self.calcRoofs(geomRoofs, geomBase)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
-        print("Vorher: " + str(geomRoofs))
-        #geomRoofs = UtilitiesGeom.simplify(geomRoofs, distTol=0.01)
-        print("Nachher: " + str(geomRoofs))
+        geomRoofs = UtilitiesGeom.simplify(geomRoofs, distTol=0.01)
 
         # Geometrie
         links = []

@@ -150,6 +150,7 @@ class UtilitiesGeom:
         simpList = []
 
         for geom in geomList:
+
             # Wenn nicht unterstützt: Direkt zurückgeben
             if geom is None or geom.IsEmpty() or geom.GetGeometryName() not in supported:
                 return geom
@@ -211,7 +212,7 @@ class UtilitiesGeom:
                     geomNewLine = ogr.Geometry(ogr.wkbPolygon)
                     geomNewLine.AddPoint(geomNew.GetPoint(0)[0], geomNew.GetPoint(0)[1], geomNew.GetPoint(0)[2])
                     geomNewLine.AddPoint(geomNew.GetPoint(1)[0], geomNew.GetPoint(1)[1], geomNew.GetPoint(1)[2])
-                    return geomNewLine
+                    simpList.append(geomNewLine)
 
                 # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
                 elif ringNew.GetPointCount() < count:
@@ -220,8 +221,6 @@ class UtilitiesGeom:
                 # Wenn fertig: Zurückgeben
                 else:
                     simpList.append(geomNew)
-
-        print(simpList)
 
         # Rückgabe
         if len(simpList) == 0:

@@ -2026,7 +2026,7 @@ class Converter(QgsTask):
         elif Utilities.findPset(ifcSite, "Pset_Address") is not None:
             ifcAddress = Utilities.findPset(ifcSite, "Pset_Address")
         else:
-            self.parent.dlg.log(u'No address details existing')
+            self.parent.dlg.log(self.tr(u'No address details existing'))
             return
 
         # XML-Struktur

@@ -4,44 +4,59 @@
 <context>
     <name>Converter</name>
     <message>
-        <location filename="../models/converter.py" line="235"/>
+        <location filename="../models/converter.py" line="275"/>
         <source>Due to the missing geometries, no bounding box can be calculated</source>
         <translation>Wegen fehlender Geometrien kann keine Bounding Box berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="479"/>
+        <location filename="../models/converter.py" line="519"/>
         <source>Due to the missing baseslab and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlender Grundfläche und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="489"/>
+        <location filename="../models/converter.py" line="529"/>
         <source>Due to the missing roof and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlenden Daches und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="529"/>
+        <location filename="../models/converter.py" line="569"/>
         <source>Due to the missing baseslab, no FootPrint geometry can be calculated</source>
         <translation>Wegen fehlender Grundfläche kann keine Grundflächengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="556"/>
+        <location filename="../models/converter.py" line="598"/>
         <source>Due to the missing roof, no RoofEdge geometry can be calculated</source>
         <translation>Wegen fehlenden Dachs kann keine Dachkantengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="645"/>
+        <location filename="../models/converter.py" line="710"/>
         <source>Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated</source>
         <translation>Wegen nicht-metrischen Einheiten oder fehlender Topologie kann keine LoD0-Geometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="669"/>
+        <location filename="../models/converter.py" line="881"/>
         <source>Due to the missing height and roof, no building geometry can be calculated</source>
         <translation>Wegen fehlender Höhe und Dach kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="677"/>
+        <location filename="../models/converter.py" line="889"/>
         <source>Due to the missing baseslab, no building geometry can be calculated</source>
         <translation>Wegen fehlender Grundfläche kann keine Gebäudegeometrie berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="899"/>
+        <source>Due to the missing roof, no building geometry can be calculated</source>
+        <translation>Wegen fehlenden Dachs kann keine Gebäudegeometrie berechnet werden</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="1212"/>
+        <source>Due to a missing roof, a wall height can&apos;t be calculated!</source>
+        <translation>Wegen eines fehlenden Daches kann eine Wandhöhe nicht berechnet werden!</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="2029"/>
+        <source>No address details existing</source>
+        <translation>Keine Adressangabe vorhanden</translation>
     </message>
 </context>
 <context>

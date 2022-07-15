@@ -12,7 +12,6 @@
 
 # Standard-Bibliotheken
 import math
-import numbers
 import sys
 import uuid
 from datetime import datetime
@@ -43,6 +42,7 @@ from .mapper import Mapper
 from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+
 
 #####
 
@@ -382,7 +382,7 @@ class Converter(QgsTask):
             if UtilitiesIfc.findPset(ifcBldgStorey, "BaseQuantities", "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["GrossHeight"]
             elif UtilitiesIfc.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
-                                    "GrossHeight") is not None:
+                                       "GrossHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["GrossHeight"]
             elif UtilitiesIfc.findPset(ifcBldgStorey, "BaseQuantities", "Height") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["Height"]
@@ -391,7 +391,7 @@ class Converter(QgsTask):
             elif UtilitiesIfc.findPset(ifcBldgStorey, "BaseQuantities", "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["BaseQuantities"]["NetHeight"]
             elif UtilitiesIfc.findPset(ifcBldgStorey, "Qto_BuildingStoreyBaseQuantities",
-                                    "NetHeight") is not None:
+                                       "NetHeight") is not None:
                 height = element.get_psets(ifcBldgStorey)["Qto_BuildingStoreyBaseQuantities"]["NetHeight"]
             else:
                 if ag:
@@ -671,57 +671,28 @@ class Converter(QgsTask):
                 geometries.AddGeometry(geometry)
 
         # Wenn mehr als eine Geometrie: Union
-        if geometries.GetGeometryCount() > 1:
+        if geometries.GetGeometryCount() > 1 or geometry.GetGeometryName() != "POLYGON":
             geometry = geometries.UnionCascaded()
 
-            # Wenn immer noch mehr als eine Geometrie: Buffer und dann Union
-            if geometry.GetGeometryCount() > 1:
-                geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
-                for i in range(0, geometries.GetGeometryCount()):
-                    g = geometries.GetGeometryRef(i)
-                    gBuffer = g.Buffer(0.01, quadsecs=0)
-                    geometriesBuffer.AddGeometry(gBuffer)
-                geometry = geometriesBuffer.UnionCascaded()
-
-                # Wenn immer noch mehr als eine Geometrie: Fehlermeldung
-                if geometry.GetGeometryName() != "POLYGON":
+            # Wenn immer noch mehr als eine Geometrie: Union auf Buffer
+            if geometry.GetGeometryCount() > 1 or geometry.GetGeometryName() != "POLYGON":
+                bufferList = [0.001, 0.005, 0.01, 0.05, 0.1]
+                i = 0
+                for i in range(0, len(bufferList)):
                     geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
-                    for i in range(0, geometries.GetGeometryCount()):
-                        g = geometries.GetGeometryRef(i)
-                        gBuffer = g.Buffer(0.05, quadsecs=0)
+                    for j in range(0, geometries.GetGeometryCount()):
+                        g = geometries.GetGeometryRef(j)
+                        gBuffer = g.Buffer(bufferList[i], quadsecs=0)
                         geometriesBuffer.AddGeometry(gBuffer)
                     geometry = geometriesBuffer.UnionCascaded()
+                    if geometry.GetGeometryCount() == 1 and geometry.GetGeometryName() == "POLYGON":
+                        break
 
-                    if geometry.GetGeometryName() != "POLYGON":
-                        geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
-                        for i in range(0, geometries.GetGeometryCount()):
-                            g = geometries.GetGeometryRef(i)
-                            gBuffer = g.Buffer(0.1, quadsecs=0)
-                            geometriesBuffer.AddGeometry(gBuffer)
-                        geometry = geometriesBuffer.UnionCascaded()
-
-                        if geometry.GetGeometryName() != "POLYGON":
-                            self.parent.dlg.log(self.tr(
-                                u'Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated'))
-                            return None
-
-                        # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
-                        else:
-                            geometry.Set3D(True)
-                            wkt = geometry.ExportToWkt()
-                            wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
-                            geometry = ogr.CreateGeometryFromWkt(wkt)
-                            geometry = UtilitiesGeom.simplify(geometry)
-                            geometry = UtilitiesGeom.buffer2D(geometry, -0.1)
-
-                    # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
-                    else:
-                        geometry.Set3D(True)
-                        wkt = geometry.ExportToWkt()
-                        wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
-                        geometry = ogr.CreateGeometryFromWkt(wkt)
-                        geometry = UtilitiesGeom.simplify(geometry)
-                        geometry = UtilitiesGeom.buffer2D(geometry, -0.05)
+                # Wenn weiterhin mehr als eine Geometrie: Fehlermeldung und Abbruch
+                if geometry.GetGeometryCount() > 1 or geometry.GetGeometryName() != "POLYGON":
+                    self.parent.dlg.log(self.tr(
+                        u'Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated'))
+                    return None
 
                 # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen
                 else:
@@ -730,7 +701,7 @@ class Converter(QgsTask):
                     wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                     geometry = ogr.CreateGeometryFromWkt(wkt)
                     geometry = UtilitiesGeom.simplify(geometry)
-                    geometry = UtilitiesGeom.buffer2D(geometry, -0.01)
+                    geometry = UtilitiesGeom.buffer2D(geometry, -bufferList[i])
 
         geometry = UtilitiesGeom.simplify(geometry)
         return geometry
@@ -821,6 +792,7 @@ class Converter(QgsTask):
         Args:
             ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+            height: Gebäudehöhe
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
@@ -837,6 +809,8 @@ class Converter(QgsTask):
 
         # Berechnung Grundfläche
         geomBase = self.calcPlane(ifcSlabs)
+        if geomBase is None:
+            return []
 
         # IFC-Elemente des Daches
         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
@@ -846,17 +820,13 @@ class Converter(QgsTask):
                 u"Due to the missing roof, no building geometry can be calculated"))
             return None
 
+        # Berechnung
         geomRoofs = self.extractRoofs(ifcRoofs)
         geomWalls, roofPoints, geomRoofsNew = self.calcWalls(geomBase, geomRoofs, height)
         geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
         geomRoofs = self.calcRoofs(geomRoofs, geomBase, roofPoints)
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
-        geomRoofsSimple = []
-        for geomRoof in geomRoofs:
-            geomRoofSimple = UtilitiesGeom.simplify(geomRoof, distTol=0.01)
-            if geomRoofSimple is not None and not geomRoofSimple.IsEmpty() and geomRoofSimple.GetGeometryName() == "POLYGON":
-                geomRoofsSimple.append(geomRoofSimple)
-        geomRoofs = geomRoofsSimple
+        geomRoofs = UtilitiesGeom.simplify(geomRoofs, distTol=0.01)
 
         # Geometrie
         links = []
@@ -872,18 +842,32 @@ class Converter(QgsTask):
         return links
 
     def setElement(self, chBldg, geometry, type):
+        """ Setzen eines CityGML-Objekts
+
+        Args:
+            chBldg: XML-Element an dem das Objekt angefügt werden soll
+            geometry: Die Geometrie des Objekts
+            type: Der Typ des Objekts
+        """
         self.geom.AddGeometry(geometry)
+
+        # XML-Struktur
         chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
         chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
         chBldgS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
         chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod2MultiSurface"))
         chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
         chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
+
+        # Geometrie
         geomXML = UtilitiesGeom.geomToGml(geometry)
         chBldgSM.append(geomXML)
+
+        # GML-ID
         chBldgPol = chBldgSM[0]
         gmlId = "PolyID" + str(uuid.uuid4())
         chBldgPol.set(QName(XmlNs.gml, "id"), gmlId)
+
         return gmlId
 
     def extractRoofs(self, ifcRoofs):

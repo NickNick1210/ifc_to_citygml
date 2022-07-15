@@ -48,85 +48,97 @@ class UtilitiesGeom:
         """ Vereinfachen von OGR-Geometrien (Polygone und LineStrings)
 
         Args:
-            geom: Die zu vereinfachende Geometrie
+            geom: Die zu vereinfachende Geometrie, einzeln oder als Liste
             zd: Ob nur zweidimensional vereinfacht werden soll
                 default: False
             distTol: Die erlaubte Toleranz bei der Vereinfachung der Punktnähe (in Einheit der Geometrie)
                 default: 0.1
 
         Returns:
-            Die vereinfachte Geometrie oder None falls ungültig
+            Die vereinfachte Geometrie, einzeln oder als Liste, oder None falls ungültig
         """
         supported = ["POLYGON", "LINESTRING"]
-        # Wenn nicht unterstützt: Direkt zurückgeben
-        if geom is None or geom.IsEmpty() or geom.GetGeometryName() not in supported:
-            return geom
+        geomList = geom if isinstance(geom, list) else [geom]
+        simpList = []
+
+        for geom in geomList:
+            # Wenn nicht unterstützt: Direkt zurückgeben
+            if geom is None or geom.IsEmpty() or geom.GetGeometryName() not in supported:
+                return geom
+            else:
+                # Auslesen der Geometrie und Erstellen der neuen Geometrie
+                if geom.GetGeometryName() == "POLYGON":
+                    ring = geom.GetGeometryRef(0)
+                    geomNew = ogr.Geometry(ogr.wkbPolygon)
+                    ringNew = ogr.Geometry(ogr.wkbLinearRing)
+                else:
+                    ring = geom
+                    ringNew = ogr.Geometry(ogr.wkbLineString)
+                count = ring.GetPointCount()
+
+                # Anfangspunkt
+                ringNew.AddPoint(ring.GetPoint(0)[0], ring.GetPoint(0)[1], ring.GetPoint(0)[2])
+
+                # Vereinfachung: Betrachtung von drei Punkten hintereinander
+                for i in range(2, ring.GetPointCount()):
+                    ptEnd, ptMid, ptSt = ring.GetPoint(i), ring.GetPoint(i - 1), ring.GetPoint(i - 2)
+
+                    # Abstand zwischen erstem und mittlerem Punkt: Unter Toleranz = Überspringen
+                    sqXY = np.square(ptMid[0] - ptSt[0]) + np.square(ptMid[1] - ptSt[1])
+                    dist = np.sqrt(sqXY) if zd else np.sqrt(sqXY + np.square(ptMid[2] - ptSt[2]))
+                    if dist < distTol:
+                        continue
+
+                    # Parallelität der Linien von Startpunkt zu Mittelpunkt und Mittelpunkt zu Endpunkt prüfen
+                    tol = 0.05
+                    # Y-Steigung in Bezug auf X-Verlauf
+                    gradYSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[1] - ptSt[1]) / abs(ptMid[0] - ptSt[0])
+                    gradYEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[1] - ptMid[1]) / abs(ptEnd[0] - ptMid[0])
+                    if gradYSt - tol < gradYEnd < gradYSt + tol:
+                        # Z-Steigung in Bezug auf X-Verlauf
+                        gradZSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[0] - ptSt[0])
+                        gradZEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[2] - ptMid[2]) / abs(ptEnd[0] - ptMid[0])
+                        if gradZSt - tol < gradZEnd < gradZSt + tol:
+                            # Z-Steigung in Bezug auf Y-Verlauf
+                            gradYZSt = -1 if ptMid[1] - ptSt[1] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[1] - ptSt[1])
+                            gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(ptEnd[1] - ptMid[1])
+                            if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
+                                continue
+
+                    # Wenn keine Vereinfachung: Mittelpunkt setzen
+                    ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+
+                # Abschließen der Geometrie
+                if geom.GetGeometryName() == "POLYGON":
+                    ringNew.CloseRings()
+                    geomNew.AddGeometry(ringNew)
+                else:
+                    ptLineEnd = geom.GetPoint(geom.GetPointCount() - 1)
+                    ringNew.AddPoint(ptLineEnd[0], ptLineEnd[1], ptLineEnd[2])
+                    geomNew = ringNew
+
+                # Wenn Polygon weniger als vier Eckpunkte hat: Eigentlich ein LineString
+                if ringNew.GetPointCount() < 4 and geom.GetGeometryName() == "POLYGON":
+                    geomNewLine = ogr.Geometry(ogr.wkbPolygon)
+                    geomNewLine.AddPoint(geomNew.GetPoint(0)[0], geomNew.GetPoint(0)[1], geomNew.GetPoint(0)[2])
+                    geomNewLine.AddPoint(geomNew.GetPoint(1)[0], geomNew.GetPoint(1)[1], geomNew.GetPoint(1)[2])
+                    return geomNewLine
+
+                # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
+                elif ringNew.GetPointCount() < count:
+                    simpList.append(UtilitiesGeom.simplify(geomNew))
+
+                # Wenn fertig: Zurückgeben
+                else:
+                    simpList.append(geomNew)
+
+        # Rückgabe
+        if len(simpList) == 0:
+            return None
+        elif len(simpList) == 1:
+            return simpList[0]
         else:
-            # Auslesen der Geometrie und Erstellen der neuen Geometrie
-            if geom.GetGeometryName() == "POLYGON":
-                ring = geom.GetGeometryRef(0)
-                geomNew = ogr.Geometry(ogr.wkbPolygon)
-                ringNew = ogr.Geometry(ogr.wkbLinearRing)
-            else:
-                ring = geom
-                ringNew = ogr.Geometry(ogr.wkbLineString)
-            count = ring.GetPointCount()
-
-            # Anfangspunkt
-            ringNew.AddPoint(ring.GetPoint(0)[0], ring.GetPoint(0)[1], ring.GetPoint(0)[2])
-
-            # Vereinfachung: Betrachtung von drei Punkten hintereinander
-            for i in range(2, ring.GetPointCount()):
-                ptEnd, ptMid, ptSt = ring.GetPoint(i), ring.GetPoint(i - 1), ring.GetPoint(i - 2)
-
-                # Abstand zwischen erstem und mittlerem Punkt: Unter Toleranz = Überspringen
-                sqXY = np.square(ptMid[0] - ptSt[0]) + np.square(ptMid[1] - ptSt[1])
-                dist = np.sqrt(sqXY) if zd else np.sqrt(sqXY + np.square(ptMid[2] - ptSt[2]))
-                if dist < distTol:
-                    continue
-
-                # Parallelität der Linien von Startpunkt zu Mittelpunkt und Mittelpunkt zu Endpunkt prüfen
-                tol = 0.05
-                # Y-Steigung in Bezug auf X-Verlauf
-                gradYSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[1] - ptSt[1]) / abs(ptMid[0] - ptSt[0])
-                gradYEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[1] - ptMid[1]) / abs(ptEnd[0] - ptMid[0])
-                if gradYSt - tol < gradYEnd < gradYSt + tol:
-                    # Z-Steigung in Bezug auf X-Verlauf
-                    gradZSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[0] - ptSt[0])
-                    gradZEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[2] - ptMid[2]) / abs(ptEnd[0] - ptMid[0])
-                    if gradZSt - tol < gradZEnd < gradZSt + tol:
-                        # Z-Steigung in Bezug auf Y-Verlauf
-                        gradYZSt = -1 if ptMid[1] - ptSt[1] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[1] - ptSt[1])
-                        gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(ptEnd[1] - ptMid[1])
-                        if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
-                            continue
-
-                # Wenn keine Vereinfachung: Mittelpunkt setzen
-                ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
-
-            # Abschließen der Geometrie
-            if geom.GetGeometryName() == "POLYGON":
-                ringNew.CloseRings()
-                geomNew.AddGeometry(ringNew)
-            else:
-                ptLineEnd = geom.GetPoint(geom.GetPointCount() - 1)
-                ringNew.AddPoint(ptLineEnd[0], ptLineEnd[1], ptLineEnd[2])
-                geomNew = ringNew
-
-            # Wenn Polygon weniger als vier Eckpunkte hat: Eigentlich ein LineString
-            if ringNew.GetPointCount() < 4 and geom.GetGeometryName() == "POLYGON":
-                geomNewLine = ogr.Geometry(ogr.wkbPolygon)
-                geomNewLine.AddPoint(geomNew.GetPoint(0)[0], geomNew.GetPoint(0)[1], geomNew.GetPoint(0)[2])
-                geomNewLine.AddPoint(geomNew.GetPoint(1)[0], geomNew.GetPoint(1)[1], geomNew.GetPoint(1)[2])
-                return geomNewLine
-
-            # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
-            elif ringNew.GetPointCount() < count:
-                return UtilitiesGeom.simplify(geomNew)
-
-            # Wenn fertig: Zurückgeben
-            else:
-                return geomNew
+            return simpList
 
     @staticmethod
     def union3D(geomsIn):
@@ -243,49 +255,62 @@ class UtilitiesGeom:
         """ Puufern von OGR-Polygonen
 
         Args:
-            geom: Die zu puffernden Polygone als Liste
+            geom: Die zu puffernden Polygone, einzeln oder als Liste
             dist: Die Pufferdistanz in Einheit der Geometrie
 
         Returns:
-            Die gepufferten Polygone in einer Liste
+            Die gepufferten Polygone, einzeln oder in einer Liste
         """
-        # Wenn nicht unterstützt: Direkt zurückgeben
-        if geom is None or geom.IsEmpty() or geom.GetGeometryName() != "POLYGON":
-            return geom
+        geomList = geom if isinstance(geom, list) else [geom]
+        bufferList = []
+
+        for geom in geomList:
+            # Wenn nicht unterstützt: Direkt zurückgeben
+            if geom is None or geom.IsEmpty() or geom.GetGeometryName() != "POLYGON":
+                return geom
+            else:
+                # Auslesen der Geometrie und Erstellen der neuen Geometrie
+                ring = geom.GetGeometryRef(0)
+                geomBuffer = ogr.Geometry(ogr.wkbPolygon)
+                ringBuffer = ogr.Geometry(ogr.wkbLinearRing)
+
+                # Vereinfachung: Betrachtung von drei Punkten hintereinander
+                for i in range(1, ring.GetPointCount()):
+                    ptSt = ring.GetPoint(ring.GetPointCount() - 2) if i == 1 else ring.GetPoint(i - 2)
+                    ptEnd, ptMid = ring.GetPoint(i), ring.GetPoint(i - 1)
+
+                    # Vektoren senkrecht zu den beiden Linien
+                    vStartB = [ptMid[1] - ptSt[1], ptMid[0] - ptSt[0]]
+                    vStartBLen = np.sqrt(np.square(vStartB[0]) + np.square(vStartB[1]))
+                    vStartBDist = [(vStartB[0] / vStartBLen) * dist, (vStartB[1] / vStartBLen) * dist]
+                    vEndB = [ptEnd[1] - ptMid[1], ptEnd[0] - ptMid[0]]
+                    vEndBLen = np.sqrt(np.square(vEndB[0]) + np.square(vEndB[1]))
+                    vEndBDist = [(vEndB[0] / vEndBLen) * dist, (vEndB[1] / vEndBLen) * dist]
+
+                    # Punkte und Linien zum Mittelpunkt, um Pufferdistanz nach außen verschoben
+                    ptMidB1 = [ptMid[0] + vStartBDist[0], ptMid[1] + vStartBDist[1], ptMid[2]]
+                    ptMidB2 = [ptMid[0] + vEndBDist[0], ptMid[1] + vEndBDist[1], ptMid[2]]
+                    b1Line = Line(Point3D(ptMidB1[0], ptMidB1[1], ptMidB1[2]),
+                                  Point3D(ptMidB1[0] + (ptMid[0] - ptSt[0]), ptMidB1[1] + (ptMid[1] - ptSt[1]),
+                                          ptMidB1[2]))
+                    b2Line = Line(Point3D(ptMidB2[0], ptMidB2[1], ptMidB2[2]),
+                                  Point3D(ptMidB2[0] + (ptEnd[0] - ptMid[0]), ptMidB2[1] + (ptEnd[1] - ptMid[1]),
+                                          ptMidB2[2]))
+
+                    # Schnittpunkt: Neuer Mittelpunkt
+                    sPoint = b1Line.intersection(b2Line)[0]
+                    ringBuffer.AddPoint(float(sPoint[0]), float(sPoint[1]), ptMidB1[2])
+
+                # Abschließen der Geometrie
+                ringBuffer.CloseRings()
+                geomBuffer.AddGeometry(ringBuffer)
+                if geomBuffer.GetGeometryRef(0).GetPointCount() > 3:
+                    bufferList.append(geomBuffer)
+
+        # Rückgabe
+        if len(bufferList) == 0:
+            return None
+        elif len(bufferList) == 1:
+            return bufferList[0]
         else:
-            # Auslesen der Geometrie und Erstellen der neuen Geometrie
-            ring = geom.GetGeometryRef(0)
-            geomBuffer = ogr.Geometry(ogr.wkbPolygon)
-            ringBuffer = ogr.Geometry(ogr.wkbLinearRing)
-
-            # Vereinfachung: Betrachtung von drei Punkten hintereinander
-            for i in range(1, ring.GetPointCount()):
-                ptSt = ring.GetPoint(ring.GetPointCount() - 2) if i == 1 else ring.GetPoint(i - 2)
-                ptEnd, ptMid = ring.GetPoint(i), ring.GetPoint(i - 1)
-
-                # Vektoren senkrecht zu den beiden Linien
-                vStartB = [ptMid[1] - ptSt[1], ptMid[0] - ptSt[0]]
-                vStartBLen = np.sqrt(np.square(vStartB[0]) + np.square(vStartB[1]))
-                vStartBDist = [(vStartB[0] / vStartBLen) * dist, (vStartB[1] / vStartBLen) * dist]
-                vEndB = [ptEnd[1] - ptMid[1], ptEnd[0] - ptMid[0]]
-                vEndBLen = np.sqrt(np.square(vEndB[0]) + np.square(vEndB[1]))
-                vEndBDist = [(vEndB[0] / vEndBLen) * dist, (vEndB[1] / vEndBLen) * dist]
-
-                # Punkte und Linien zum Mittelpunkt, um Pufferdistanz nach außen verschoben
-                ptMidB1 = [ptMid[0] + vStartBDist[0], ptMid[1] + vStartBDist[1], ptMid[2]]
-                ptMidB2 = [ptMid[0] + vEndBDist[0], ptMid[1] + vEndBDist[1], ptMid[2]]
-                b1Line = Line(Point3D(ptMidB1[0], ptMidB1[1], ptMidB1[2]),
-                              Point3D(ptMidB1[0] + (ptMid[0] - ptSt[0]), ptMidB1[1] + (ptMid[1] - ptSt[1]),
-                                      ptMidB1[2]))
-                b2Line = Line(Point3D(ptMidB2[0], ptMidB2[1], ptMidB2[2]),
-                              Point3D(ptMidB2[0] + (ptEnd[0] - ptMid[0]), ptMidB2[1] + (ptEnd[1] - ptMid[1]),
-                                      ptMidB2[2]))
-
-                # Schnittpunkt: Neuer Mittelpunkt
-                sPoint = b1Line.intersection(b2Line)[0]
-                ringBuffer.AddPoint(float(sPoint[0]), float(sPoint[1]), ptMidB1[2])
-
-            # Abschließen der Geometrie
-            ringBuffer.CloseRings()
-            geomBuffer.AddGeometry(ringBuffer)
-            return None if geomBuffer.GetGeometryRef(0).GetPointCount() < 4 else geomBuffer
+            return bufferList

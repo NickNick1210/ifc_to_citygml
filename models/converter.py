@@ -853,7 +853,7 @@ class Converter(QgsTask):
         geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
         geomRoofsSimple = []
         for geomRoof in geomRoofs:
-            geomRoofSimple = UtilitiesGeom.simplify(geomRoof, tol=0.01)
+            geomRoofSimple = UtilitiesGeom.simplify(geomRoof, distTol=0.01)
             if geomRoofSimple is not None and not geomRoofSimple.IsEmpty() and geomRoofSimple.GetGeometryName() == "POLYGON":
                 geomRoofsSimple.append(geomRoofSimple)
         geomRoofs = geomRoofsSimple
@@ -1708,7 +1708,7 @@ class Converter(QgsTask):
                     if pt1Check and pt2Check:
                         anyInt = True
             if anyInt:
-                wall = UtilitiesGeom.simplify(wall)
+                wall = UtilitiesGeom.simplify(wall, distTol=0.01)
                 wallsChecked.append(wall)
 
         wallsOut = UtilitiesGeom.union3D(wallsChecked)

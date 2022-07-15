@@ -46,10 +46,7 @@ class UtilitiesIfc:
             # Suche nach Attribut
             else:
                 pset = element.get_psets(ifcElement)[psetName]
-                if attrName in pset.keys():
-                    return pset[attrName]
-                else:
-                    return None
+                return pset[attrName] if attrName in pset.keys() else None
         else:
             return None
 
@@ -71,51 +68,28 @@ class UtilitiesIfc:
         """
         rels = ifc.get_inverse(inElement)
         for rel in rels:
+
             # Bei Aggregierungen
-            if rel.is_a('IfcRelAggregates'):
-                if rel.RelatingObject == inElement:
-                    for obj in rel.RelatedObjects:
-                        if obj.is_a(outElement):
-                            if type is not None:
-                                if obj.PredefinedType == type:
-                                    if obj not in result:
-                                        result.append(obj)
-                            else:
-                                if obj not in result:
-                                    result.append(obj)
-                        else:
-                            UtilitiesIfc.findElement(ifc, obj, outElement, result, type)
-
+            if rel.is_a('IfcRelAggregates') and rel.RelatingObject == inElement:
+                objs = rel.RelatedObjects
             # Bei räumlichen Begrenzungen
-            elif rel.is_a("IfcRelSpaceBoundary"):
-                if rel.RelatingSpace == inElement:
-                    obj = rel.RelatedBuildingElement
-                    if obj is not None:
-                        if obj.is_a(outElement):
-                            if type is not None:
-                                if obj.PredefinedType == type:
-                                    if obj not in result:
-                                        result.append(obj)
-                            else:
-                                if obj not in result:
-                                    result.append(obj)
-                        else:
-                            UtilitiesIfc.findElement(ifc, obj, outElement, result, type)
-
+            elif rel.is_a("IfcRelSpaceBoundary") and rel.RelatingSpace == inElement:
+                objs = [rel.RelatedBuildingElement] if rel.RelatedBuildingElement is not None else []
             # Bei räumlichen Enthaltungen
-            elif rel.is_a("IfcRelContainedInSpatialStructure"):
-                if rel.RelatingStructure == inElement:
-                    objs = rel.RelatedElements
-                    for obj in objs:
-                        if obj is not None:
-                            if obj.is_a(outElement):
-                                if type is not None:
-                                    if obj.PredefinedType == type:
-                                        if obj not in result:
-                                            result.append(obj)
-                                else:
-                                    if obj not in result:
-                                        result.append(obj)
-                            else:
-                                UtilitiesIfc.findElement(ifc, obj, outElement, result, type)
+            elif rel.is_a("IfcRelContainedInSpatialStructure") and rel.RelatingStructure == inElement:
+                objs = rel.RelatedElements
+            else:
+                continue
+
+            for obj in objs:
+                if obj.is_a(outElement):
+                    if type is not None:
+                        if obj.PredefinedType == type and obj not in result:
+                            result.append(obj)
+                    else:
+                        if obj not in result:
+                            result.append(obj)
+                else:
+                    UtilitiesIfc.findElement(ifc, obj, outElement, result, type)
+
         return result

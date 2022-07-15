@@ -11,8 +11,6 @@
 #####
 
 # Standard-Bibliotheken
-import math
-
 import numpy as np
 
 # XML-Bibliotheken
@@ -79,9 +77,7 @@ class UtilitiesGeom:
 
             # Vereinfachung: Betrachtung von drei Punkten hintereinander
             for i in range(2, ring.GetPointCount()):
-                ptEnd = ring.GetPoint(i)
-                ptMid = ring.GetPoint(i - 1)
-                ptSt = ring.GetPoint(i - 2)
+                ptEnd, ptMid, ptSt = ring.GetPoint(i), ring.GetPoint(i - 1), ring.GetPoint(i - 2)
 
                 # Abstand zwischen erstem und mittlerem Punkt: Unter Toleranz = Überspringen
                 sqXY = np.square(ptMid[0] - ptSt[0]) + np.square(ptMid[1] - ptSt[1])
@@ -134,64 +130,82 @@ class UtilitiesGeom:
 
     @staticmethod
     def union3D(geomsIn):
+        """ Vereinigen von OGR-Polygonen, sofern möglich
+
+        Args:
+            geomsIn: Die zu vereinfachenden Polygone als Liste
+
+        Returns:
+            Die vereinigten Polygone in einer Liste
+        """
         geomsOut = []
         done = []
+
+        # Alle Geometrie miteinander auf Berührung testen
         for i in range(0, len(geomsIn)):
             if i in done:
                 continue
+
+            # Vereinfachen der Geometrie
             geom1 = UtilitiesGeom.simplify(geomsIn[i])
-            if geom1 is None or geom1.GetGeometryName() != "POLYGON":
+            if geom1 is None or geom1.GetGeometryName() != "POLYGON" or geom1.IsEmpty():
                 done.append(i)
                 continue
             ring1 = geom1.GetGeometryRef(0)
-            if ring1 is None:
-                done.append(i)
-                continue
+
             for j in range(i + 1, len(geomsIn)):
                 if j in done:
                     continue
+
+                # Vereinfachen der Geometrie
                 geom2 = UtilitiesGeom.simplify(geomsIn[j])
-                if geom2 is None or geom2.GetGeometryName() != "POLYGON":
+                if geom2 is None or geom2.GetGeometryName() != "POLYGON" or geom2.IsEmpty():
                     done.append(j)
                     continue
                 ring2 = geom2.GetGeometryRef(0)
-                if ring2 is None:
-                    done.append(j)
-                    continue
+
+                # Alle Eckpunkte miteinander vergleichen
                 samePts = []
                 for k in range(0, ring1.GetPointCount() - 1):
-                    point1 = ring1.GetPoint(k)
-                    for l in range(0, ring2.GetPointCount() - 1):
-                        point2 = ring2.GetPoint(l)
-                        if point1 == point2:
-                            samePts.append(point1)
+                    for m in range(0, ring2.GetPointCount() - 1):
+                        if ring1.GetPoint(k) == ring2.GetPoint(m):
+                            samePts.append(ring1.GetPoint(k))
+
+                # Wenn mehrere gleiche Punkte gefunden
                 if len(samePts) > 1:
-                    plane1 = Plane(Point3D(ring1.GetPoint(0)[0], ring1.GetPoint(0)[1], ring1.GetPoint(0)[2]),
-                                   Point3D(ring1.GetPoint(1)[0], ring1.GetPoint(1)[1], ring1.GetPoint(1)[2]),
-                                   Point3D(ring1.GetPoint(2)[0], ring1.GetPoint(2)[1], ring1.GetPoint(2)[2]))
-                    plane2 = Plane(Point3D(ring2.GetPoint(0)[0], ring2.GetPoint(0)[1], ring2.GetPoint(0)[2]),
-                                   Point3D(ring2.GetPoint(1)[0], ring2.GetPoint(1)[1], ring2.GetPoint(1)[2]),
-                                   Point3D(ring2.GetPoint(2)[0], ring2.GetPoint(2)[1], ring2.GetPoint(2)[2]))
+                    # Auf Parallität prüfen
+                    pt11, pt12, pt13 = ring1.GetPoint(0), ring1.GetPoint(1), ring1.GetPoint(2)
+                    pt21, pt22, pt23 = ring2.GetPoint(0), ring2.GetPoint(1), ring2.GetPoint(2)
+                    plane1 = Plane(Point3D(pt11[0], pt11[1], pt11[2]), Point3D(pt12[0], pt12[1], pt12[2]),
+                                   Point3D(pt13[0], pt13[1], pt13[2]))
+                    plane2 = Plane(Point3D(pt21[0], pt21[1], pt21[2]), Point3D(pt22[0], pt22[1], pt22[2]),
+                                   Point3D(pt23[0], pt23[1], pt23[2]))
                     if plane1.is_parallel(plane2):
+
+                        # Vereinigungs-Geometrie erstellen
                         geometry = ogr.Geometry(ogr.wkbPolygon)
                         ring = ogr.Geometry(ogr.wkbLinearRing)
                         for k in range(0, ring1.GetPointCount() - 1):
                             point1 = ring1.GetPoint(k)
+
+                            # Wenn gleicher Eckpunkt
                             if point1 in samePts:
                                 ring.AddPoint(point1[0], point1[1], point1[2])
-                                for l in range(0, ring2.GetPointCount() - 1):
-                                    point2 = ring2.GetPoint(l)
+
+                                # Anbinden der zweiten Geometrie
+                                for m in range(0, ring2.GetPointCount() - 1):
+                                    point2 = ring2.GetPoint(m)
                                     if point2 == point1:
-                                        if ring2.GetPoint(l + 1) in samePts:
+                                        if ring2.GetPoint(m + 1) in samePts:
                                             break
                                         else:
-                                            for m in range(l + 1, ring2.GetPointCount() - 1):
-                                                point3 = ring2.GetPoint(m)
+                                            for n in range(m + 1, ring2.GetPointCount() - 1):
+                                                point3 = ring2.GetPoint(n)
                                                 if point3 in samePts:
                                                     break
                                                 else:
                                                     ring.AddPoint(point3[0], point3[1], point3[2])
-                                            for o in range(0, l):
+                                            for o in range(0, m):
                                                 point3 = ring2.GetPoint(o)
                                                 if point3 in samePts:
                                                     break
@@ -199,8 +213,11 @@ class UtilitiesGeom:
                                                     ring.AddPoint(point3[0], point3[1], point3[2])
                                             break
 
+                            # Wenn normaler Eckpunkt
                             else:
                                 ring.AddPoint(point1[0], point1[1], point1[2])
+
+                        # Geometrie abschließen
                         ring.CloseRings()
                         geometry.AddGeometry(ring)
                         geomsOut.append(geometry)
@@ -208,60 +225,67 @@ class UtilitiesGeom:
                         done.append(j)
                         break
 
+            # Wenn keine berührende Geometrie gefunden
             if i not in done:
                 done.append(i)
                 geomsOut.append(geomsIn[i])
 
+        # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
         if len(geomsOut) < len(geomsIn):
             return UtilitiesGeom.union3D(geomsOut)
+
+        # Wenn fertig: Zurückgeben
         else:
             return geomsOut
 
     @staticmethod
     def buffer2D(geom, dist):
+        """ Puufern von OGR-Polygonen
+
+        Args:
+            geom: Die zu puffernden Polygone als Liste
+            dist: Die Pufferdistanz in Einheit der Geometrie
+
+        Returns:
+            Die gepufferten Polygone in einer Liste
+        """
+        # Wenn nicht unterstützt: Direkt zurückgeben
         if geom is None or geom.IsEmpty() or geom.GetGeometryName() != "POLYGON":
             return geom
         else:
+            # Auslesen der Geometrie und Erstellen der neuen Geometrie
             ring = geom.GetGeometryRef(0)
-
             geomBuffer = ogr.Geometry(ogr.wkbPolygon)
             ringBuffer = ogr.Geometry(ogr.wkbLinearRing)
 
+            # Vereinfachung: Betrachtung von drei Punkten hintereinander
             for i in range(1, ring.GetPointCount()):
-                if i == 1:
-                    ptStart = ring.GetPoint(ring.GetPointCount() - 2)
-                else:
-                    ptStart = ring.GetPoint(i - 2)
-                ptEnd = ring.GetPoint(i)
-                ptMid = ring.GetPoint(i - 1)
+                ptSt = ring.GetPoint(ring.GetPointCount() - 2) if i == 1 else ring.GetPoint(i - 2)
+                ptEnd, ptMid = ring.GetPoint(i), ring.GetPoint(i - 1)
 
-                vStart = [ptMid[0] - ptStart[0], ptMid[1] - ptStart[1]]
-                vStartB = [vStart[1], vStart[0]]
+                # Vektoren senkrecht zu den beiden Linien
+                vStartB = [ptMid[1] - ptSt[1], ptMid[0] - ptSt[0]]
                 vStartBLen = np.sqrt(np.square(vStartB[0]) + np.square(vStartB[1]))
-                vStartBNorm = [vStartB[0] / vStartBLen, vStartB[1] / vStartBLen]
-                vStartBDist = [vStartBNorm[0] * dist, vStartBNorm[1] * dist]
-
-                vEnd = [ptEnd[0] - ptMid[0], ptEnd[1] - ptMid[1]]
-                vEndB = [vEnd[1], vEnd[0]]
+                vStartBDist = [(vStartB[0] / vStartBLen) * dist, (vStartB[1] / vStartBLen) * dist]
+                vEndB = [ptEnd[1] - ptMid[1], ptEnd[0] - ptMid[0]]
                 vEndBLen = np.sqrt(np.square(vEndB[0]) + np.square(vEndB[1]))
-                vEndBNorm = [vEndB[0] / vEndBLen, vEndB[1] / vEndBLen]
-                vEndBDist = [vEndBNorm[0] * dist, vEndBNorm[1] * dist]
+                vEndBDist = [(vEndB[0] / vEndBLen) * dist, (vEndB[1] / vEndBLen) * dist]
 
+                # Punkte und Linien zum Mittelpunkt, um Pufferdistanz nach außen verschoben
                 ptMidB1 = [ptMid[0] + vStartBDist[0], ptMid[1] + vStartBDist[1], ptMid[2]]
                 ptMidB2 = [ptMid[0] + vEndBDist[0], ptMid[1] + vEndBDist[1], ptMid[2]]
-
                 b1Line = Line(Point3D(ptMidB1[0], ptMidB1[1], ptMidB1[2]),
-                              Point3D(ptMidB1[0] + (ptMid[0] - ptStart[0]), ptMidB1[1] + (ptMid[1] - ptStart[1]),
+                              Point3D(ptMidB1[0] + (ptMid[0] - ptSt[0]), ptMidB1[1] + (ptMid[1] - ptSt[1]),
                                       ptMidB1[2]))
                 b2Line = Line(Point3D(ptMidB2[0], ptMidB2[1], ptMidB2[2]),
                               Point3D(ptMidB2[0] + (ptEnd[0] - ptMid[0]), ptMidB2[1] + (ptEnd[1] - ptMid[1]),
                                       ptMidB2[2]))
+
+                # Schnittpunkt: Neuer Mittelpunkt
                 sPoint = b1Line.intersection(b2Line)[0]
                 ringBuffer.AddPoint(float(sPoint[0]), float(sPoint[1]), ptMidB1[2])
 
+            # Abschließen der Geometrie
             ringBuffer.CloseRings()
             geomBuffer.AddGeometry(ringBuffer)
-            if geomBuffer.GetGeometryRef(0).GetPointCount() < 4:
-                return None
-            else:
-                return geomBuffer
+            return None if geomBuffer.GetGeometryRef(0).GetPointCount() < 4 else geomBuffer

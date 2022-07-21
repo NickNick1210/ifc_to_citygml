@@ -919,10 +919,10 @@ class Converter(QgsTask):
 
         # Berechnung
         geomRoofs = self.extractRoofs(ifcRoofs)
-        geomWalls, geomRoofsNew = self.calcWalls(geomBase, geomRoofs, height)
-        geomWallsR, geomRoofs = self.calcRoofWalls(geomRoofs + geomRoofsNew)
-        geomRoofs = self.calcRoofs(geomRoofs, geomBase)
-        geomWalls += self.checkRoofWalls(geomWallsR, geomRoofs)
+        geomWalls, geomRoofsNew = self.calcLoD2Walls(geomBase, geomRoofs, height)
+        geomWallsR, geomRoofs = self.calcLoD2RoofWalls(geomRoofs + geomRoofsNew)
+        geomRoofs = self.calcLoD2Roofs(geomRoofs, geomBase)
+        geomWalls += self.checkLoD2RoofWalls(geomWallsR, geomRoofs)
         geomRoofs = UtilitiesGeom.simplify(geomRoofs, distTol=0.01)
 
         # Geometrie
@@ -1086,8 +1086,8 @@ class Converter(QgsTask):
 
         return roofs
 
-    def calcWalls(self, base, roofs, height):
-        """ Berechnen der Grundwände
+    def calcLoD2Walls(self, base, roofs, height):
+        """ Berechnen der Grundwände in Level of Detail (LoD) 2
 
         Args:
             base: Die Geometrie der Grundfläche
@@ -1342,8 +1342,8 @@ class Converter(QgsTask):
         return walls, roofsNew
 
     # noinspection PyMethodMayBeStatic
-    def calcRoofs(self, roofsIn, base):
-        """ Anpassen der Dächer, u.a. auf die Grundfläche und überschneidende Dächer
+    def calcLoD2Roofs(self, roofsIn, base):
+        """ Anpassen der Dächer, u.a. auf die Grundfläche und überschneidende Dächer in Level of Detail (LoD) 2
 
         Args:
             roofsIn: Die Geometrien der Dächer als Liste
@@ -1395,7 +1395,7 @@ class Converter(QgsTask):
         return roofs
 
     # noinspection PyMethodMayBeStatic
-    def calcRoofWalls(self, roofs):
+    def calcLoD2RoofWalls(self, roofs):
         """ Berechnen von Wänden zwischen zwei Dächern, die nicht bereits über die Grundfläche erstellt wurden
 
         Args:
@@ -1678,7 +1678,7 @@ class Converter(QgsTask):
         return walls, roofsOut
 
     # noinspection PyMethodMayBeStatic
-    def checkRoofWalls(self, wallsIn, roofs):
+    def checkLoD2RoofWalls(self, wallsIn, roofs):
         """ Überprüfen und ggf. Aussortieren der neu erstellten Wand-Geometrien
 
         Args:
@@ -1751,9 +1751,9 @@ class Converter(QgsTask):
             height: Gebäudehöhe
         """
         # Berechnung
-        # TODO: Berechnung
-
-        geomBases, geomRoofs, geomWalls = [], [], []
+        geomBases = self.calcLoD3Bases(ifcBuilding)
+        geomRoofs = self.calcLoD3Roofs(ifcBuilding)
+        geomWalls = self.calcLoD3Walls(ifcBuilding)
 
         # Geometrie
         links = []
@@ -1804,7 +1804,6 @@ class Converter(QgsTask):
         for opening in openings:
             chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
             # TODO: Openings
-            # Window oder Door
 
         # Geometrie
         geomXML = UtilitiesGeom.geomToGml(geometry)
@@ -1816,3 +1815,68 @@ class Converter(QgsTask):
         chBldgPol.set(QName(XmlNs.gml, "id"), gmlId)
 
         return gmlId
+
+    # noinspection PyMethodMayBeStatic
+    def calcLoD3Bases(self, ifcBuilding):
+        """ Berechnen der Grundfläche in Level of Detail (LoD) 3
+        
+        Args:
+            ifcBuilding: Das Gebäude, aus dem die Grundflächen entnommen werden sollen
+
+        Returns:
+            Die berechneten Grundflächen-Geometrien als Liste
+        """
+        bases = []
+
+        # IFC-Elemente der Grundfläche
+        ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        if len(ifcSlabs) == 0:
+            ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            # Wenn keine Grundfläche vorhanden
+            if len(ifcSlabs) == 0:
+                self.parent.dlg.log(self.tr(u"Due to the missing baseslab, it will also be missing in CityGML"))
+                return []
+
+        return bases
+
+    # noinspection PyMethodMayBeStatic
+    def calcLoD3Roofs(self, ifcBuilding):
+        """ Berechnen der Dächer in Level of Detail (LoD) 3
+        
+        Args:
+            ifcBuilding: Das Gebäude, aus dem die Dächer entnommen werden sollen
+
+        Returns:
+            Die berechneten Dächer als Liste
+        """
+        roofs = []
+
+        # IFC-Elemente des Daches
+        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        ifcRoofs += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+        if len(ifcRoofs) == 0:
+            self.parent.dlg.log(self.tr(u"Due to the missing roofs, it will also be missing in CityGML"))
+            return []
+
+        return roofs
+
+    # noinspection PyMethodMayBeStatic
+    def calcLoD3Walls(self, ifcBuilding):
+        """ Berechnen der Außenwände in Level of Detail (LoD) 3
+        
+        Args:
+            ifcBuilding: Das Gebäude, aus dem die Wände entnommen werden sollen
+
+        Returns:
+            Die berechneten Wand-Geometrien als Liste
+        """
+        walls = []
+
+        # IFC-Elemente der Wände
+        ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
+        ifcWalls += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWallStandardCase", result=[])
+        if len(ifcWalls) == 0:
+            self.parent.dlg.log(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
+            return []
+
+        return walls

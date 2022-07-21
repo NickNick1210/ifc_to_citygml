@@ -4,57 +4,57 @@
 <context>
     <name>Converter</name>
     <message>
-        <location filename="../models/converter.py" line="275"/>
+        <location filename="../models/converter.py" line="277"/>
         <source>Due to the missing geometries, no bounding box can be calculated</source>
         <translation>Wegen fehlender Geometrien kann keine Bounding Box berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="519"/>
+        <location filename="../models/converter.py" line="521"/>
         <source>Due to the missing baseslab and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlender Grundfläche und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="529"/>
+        <location filename="../models/converter.py" line="531"/>
         <source>Due to the missing roof and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlenden Daches und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="569"/>
+        <location filename="../models/converter.py" line="571"/>
         <source>Due to the missing baseslab, no FootPrint geometry can be calculated</source>
         <translation>Wegen fehlender Grundfläche kann keine Grundflächengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="598"/>
+        <location filename="../models/converter.py" line="600"/>
         <source>Due to the missing roof, no RoofEdge geometry can be calculated</source>
         <translation>Wegen fehlenden Dachs kann keine Dachkantengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="710"/>
+        <location filename="../models/converter.py" line="695"/>
         <source>Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated</source>
         <translation>Wegen nicht-metrischen Einheiten oder fehlender Topologie kann keine LoD0-Geometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="881"/>
+        <location filename="../models/converter.py" line="801"/>
         <source>Due to the missing height and roof, no building geometry can be calculated</source>
         <translation>Wegen fehlender Höhe und Dach kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="889"/>
+        <location filename="../models/converter.py" line="809"/>
         <source>Due to the missing baseslab, no building geometry can be calculated</source>
         <translation>Wegen fehlender Grundfläche kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="899"/>
+        <location filename="../models/converter.py" line="821"/>
         <source>Due to the missing roof, no building geometry can be calculated</source>
         <translation>Wegen fehlenden Dachs kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1212"/>
+        <location filename="../models/converter.py" line="1178"/>
         <source>Due to a missing roof, a wall height can&apos;t be calculated!</source>
         <translation>Wegen eines fehlenden Daches kann eine Wandhöhe nicht berechnet werden!</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="2029"/>
+        <location filename="../models/converter.py" line="1666"/>
         <source>No address details existing</source>
         <translation>Keine Adressangabe vorhanden</translation>
     </message>
@@ -133,6 +133,24 @@
         <location filename="../dialog_vm.py" line="59"/>
         <source>Tool started</source>
         <translation>Tool gestartet</translation>
+    </message>
+</context>
+<context>
+    <name>GisVM</name>
+    <message>
+        <location filename="../gis_vm.py" line="50"/>
+        <source>CityGML building model added to QGIS</source>
+        <translation>CityGML-Gebäudemodell zu QGIS hinzugefügt</translation>
+    </message>
+    <message>
+        <location filename="../gis_vm.py" line="53"/>
+        <source>CityGML bulding model could not be added to QGIS</source>
+        <translation>CityGML-Gebäudemodell konnte nicht zu QGIS hinzugefügt werden</translation>
+    </message>
+    <message>
+        <location filename="../gis_vm.py" line="77"/>
+        <source>3D properties adjusted to display the building model</source>
+        <translation>3D-Einstellungen angepasst um das Gebäudemodell anzeigen zu können</translation>
     </message>
 </context>
 <context>

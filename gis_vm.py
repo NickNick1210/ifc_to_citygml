@@ -38,7 +38,7 @@ class GisVM:
         Returns:
             Übersetzter Text
         """
-        return QCoreApplication.translate('Converter', msg)
+        return QCoreApplication.translate('GisVM', msg)
 
     def loadIntoGIS(self, path):
         print(path)
@@ -57,9 +57,6 @@ class GisVM:
         minV = qml.xpath("//Option[@name='minValue']")[0]
         maxV = qml.xpath("//Option[@name='maxValue']")[0]
 
-        print(etree.tostring(minV))
-        print(etree.tostring(maxV))
-
         minHeight = sys.maxsize
         maxHeight = -sys.maxsize
         ix = layer.fields().indexFromName('measuredHeight')
@@ -69,8 +66,6 @@ class GisVM:
                 minHeight = height
             if height > maxHeight:
                 maxHeight = height
-        print(minHeight)
-        print(maxHeight)
 
         minV.set("value", str(minHeight))
         maxV.set("value", str(maxHeight))
@@ -79,4 +74,4 @@ class GisVM:
 
         layer.loadNamedStyle("C:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/resources/3D.qml")
         layer.triggerRepaint()
-        self.parent.dlg.log(self.tr(u'3D properties adjusted for displaying the building model'))
+        self.parent.dlg.log(self.tr(u'3D properties adjusted to display the building model'))

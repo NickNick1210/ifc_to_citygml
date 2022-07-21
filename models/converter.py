@@ -100,10 +100,8 @@ class Converter(QgsTask):
             root = self.convertLoD1(root, self.eade)
         elif self.lod == 2:
             root = self.convertLoD2(root, self.eade)
-            pass
         elif self.lod == 3:
-            # TODO LoD3
-            pass
+            root = self.convertLoD3(root, self.eade)
         elif self.lod == 4:
             # TODO LoD4
             pass
@@ -251,8 +249,44 @@ class Converter(QgsTask):
 
             # Konvertierung
             height = self.convertBldgAttr(ifcBuilding, chBldg)
-            links = self.convertBldgBound(ifcBuilding, chBldg, height)
-            self.convertLoD2Solid(chBldg, links)
+            links = self.convertLoD2BldgBound(ifcBuilding, chBldg, height)
+            self.convertLoDSolid(chBldg, links, 2)
+            self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.convertBound(self.geom, chBound)
+
+            # EnergyADE
+            if eade:
+                # TODO: EnergyADE
+                pass
+
+        return root
+
+    def convertLoD3(self, root, eade):
+        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 3
+
+        Args:
+            root: Das vorbereitete XML-Schema
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+        """
+        # IFC-Grundelemente
+        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcBuildings = self.ifc.by_type("IfcBuilding")
+
+        # XML-Struktur
+        chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
+        chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
+
+        # Über alle enthaltenen Gebäude iterieren
+        for ifcBuilding in ifcBuildings:
+            chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
+            chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
+
+            # Konvertierung
+            height = self.convertBldgAttr(ifcBuilding, chBldg)
+            links = self.convertLoD3BldgBound(ifcBuilding, chBldg, height)
+            links = []
+            self.convertLoDSolid(chBldg, links, 3)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
 
@@ -553,6 +587,69 @@ class Converter(QgsTask):
         height = maxHeight - minHeight
         return height
 
+    def convertAddress(self, ifcBuilding, ifcSite, chBldg):
+        """ Konvertieren der Adresse von IFC zu CityGML
+
+        Args:
+            ifcBuilding: Das Gebäude, aus dem die Adresse entnommen werden soll
+            ifcSite: Das Grundstück, auf dem das Gebäude steht
+            chBldg: XML-Element an dem die Adresse angefügt werden soll
+        """
+        # Prüfen, wo Addresse vorhanden
+        if ifcBuilding.BuildingAddress is not None:
+            ifcAddress = ifcBuilding.BuildingAddress
+        elif UtilitiesIfc.findPset(ifcBuilding, "Pset_Address") is not None:
+            ifcAddress = UtilitiesIfc.findPset(ifcBuilding, "Pset_Address")
+        elif ifcSite.SiteAddress is not None:
+            ifcAddress = ifcSite.SiteAddress
+        elif UtilitiesIfc.findPset(ifcSite, "Pset_Address") is not None:
+            ifcAddress = UtilitiesIfc.findPset(ifcSite, "Pset_Address")
+        else:
+            self.parent.dlg.log(self.tr(u'No address details existing'))
+            return
+
+        # XML-Struktur
+        chBldgAdr = etree.SubElement(chBldg, QName(XmlNs.bldg, "address"))
+        chBldgAdrObj = etree.SubElement(chBldgAdr, QName(XmlNs.core, "Address"))
+        chBldgAdrXal = etree.SubElement(chBldgAdrObj, QName(XmlNs.core, "xalAddress"))
+        chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
+        chBldgAdrLoc = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "Locality"))
+        chBldgAdrLoc.set("Type", "Town")
+
+        # Stadt
+        if ifcAddress.Town is not None and ifcAddress.Town != "":
+            chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
+            chBldgAdrLocName.text = ifcAddress.Town
+
+        # Straße und Hausnummer
+        if ifcAddress.AddressLines is not None and ifcAddress.AddressLines != "":
+            chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
+            chBldgAdrLocTh.set("Type", "Street")
+            chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
+            chBldgAdrLocThName = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareName"))
+
+            address = ifcAddress.AddressLines[0]
+            # Format heraussuchen
+            if address[0].isdigit():
+                sep = address.find(" ")
+                street = address[sep + 1:]
+                nr = address[0:sep]
+            elif address[len(address) - 1].isdigit():
+                sep = address.rfind(" ")
+                street = address[0:sep]
+                nr = address[sep + 1:]
+            else:
+                street = address
+                nr = ""
+            chBldgAdrLocThName.text = street
+            chBldgAdrLocThNr.text = nr
+
+        # Postleitzahl
+        if ifcAddress.PostalCode is not None and ifcAddress.PostalCode != "":
+            chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
+            chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
+            chBldgAdrLocPCNr.text = ifcAddress.PostalCode
+
     def convertLoD0FootPrint(self, ifcBuilding, chBldg):
         """ Konvertieren der Grundfläche von IFC zu CityGML
 
@@ -786,8 +883,8 @@ class Converter(QgsTask):
 
         return geometries
 
-    def convertBldgBound(self, ifcBuilding, chBldg, height):
-        """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML
+    def convertLoD2BldgBound(self, ifcBuilding, chBldg, height):
+        """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 2
 
         Args:
             ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
@@ -831,23 +928,24 @@ class Converter(QgsTask):
         # Geometrie
         links = []
         if geomWalls is not None and len(geomRoofs) > 0 and geomRoofs is not None and len(geomRoofs) > 0:
-            link = self.setElement(chBldg, geomBase, "GroundSurface")
+            link = self.setElement(chBldg, geomBase, "GroundSurface", 2)
             links.append(link)
             for geomRoof in geomRoofs:
-                link = self.setElement(chBldg, geomRoof, "RoofSurface")
+                link = self.setElement(chBldg, geomRoof, "RoofSurface", 2)
                 links.append(link)
             for geomWall in geomWalls:
-                link = self.setElement(chBldg, geomWall, "WallSurface")
+                link = self.setElement(chBldg, geomWall, "WallSurface", 2)
                 links.append(link)
         return links
 
-    def setElement(self, chBldg, geometry, type):
+    def setElement(self, chBldg, geometry, type, lod):
         """ Setzen eines CityGML-Objekts
 
         Args:
             chBldg: XML-Element an dem das Objekt angefügt werden soll
             geometry: Die Geometrie des Objekts
             type: Der Typ des Objekts
+            lod: Level of Detail (LoD)
         """
         self.geom.AddGeometry(geometry)
 
@@ -855,7 +953,7 @@ class Converter(QgsTask):
         chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
         chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
         chBldgS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
-        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod2MultiSurface"))
+        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
         chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
         chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
 
@@ -1626,16 +1724,17 @@ class Converter(QgsTask):
         wallsOut = UtilitiesGeom.union3D(wallsChecked)
         return wallsOut
 
-    def convertLoD2Solid(self, chBldg, links):
+    def convertLoDSolid(self, chBldg, links, lod):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds
 
         Args:
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
             links: Zu nutzende XLinks
+            lod: Level of Detail (LoD)
         """
         if links is not None and len(links) > 0:
             # XML-Struktur
-            chBldgSolid = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod2Solid"))
+            chBldgSolid = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod" + str(lod) + "Solid"))
             chBldgSolidSol = etree.SubElement(chBldgSolid, QName(XmlNs.gml, "Solid"))
             chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
             chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
@@ -1643,65 +1742,77 @@ class Converter(QgsTask):
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
                 chBldgSolidSM.set(QName(XmlNs.xlink, "href"), link)
 
-    def convertAddress(self, ifcBuilding, ifcSite, chBldg):
-        """ Konvertieren der Adresse von IFC zu CityGML
+    def convertLoD3BldgBound(self, ifcBuilding, chBldg, height):
+        """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 3
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem die Adresse entnommen werden soll
-            ifcSite: Das Grundstück, auf dem das Gebäude steht
-            chBldg: XML-Element an dem die Adresse angefügt werden soll
+            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
+            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+            height: Gebäudehöhe
         """
-        # Prüfen, wo Addresse vorhanden
-        if ifcBuilding.BuildingAddress is not None:
-            ifcAddress = ifcBuilding.BuildingAddress
-        elif UtilitiesIfc.findPset(ifcBuilding, "Pset_Address") is not None:
-            ifcAddress = UtilitiesIfc.findPset(ifcBuilding, "Pset_Address")
-        elif ifcSite.SiteAddress is not None:
-            ifcAddress = ifcSite.SiteAddress
-        elif UtilitiesIfc.findPset(ifcSite, "Pset_Address") is not None:
-            ifcAddress = UtilitiesIfc.findPset(ifcSite, "Pset_Address")
-        else:
-            self.parent.dlg.log(self.tr(u'No address details existing'))
-            return
+        # Berechnung
+        # TODO: Berechnung
+
+        geomBases, geomRoofs, geomWalls = [], [], []
+
+        # Geometrie
+        links = []
+        for geomBase in geomBases:
+            link = self.setElementGroup(chBldg, geomBase, "GroundSurface", 3)
+            links.append(link)
+        for geomRoof in geomRoofs:
+            link = self.setElementGroup(chBldg, geomRoof, "RoofSurface", 3)
+            links.append(link)
+        for geomWall in geomWalls:
+            # TODO: Openings hinzufügen
+            link = self.setElementGroup(chBldg, geomWall, "WallSurface", 3, openings = [])
+            links.append(link)
+        return links
+
+    def setElementGroup(self, chBldg, geometries, type, lod, name = None, openings = []):
+        """ Setzen eines CityGML-Objekts, bestehend aus mehreren Geometrien
+
+        Args:
+            chBldg: XML-Element an dem das Objekt angefügt werden soll
+            geometries: Die Geometrien des Objekts
+            type: Der Typ des Objekts
+            lod: Level of Detail (LoD)
+            name: Name der Oberfläche
+                default: None
+            openings: Öffnungen des Objektes
+                default: []
+        """
+        for geometry in geometries:
+            self.geom.AddGeometry(geometry)
 
         # XML-Struktur
-        chBldgAdr = etree.SubElement(chBldg, QName(XmlNs.bldg, "address"))
-        chBldgAdrObj = etree.SubElement(chBldgAdr, QName(XmlNs.core, "Address"))
-        chBldgAdrXal = etree.SubElement(chBldgAdrObj, QName(XmlNs.core, "xalAddress"))
-        chBldgAdrDetails = etree.SubElement(chBldgAdrXal, QName(XmlNs.xAL, "AddressDetails"))
-        chBldgAdrLoc = etree.SubElement(chBldgAdrDetails, QName(XmlNs.xAL, "Locality"))
-        chBldgAdrLoc.set("Type", "Town")
+        chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
+        chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
+        chBldgS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
 
-        # Stadt
-        if ifcAddress.Town is not None and ifcAddress.Town != "":
-            chBldgAdrLocName = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "LocalityName"))
-            chBldgAdrLocName.text = ifcAddress.Town
+        # Name
+        if name is not None:
+            chBldgSName = etree.SubElement(chBldgS, QName(XmlNs.gml, "name"))
+            chBldgSName.text = name
 
-        # Straße und Hausnummer
-        if ifcAddress.AddressLines is not None and ifcAddress.AddressLines != "":
-            chBldgAdrLocTh = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "Thoroughfare"))
-            chBldgAdrLocTh.set("Type", "Street")
-            chBldgAdrLocThNr = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareNumber"))
-            chBldgAdrLocThName = etree.SubElement(chBldgAdrLocTh, QName(XmlNs.xAL, "ThoroughfareName"))
+        # MultiSurface
+        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
+        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
+        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
 
-            address = ifcAddress.AddressLines[0]
-            # Format heraussuchen
-            if address[0].isdigit():
-                sep = address.find(" ")
-                street = address[sep + 1:]
-                nr = address[0:sep]
-            elif address[len(address) - 1].isdigit():
-                sep = address.rfind(" ")
-                street = address[0:sep]
-                nr = address[sep + 1:]
-            else:
-                street = address
-                nr = ""
-            chBldgAdrLocThName.text = street
-            chBldgAdrLocThNr.text = nr
+        # Öffnungen
+        for opening in openings:
+            chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
+            # TODO: Openings
+            # Window oder Door
 
-        # Postleitzahl
-        if ifcAddress.PostalCode is not None and ifcAddress.PostalCode != "":
-            chBldgAdrLocPC = etree.SubElement(chBldgAdrLoc, QName(XmlNs.xAL, "PostalCode"))
-            chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
-            chBldgAdrLocPCNr.text = ifcAddress.PostalCode
+        # Geometrie
+        geomXML = UtilitiesGeom.geomToGml(geometry)
+        chBldgSM.append(geomXML)
+
+        # GML-ID
+        chBldgPol = chBldgSM[0]
+        gmlId = "PolyID" + str(uuid.uuid4())
+        chBldgPol.set(QName(XmlNs.gml, "id"), gmlId)
+
+        return gmlId

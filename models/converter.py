@@ -285,7 +285,6 @@ class Converter(QgsTask):
             # Konvertierung
             height = self.convertBldgAttr(ifcBuilding, chBldg)
             links = self.convertLoD3BldgBound(ifcBuilding, chBldg, height)
-            links = []
             self.convertLoDSolid(chBldg, links, 3)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
@@ -1765,11 +1764,12 @@ class Converter(QgsTask):
             links.append(link)
         for geomWall in geomWalls:
             # TODO: Openings hinzufügen
-            link = self.setElementGroup(chBldg, geomWall, "WallSurface", 3, openings = [])
+            # TODO: Namen
+            link = self.setElementGroup(chBldg, geomWall, "WallSurface", 3, openings=[])
             links.append(link)
         return links
 
-    def setElementGroup(self, chBldg, geometries, type, lod, name = None, openings = []):
+    def setElementGroup(self, chBldg, geometries, type, lod, name=None, openings=[]):
         """ Setzen eines CityGML-Objekts, bestehend aus mehreren Geometrien
 
         Args:
@@ -1797,8 +1797,11 @@ class Converter(QgsTask):
 
         # MultiSurface
         chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
-        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
-        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
+        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.gml, "MultiSurface"))
+        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.gml, "surfaceMember"))
+        chBldgCS = etree.SubElement(chBldgSM, QName(XmlNs.gml, "CompositeSurface"))
+        gmlId = "PolyID" + str(uuid.uuid4())
+        chBldgCS.set(QName(XmlNs.gml, "id"), gmlId)
 
         # Öffnungen
         for opening in openings:
@@ -1806,13 +1809,15 @@ class Converter(QgsTask):
             # TODO: Openings
 
         # Geometrie
-        geomXML = UtilitiesGeom.geomToGml(geometry)
-        chBldgSM.append(geomXML)
+        for geometry in geometries:
+            chBldgCSSM = etree.SubElement(chBldgCS, QName(XmlNs.gml, "surfaceMember"))
+            geomXML = UtilitiesGeom.geomToGml(geometry)
+            chBldgCSSM.append(geomXML)
 
-        # GML-ID
-        chBldgPol = chBldgSM[0]
-        gmlId = "PolyID" + str(uuid.uuid4())
-        chBldgPol.set(QName(XmlNs.gml, "id"), gmlId)
+            # GML-ID
+            chBldgPol = chBldgSM[0]
+            gmlIdPoly = "PolyID" + str(uuid.uuid4())
+            chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
 
         return gmlId
 
@@ -1837,6 +1842,43 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, it will also be missing in CityGML"))
                 return []
 
+        for ifcSlab in ifcSlabs:
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
+            # Vertizes
+            verts = shape.geometry.verts
+            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
+                           range(0, len(verts), 3)]
+            # Flächen
+            faces = shape.geometry.faces
+            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
+            # Vertizes der Flächen
+            grVertsList = []
+            for face in grFacesCurr:
+                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
+                points = []
+                for facePoint in facePoints:
+                    point = self.trans.georeferencePoint(facePoint)
+                    points.append(point)
+                grVertsList.append(points)
+
+            # Geometrien erstellen
+            geometries = []
+            for grVerts in grVertsList:
+                # Polygon aus Ring aus Punkten erstellen
+                geometry = ogr.Geometry(ogr.wkbPolygon)
+                ring = ogr.Geometry(ogr.wkbLinearRing)
+                for grVert in grVerts:
+                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
+                ring.CloseRings()
+                geometry.AddGeometry(ring)
+                geometries.append(geometry)
+
+            # Alle Flächen in der gleichen Ebene vereinigen
+            slabGeom = UtilitiesGeom.union3D(geometries, 0.001)
+            bases.append(slabGeom)
+
         return bases
 
     # noinspection PyMethodMayBeStatic
@@ -1858,6 +1900,43 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u"Due to the missing roofs, it will also be missing in CityGML"))
             return []
 
+        for ifcRoof in ifcRoofs:
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
+            # Vertizes
+            verts = shape.geometry.verts
+            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
+                           range(0, len(verts), 3)]
+            # Flächen
+            faces = shape.geometry.faces
+            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
+            # Vertizes der Flächen
+            grVertsList = []
+            for face in grFacesCurr:
+                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
+                points = []
+                for facePoint in facePoints:
+                    point = self.trans.georeferencePoint(facePoint)
+                    points.append(point)
+                grVertsList.append(points)
+
+            # Geometrien erstellen
+            geometries = []
+            for grVerts in grVertsList:
+                # Polygon aus Ring aus Punkten erstellen
+                geometry = ogr.Geometry(ogr.wkbPolygon)
+                ring = ogr.Geometry(ogr.wkbLinearRing)
+                for grVert in grVerts:
+                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
+                ring.CloseRings()
+                geometry.AddGeometry(ring)
+                geometries.append(geometry)
+
+            # Alle Flächen in der gleichen Ebene vereinigen
+            roofGeom = UtilitiesGeom.union3D(geometries, 0.001)
+            roofs.append(roofGeom)
+
         return roofs
 
     # noinspection PyMethodMayBeStatic
@@ -1878,5 +1957,45 @@ class Converter(QgsTask):
         if len(ifcWalls) == 0:
             self.parent.dlg.log(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
             return []
+
+        print(len(ifcWalls))
+        ifcWalls = ifcWalls[1:2]
+        for ifcWall in ifcWalls:
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            shape = ifcopenshell.geom.create_shape(settings, ifcWall)
+            # Vertizes
+            verts = shape.geometry.verts
+            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
+                           range(0, len(verts), 3)]
+            # Flächen
+            faces = shape.geometry.faces
+            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
+            # Vertizes der Flächen
+            grVertsList = []
+            for face in grFacesCurr:
+                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
+                points = []
+                for facePoint in facePoints:
+                    point = self.trans.georeferencePoint(facePoint)
+                    points.append(point)
+                grVertsList.append(points)
+
+            # Geometrien erstellen
+            geometries = []
+            for grVerts in grVertsList:
+                # Polygon aus Ring aus Punkten erstellen
+                geometry = ogr.Geometry(ogr.wkbPolygon)
+                ring = ogr.Geometry(ogr.wkbLinearRing)
+                for grVert in grVerts:
+                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
+                ring.CloseRings()
+                geometry.AddGeometry(ring)
+                geometries.append(geometry)
+
+            # Alle Flächen in der gleichen Ebene vereinigen
+            print("##############################")
+            wallGeom = UtilitiesGeom.union3D(geometries, 0.001)
+            walls.append(wallGeom)
 
         return walls

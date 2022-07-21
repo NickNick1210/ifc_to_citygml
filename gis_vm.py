@@ -10,22 +10,29 @@
 
 #####
 
-# QGIS-Bibliotheken
+# Standard-Bibliotheken
 import sys
+import os.path
 
+# QGIS-Bibliotheken
 from qgis.core import QgsProject, QgsVectorLayer
 from qgis.PyQt.QtCore import QCoreApplication
 
+# XML-Bibliotheken
 from lxml import etree
+
 
 #####
 
 class GisVM:
     """ ViewModel der GIS-View """
 
-    def __init__(self, parent, model):
-        """Constructor."""
-        self.parent = parent
+    def __init__(self, model):
+        """ Konstruktor der ViewModel der GIS-View
+
+        Args:
+            model: Die zugrunde liegende zentrale Model-Klasse
+        """
         self.model = model
 
     @staticmethod
@@ -41,24 +48,40 @@ class GisVM:
         return QCoreApplication.translate('GisVM', msg)
 
     def loadIntoGIS(self, path):
-        print(path)
+        """ Laden des Datensatzes als Layer in QGIS
+
+        Args:
+            path: Pfad zum Datensatz
+        """
+
+        # Erstellen des Vektorlayers
         name = path[path.rindex("\\") + 1:-4]
         layer = QgsVectorLayer(path, name, "ogr")
-        print(layer.isValid())
+
+        # Wenn Layer valide ist: Hinzufügen
         if layer.isValid():
             QgsProject.instance().addMapLayer(layer)
-            self.parent.dlg.log(self.tr(u'CityGML building model added to QGIS'))
+            self.model.dlg.log(self.tr(u'CityGML building model added to QGIS'))
             self.set3dProperties(layer)
+
+        # Wenn Layer invalide ist: Fehlermeldung
         else:
-            self.parent.dlg.log(self.tr(u'CityGML bulding model could not be added to QGIS'))
+            self.model.dlg.log(self.tr(u'CityGML bulding model could not be added to QGIS'))
 
     def set3dProperties(self, layer):
-        qml = etree.parse("C:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/resources/3D.qml")
-        minV = qml.xpath("//Option[@name='minValue']")[0]
-        maxV = qml.xpath("//Option[@name='maxValue']")[0]
+        """ Setzen der 3D-Einstellungen, damit der Layer dreidimensional angezeigt werden kann
 
-        minHeight = sys.maxsize
-        maxHeight = -sys.maxsize
+        Args:
+            layer: Layer, dessen Einstellungen geändert werden sollen
+        """
+
+        # Stilvorlage einlesen
+        stylePath = os.path.dirname(__file__) + '/resources/3D.qml'
+        qml = etree.parse(stylePath)
+        minV, maxV = qml.xpath("//Option[@name='minValue']")[0], qml.xpath("//Option[@name='maxValue']")[0]
+
+        # Minimale und maximale Höhe berechnen und setzen
+        minHeight, maxHeight = sys.maxsize, -sys.maxsize
         ix = layer.fields().indexFromName('measuredHeight')
         for feature in layer.getFeatures():
             height = feature.attributes()[ix]
@@ -66,12 +89,14 @@ class GisVM:
                 minHeight = height
             if height > maxHeight:
                 maxHeight = height
-
         minV.set("value", str(minHeight))
         maxV.set("value", str(maxHeight))
 
-        qml.write("C:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/resources/3D.qml", xml_declaration=True, encoding="UTF-8", pretty_print=True)
+        # Änderungen speichern
+        qml.write(stylePath, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
-        layer.loadNamedStyle("C:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/resources/3D.qml")
+        # Stil einlesen und Layer aktualisieren
+        layer.loadNamedStyle(stylePath)
         layer.triggerRepaint()
-        self.parent.dlg.log(self.tr(u'3D properties adjusted to display the building model'))
+
+        self.model.dlg.log(self.tr(u'3D properties adjusted to display the building model'))

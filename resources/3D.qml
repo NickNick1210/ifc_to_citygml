@@ -25,9 +25,9 @@
                 <Option name="d" type="Map">
                   <Option name="exponent" value="1" type="double"/>
                   <Option name="maxOutput" value="10" type="double"/>
-                  <Option name="maxValue" value="6.51769" type="double"/>
+                  <Option name="maxValue" value="15.34932" type="double"/>
                   <Option name="minOutput" value="1" type="double"/>
-                  <Option name="minValue" value="6.51769" type="double"/>
+                  <Option name="minValue" value="15.34932" type="double"/>
                   <Option name="nullOutput" value="0" type="double"/>
                 </Option>
                 <Option name="t" value="0" type="int"/>

@@ -157,5 +157,5 @@ class Base:
         # Views und Viewmodels starten
         self.dlg = DialogVM(self, self.model)
         self.dlg.show()
-        self.gis = GisVM(self, self.model)
+        self.gis = GisVM(self.model)
         self.model.setVM(self.dlg, self.gis)

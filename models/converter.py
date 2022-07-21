@@ -42,6 +42,7 @@ from .mapper import Mapper
 from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+from ..gis_vm import GisVM
 
 
 #####
@@ -113,9 +114,10 @@ class Converter(QgsTask):
 
         # Integration der CityGML in QGIS
         if self.integr:
-            # TODO QGIS-Integration
-            pass
+            gisVM = GisVM(self.parent, self)
+            gisVM.loadIntoGIS(self.outPath)
 
+        # Abschließen
         self.finished(True)
         return True
 

@@ -231,13 +231,11 @@ class UtilitiesGeom:
             return simpList
 
     @staticmethod
-    def union3D(geomsIn, distTol=0.1):
+    def union3D(geomsIn):
         """ Vereinigen von OGR-Polygonen, sofern möglich
 
         Args:
             geomsIn: Die zu vereinfachenden Polygone als Liste
-            distTol: Die erlaubte Toleranz bei der Vereinfachung der Punktnähe (in Einheit der Geometrie)
-                default: 0.1
 
         Returns:
             Die vereinigten Polygone in einer Liste
@@ -249,9 +247,7 @@ class UtilitiesGeom:
         for i in range(0, len(geomsIn)):
             if i in done:
                 continue
-
-            # Vereinfachen der Geometrie
-            geom1 = UtilitiesGeom.simplify(geomsIn[i], distTol=distTol)
+            geom1 = geomsIn[i]
             if geom1 is None or geom1.GetGeometryName() != "POLYGON" or geom1.IsEmpty():
                 done.append(i)
                 continue
@@ -260,11 +256,7 @@ class UtilitiesGeom:
             for j in range(i + 1, len(geomsIn)):
                 if j in done:
                     continue
-
-                print(str(i) + " mit " + str(j))
-
-                # Vereinfachen der Geometrie
-                geom2 = UtilitiesGeom.simplify(geomsIn[j], distTol=distTol)
+                geom2 = geomsIn[j]
                 if geom2 is None or geom2.GetGeometryName() != "POLYGON" or geom2.IsEmpty():
                     done.append(j)
                     continue
@@ -279,21 +271,24 @@ class UtilitiesGeom:
 
                 # Wenn mehrere gleiche Punkte gefunden
                 if len(samePts) > 1:
-                    print("SamePoints: " + str(samePts))
-                    # Auf Parallität prüfen
-                    pt11, pt12, pt13 = ring1.GetPoint(0), ring1.GetPoint(1), ring1.GetPoint(2)
-                    pt21, pt22, pt23 = ring2.GetPoint(0), ring2.GetPoint(1), ring2.GetPoint(2)
-                    plane1 = Plane(Point3D(pt11[0], pt11[1], pt11[2]), Point3D(pt12[0], pt12[1], pt12[2]),
-                                   Point3D(pt13[0], pt13[1], pt13[2]))
-                    plane2 = Plane(Point3D(pt21[0], pt21[1], pt21[2]), Point3D(pt22[0], pt22[1], pt22[2]),
-                                   Point3D(pt23[0], pt23[1], pt23[2]))
-                    if not plane1.is_parallel(plane2):
-                        print("Nicht parallel: " + str(geom1) + " zu " + str(geom2))
-                    if plane1.is_parallel(plane2):
-                        print("Parallel")
 
-                        # TODO: Eigene Parallelitäts-Methode schreiben
-                        # Kreuzprodukte müssen Vielfaches voneinander sein
+                    # Auf Parallität prüfen
+                    geom1Simp = UtilitiesGeom.simplify(geom1, distTol=0.001)
+                    ring1Simp = geom1Simp.GetGeometryRef(0)
+                    geom2Simp = UtilitiesGeom.simplify(geom2, distTol=0.001)
+                    ring2Simp = geom2Simp.GetGeometryRef(0)
+                    pt11, pt12, pt13 = ring1Simp.GetPoint(0), ring1Simp.GetPoint(1), ring1Simp.GetPoint(2)
+                    pt21, pt22, pt23 = ring2Simp.GetPoint(0), ring2Simp.GetPoint(1), ring2Simp.GetPoint(2)
+                    r11 = [pt12[0] - pt11[0], pt12[1] - pt11[1], pt12[2] - pt11[2]]
+                    r12 = [pt13[0] - pt11[0], pt13[1] - pt11[1], pt13[2] - pt11[2]]
+                    r21 = [pt22[0] - pt21[0], pt22[1] - pt21[1], pt22[2] - pt21[2]]
+                    r22 = [pt23[0] - pt21[0], pt23[1] - pt21[1], pt23[2] - pt21[2]]
+                    norm1, norm2 = np.cross(r11, r12), np.cross(r21, r22)
+                    unit1, unit2 = np.abs(norm1 / np.linalg.norm(norm1)), np.abs(norm2 / np.linalg.norm(norm2))
+
+                    tol = 0.00001
+                    if unit1[0] - tol < unit2[0] < unit1[0] + tol and unit1[1] - tol < unit2[1] < unit1[1] + tol and \
+                            unit1[2] - tol < unit2[2] < unit1[2] + tol:
 
                         # Vereinigungs-Geometrie erstellen
                         geometry = ogr.Geometry(ogr.wkbPolygon)
@@ -338,10 +333,8 @@ class UtilitiesGeom:
                 geomsOut.append(geomsIn[i])
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
-        print("Aus " + str(len(geomsIn)) + " wurden " + str(len(geomsOut)))
         if len(geomsOut) < len(geomsIn):
-            print("------------------------------")
-            return UtilitiesGeom.union3D(geomsOut)
+            return UtilitiesGeom.union3D(geomsOut, count+1)
 
         # Wenn fertig: Zurückgeben
         else:

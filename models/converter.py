@@ -1751,7 +1751,8 @@ class Converter(QgsTask):
         """
         # Berechnung
         geomBases = self.calcLoD3Bases(ifcBuilding)
-        geomRoofs = self.calcLoD3Roofs(ifcBuilding)
+        #geomRoofs = self.calcLoD3Roofs(ifcBuilding)
+        geomRoofs = []
         geomWalls = self.calcLoD3Walls(ifcBuilding)
 
         # Geometrie
@@ -1876,7 +1877,8 @@ class Converter(QgsTask):
                 geometries.append(geometry)
 
             # Alle Flächen in der gleichen Ebene vereinigen
-            slabGeom = UtilitiesGeom.union3D(geometries, 0.001)
+            slabGeom = UtilitiesGeom.union3D(geometries)
+            slabGeom = UtilitiesGeom.simplify(slabGeom, distTol=0.001)
             bases.append(slabGeom)
 
         return bases
@@ -1934,7 +1936,8 @@ class Converter(QgsTask):
                 geometries.append(geometry)
 
             # Alle Flächen in der gleichen Ebene vereinigen
-            roofGeom = UtilitiesGeom.union3D(geometries, 0.001)
+            roofGeom = UtilitiesGeom.union3D(geometries)
+            roofGeom = UtilitiesGeom.simplify(roofGeom, distTol=0.001)
             roofs.append(roofGeom)
 
         return roofs
@@ -1959,7 +1962,7 @@ class Converter(QgsTask):
             return []
 
         print(len(ifcWalls))
-        ifcWalls = ifcWalls[1:2]
+        #ifcWalls = ifcWalls[3:4]
         for ifcWall in ifcWalls:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -1994,8 +1997,8 @@ class Converter(QgsTask):
                 geometries.append(geometry)
 
             # Alle Flächen in der gleichen Ebene vereinigen
-            print("##############################")
-            wallGeom = UtilitiesGeom.union3D(geometries, 0.001)
+            wallGeom = UtilitiesGeom.union3D(geometries)
+            wallGeom = UtilitiesGeom.simplify(wallGeom, distTol=0.001)
             walls.append(wallGeom)
 
         return walls

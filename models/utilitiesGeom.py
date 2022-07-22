@@ -132,7 +132,7 @@ class UtilitiesGeom:
         return Plane(Point3D(pt1[0], pt1[1], pt1[2]), Point3D(pt2[0], pt2[1], pt2[2]), Point3D(pt3[0], pt3[1], pt3[2]))
 
     @staticmethod
-    def simplify(geom, zd=False, distTol=0.1):
+    def simplify(geom, distTol, angTol, zd=False):
         """ Vereinfachen von OGR-Geometrien (Polygone und LineStrings)
 
         Args:
@@ -179,7 +179,7 @@ class UtilitiesGeom:
                         continue
 
                     # Parallelität der Linien von Startpunkt zu Mittelpunkt und Mittelpunkt zu Endpunkt prüfen
-                    tol = 0.05
+                    tol = angTol
                     # Y-Steigung in Bezug auf X-Verlauf
                     gradYSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[1] - ptSt[1]) / abs(ptMid[0] - ptSt[0])
                     gradYEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[1] - ptMid[1]) / abs(ptEnd[0] - ptMid[0])
@@ -209,14 +209,18 @@ class UtilitiesGeom:
 
                 # Wenn Polygon weniger als vier Eckpunkte hat: Eigentlich ein LineString
                 if ringNew.GetPointCount() < 4 and geom.GetGeometryName() == "POLYGON":
-                    geomNewLine = ogr.Geometry(ogr.wkbPolygon)
+                    geomNewLine = ogr.Geometry(ogr.wkbLineString)
                     geomNewLine.AddPoint(geomNew.GetPoint(0)[0], geomNew.GetPoint(0)[1], geomNew.GetPoint(0)[2])
                     geomNewLine.AddPoint(geomNew.GetPoint(1)[0], geomNew.GetPoint(1)[1], geomNew.GetPoint(1)[2])
                     simpList.append(geomNewLine)
 
+                    print(ringNew)
+                    print(distTol)
+                    print(tol)
+
                 # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
                 elif ringNew.GetPointCount() < count:
-                    simpList.append(UtilitiesGeom.simplify(geomNew))
+                    simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol))
 
                 # Wenn fertig: Zurückgeben
                 else:
@@ -273,9 +277,9 @@ class UtilitiesGeom:
                 if len(samePts) > 1:
 
                     # Auf Parallität prüfen
-                    geom1Simp = UtilitiesGeom.simplify(geom1, distTol=0.001)
+                    geom1Simp = UtilitiesGeom.simplify(geom1, 0.001, .001)
                     ring1Simp = geom1Simp.GetGeometryRef(0)
-                    geom2Simp = UtilitiesGeom.simplify(geom2, distTol=0.001)
+                    geom2Simp = UtilitiesGeom.simplify(geom2, 0.001, 0.001)
                     ring2Simp = geom2Simp.GetGeometryRef(0)
                     pt11, pt12, pt13 = ring1Simp.GetPoint(0), ring1Simp.GetPoint(1), ring1Simp.GetPoint(2)
                     pt21, pt22, pt23 = ring2Simp.GetPoint(0), ring2Simp.GetPoint(1), ring2Simp.GetPoint(2)
@@ -334,7 +338,7 @@ class UtilitiesGeom:
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
         if len(geomsOut) < len(geomsIn):
-            return UtilitiesGeom.union3D(geomsOut, count+1)
+            return UtilitiesGeom.union3D(geomsOut)
 
         # Wenn fertig: Zurückgeben
         else:

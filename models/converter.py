@@ -796,10 +796,10 @@ class Converter(QgsTask):
                     wkt = geometry.ExportToWkt()
                     wkt = wkt.replace(" 0,", " " + str(height) + ",").replace(" 0)", " " + str(height) + ")")
                     geometry = ogr.CreateGeometryFromWkt(wkt)
-                    geometry = UtilitiesGeom.simplify(geometry)
+                    geometry = UtilitiesGeom.simplify(geometry, 0.1, 0.05)
                     geometry = UtilitiesGeom.buffer2D(geometry, -bufferList[i])
 
-        geometry = UtilitiesGeom.simplify(geometry)
+        geometry = UtilitiesGeom.simplify(geometry, 0.1, 0.05)
         return geometry
 
     def convertLoD1Solid(self, ifcBuilding, chBldg, height):
@@ -922,7 +922,7 @@ class Converter(QgsTask):
         geomWallsR, geomRoofs = self.calcLoD2RoofWalls(geomRoofs + geomRoofsNew)
         geomRoofs = self.calcLoD2Roofs(geomRoofs, geomBase)
         geomWalls += self.checkLoD2RoofWalls(geomWallsR, geomRoofs)
-        geomRoofs = UtilitiesGeom.simplify(geomRoofs, distTol=0.01)
+        geomRoofs = UtilitiesGeom.simplify(geomRoofs, 0.01, 0.05)
 
         # Geometrie
         links = []
@@ -1717,7 +1717,7 @@ class Converter(QgsTask):
                     if pt1Check and pt2Check:
                         anyInt = True
             if anyInt:
-                wall = UtilitiesGeom.simplify(wall, distTol=0.01)
+                wall = UtilitiesGeom.simplify(wall, 0.01, 0.05)
                 wallsChecked.append(wall)
 
         wallsOut = UtilitiesGeom.union3D(wallsChecked)
@@ -1878,7 +1878,7 @@ class Converter(QgsTask):
 
             # Alle Flächen in der gleichen Ebene vereinigen
             slabGeom = UtilitiesGeom.union3D(geometries)
-            slabGeom = UtilitiesGeom.simplify(slabGeom, distTol=0.001)
+            slabGeom = UtilitiesGeom.simplify(slabGeom, 0.001, 0.05)
             bases.append(slabGeom)
 
         return bases
@@ -1937,7 +1937,7 @@ class Converter(QgsTask):
 
             # Alle Flächen in der gleichen Ebene vereinigen
             roofGeom = UtilitiesGeom.union3D(geometries)
-            roofGeom = UtilitiesGeom.simplify(roofGeom, distTol=0.001)
+            roofGeom = UtilitiesGeom.simplify(roofGeom, 0.001, 0.05)
             roofs.append(roofGeom)
 
         return roofs
@@ -1998,7 +1998,7 @@ class Converter(QgsTask):
 
             # Alle Flächen in der gleichen Ebene vereinigen
             wallGeom = UtilitiesGeom.union3D(geometries)
-            wallGeom = UtilitiesGeom.simplify(wallGeom, distTol=0.001)
+            wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
             walls.append(wallGeom)
 
         return walls

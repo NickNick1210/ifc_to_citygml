@@ -1961,7 +1961,7 @@ class Converter(QgsTask):
             return []
 
         print(len(ifcWalls))
-        #ifcWalls = ifcWalls[3:4]
+        ifcWalls = ifcWalls[7:8]
         for ifcWall in ifcWalls:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -1996,8 +1996,9 @@ class Converter(QgsTask):
                 geometries.append(geometry)
 
             # Alle Flächen in der gleichen Ebene vereinigen
-            wallGeom = UtilitiesGeom.union3D(geometries)
-            wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
+            wallGeom = UtilitiesGeom.union3D(geometries, 1)
+            #wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
+            #wallGeom = geometries
             walls.append(wallGeom)
 
         return walls

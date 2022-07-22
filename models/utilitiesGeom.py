@@ -235,7 +235,7 @@ class UtilitiesGeom:
             return simpList
 
     @staticmethod
-    def union3D(geomsIn):
+    def union3D(geomsIn, count=1):
         """ Vereinigen von OGR-Polygonen, sofern möglich
 
         Args:
@@ -268,9 +268,15 @@ class UtilitiesGeom:
 
                 # Alle Eckpunkte miteinander vergleichen
                 samePts = []
+                firstK, lastK = None, None
+                ks = []
                 for k in range(0, ring1.GetPointCount() - 1):
                     for m in range(0, ring2.GetPointCount() - 1):
                         if ring1.GetPoint(k) == ring2.GetPoint(m):
+                            if firstK is None:
+                                firstK = k
+                            lastK = k
+                            ks.append(k)
                             samePts.append(ring1.GetPoint(k))
 
                 # Wenn mehrere gleiche Punkte gefunden
@@ -297,39 +303,162 @@ class UtilitiesGeom:
                         # Vereinigungs-Geometrie erstellen
                         geometry = ogr.Geometry(ogr.wkbPolygon)
                         ring = ogr.Geometry(ogr.wkbLinearRing)
-                        for k in range(0, ring1.GetPointCount() - 1):
-                            point1 = ring1.GetPoint(k)
-                            ring.AddPoint(point1[0], point1[1], point1[2])
 
-                            # Wenn gleicher Eckpunkt: Anbinden der zweiten Geometrie
-                            if point1 in samePts:
-                                for m in range(0, ring2.GetPointCount() - 1):
-                                    point2 = ring2.GetPoint(m)
-                                    if point2 == point1:
-                                        if ring2.GetPoint(m + 1) in samePts:
+                        # Testen, ob alle übereinstimmenden Eckpunkte hintereinander liegen
+                        row = True
+                        if firstK == 0 and lastK == ring1.GetPointCount()-2:
+                            for p in range(0, len(ks)):
+                                if ks[p]+1 != ks[p+1]:
+                                    for q in range(p+1, len(ks)):
+                                        if q+1 != len(ks) and ks[q]+1 != ks[q+1]:
+                                            row = False
                                             break
+                                break
+                        else:
+                            if firstK + len(samePts)-1 != lastK:
+                                row = False
+
+                        if len(samePts) < 4 or row:
+                            for k in range(0, ring1.GetPointCount() - 1):
+                                point1 = ring1.GetPoint(k)
+                                ring.AddPoint(point1[0], point1[1], point1[2])
+
+                                # Wenn gleicher Eckpunkt: Anbinden der zweiten Geometrie
+                                if point1 in samePts:
+                                    for m in range(0, ring2.GetPointCount() - 1):
+                                        point2 = ring2.GetPoint(m)
+                                        if point2 == point1:
+                                            if ring2.GetPoint(m + 1) in samePts:
+                                                break
+                                            else:
+                                                for n in range(m + 1, ring2.GetPointCount() - 1):
+                                                    point3 = ring2.GetPoint(n)
+                                                    if point3 in samePts:
+                                                        break
+                                                    else:
+                                                        ring.AddPoint(point3[0], point3[1], point3[2])
+                                                for o in range(0, m):
+                                                    point3 = ring2.GetPoint(o)
+                                                    if point3 in samePts:
+                                                        break
+                                                    else:
+                                                        ring.AddPoint(point3[0], point3[1], point3[2])
+                                                break
+
+                            # Geometrie abschließen
+                            ring.CloseRings()
+                            geometry.AddGeometry(ring)
+                            geomsOut.append(geometry)
+                            done.append(i)
+                            done.append(j)
+                            break
+
+                        # Spezialfall: Loch zwischen den beiden Polygonen
+                        else:
+                            print("Hier")
+                            print(ks)
+                            print(samePts)
+                            print(ring1.GetPointCount())
+                            print(geom1)
+                            print(geom2)
+
+                            #Zwei k-m-Paare mit unterschied zwischen k2-k1 und m2-m1
+                            sameKMs = []
+                            for k in range(0, ring1.GetPointCount() - 1):
+                                point1 = ring1.GetPoint(k)
+                                if point1 in samePts:
+                                    for m in range(0, ring2.GetPointCount() - 1):
+                                        point2 = ring2.GetPoint(m)
+                                        if point2 == point1:
+                                            sameKMs.append([k, m])
+
+                            ringsHole = []
+                            for r in range(1, len(sameKMs)):
+                                currKM = sameKMs[r]
+                                lastKM = sameKMs[r-1]
+
+                                if currKM[0] > lastKM[0]:
+                                    kDiff = currKM[0]-lastKM[0]
+                                else:
+                                    kDiff = ring1.GetPointCount() - lastKM[0] + currKM[0] - 1
+                                if currKM[1] < lastKM[1]:
+                                    mDiff = abs(currKM[1]-lastKM[1])
+                                else:
+                                    mDiff = ring2.GetPointCount() - currKM[1] + lastKM[1] - 1
+
+                                if kDiff != mDiff:
+                                    print("Loch zwischen k" + str(lastKM[0]) + "/m" + str(lastKM[1]) + " und k" + str(currKM[0]) + "/m" + str(currKM[1]))
+                                    ringHole = ogr.Geometry(ogr.wkbLinearRing)
+                                    if currKM[0] > lastKM[0]:
+                                        for s in range(lastKM[0], currKM[0]):
+                                            pt = ring1.GetPoint(s)
+                                            ringHole.AddPoint(pt[0], pt[1], pt[2])
+                                        if currKM[1] < lastKM[0]:
+                                            for t in range(currKM[1], lastKM[1]):
+                                                pt = ring2.GetPoint(t)
+                                                ringHole.AddPoint(pt[0], pt[1], pt[2])
                                         else:
-                                            for n in range(m + 1, ring2.GetPointCount() - 1):
-                                                point3 = ring2.GetPoint(n)
-                                                if point3 in samePts:
-                                                    break
-                                                else:
-                                                    ring.AddPoint(point3[0], point3[1], point3[2])
-                                            for o in range(0, m):
-                                                point3 = ring2.GetPoint(o)
-                                                if point3 in samePts:
-                                                    break
-                                                else:
-                                                    ring.AddPoint(point3[0], point3[1], point3[2])
-                                            break
+                                            pass
+                                            # TODO
+                                    else:
+                                        pass
+                                        # TODO
+                                    ringHole.CloseRings()
+                                    ringsHole.append(ringHole)
 
-                        # Geometrie abschließen
-                        ring.CloseRings()
-                        geometry.AddGeometry(ring)
-                        geomsOut.append(geometry)
-                        done.append(i)
-                        done.append(j)
-                        break
+                            for k in range(0, ring1.GetPointCount() - 1):
+                                point1 = ring1.GetPoint(k)
+                                ring.AddPoint(point1[0], point1[1], point1[2])
+                                print("k" + str(k) + ": " + str(point1) + " gesetzt")
+
+                                # Wenn gleicher Eckpunkt: Anbinden der zweiten Geometrie
+                                if point1 in samePts:
+                                    for m in range(0, ring2.GetPointCount() - 1):
+                                        point2 = ring2.GetPoint(m)
+                                        if point2 == point1:
+                                            stop = False
+                                            for n in range(m+1, ring2.GetPointCount()):
+                                                point3 = ring2.GetPoint(n)
+                                                ring.AddPoint(point3[0], point3[1], point3[2])
+                                                print("n" + str(n) + ": " + str(point3) + " gesetzt")
+                                                if point3 in samePts:
+                                                    for p in range(0, ring1.GetPointCount() - 1):
+                                                        point4 = ring1.GetPoint(p)
+                                                        if point3 == point4:
+                                                            for q in range(p+1, ring1.GetPointCount() - 1):
+                                                                point5 = ring1.GetPoint(q)
+                                                                ring.AddPoint(point5[0], point5[1], point5[2])
+                                                                print("q" + str(q) + ": " + str(point5) + " gesetzt")
+                                                            break
+                                                    stop = True
+                                                    break
+                                            if not stop:
+                                                for o in range(0, m):
+                                                    point3 = ring2.GetPoint(o)
+                                                    ring.AddPoint(point3[0], point3[1], point3[2])
+                                                    print("o" + str(o) + ": " + str(point3) + " gesetzt")
+                                                    if point3 in samePts:
+                                                        for p in range(0, ring1.GetPointCount() - 1):
+                                                            point4 = ring1.GetPoint(p)
+                                                            if point3 == point4:
+                                                                for q in range(p+1, ring1.GetPointCount() - 1):
+                                                                    point5 = ring1.GetPoint(q)
+                                                                    ring.AddPoint(point5[0], point5[1], point5[2])
+                                                                    print("q" + str(q) + ": " + str(point5) + " gesetzt")
+                                                                break
+                                                        break
+                                                break
+                                    break
+
+                            # Geometrie abschließen
+                            ring.CloseRings()
+                            geometry.AddGeometry(ring)
+                            for ringHole in ringsHole:
+                                geometry.AddGeometry(ringHole)
+                            geomsOut.append(geometry)
+                            done.append(i)
+                            done.append(j)
+                            break
 
             # Wenn keine berührende Geometrie gefunden
             if i not in done:
@@ -337,8 +466,9 @@ class UtilitiesGeom:
                 geomsOut.append(geomsIn[i])
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
-        if len(geomsOut) < len(geomsIn):
-            return UtilitiesGeom.union3D(geomsOut)
+        if len(geomsOut) < len(geomsIn) and count < 5:
+            print("von " + str(len(geomsIn)) + " zu " + str(len(geomsOut)))
+            return UtilitiesGeom.union3D(geomsOut, count+1)
 
         # Wenn fertig: Zurückgeben
         else:

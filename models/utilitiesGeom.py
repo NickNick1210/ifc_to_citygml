@@ -21,6 +21,7 @@ from lxml.etree import QName
 # Geo-Bibliotheken
 from osgeo import ogr
 from sympy import Point3D, Plane, Line
+from shapely.geometry import Point, Polygon
 
 
 #####
@@ -372,6 +373,8 @@ class UtilitiesGeom:
                                         if point2 == point1:
                                             sameKMs.append([k, m])
 
+                            print("SameKMs: " + str(sameKMs))
+
                             ringsHole = []
                             for r in range(1, len(sameKMs)):
                                 currKM = sameKMs[r]
@@ -386,7 +389,7 @@ class UtilitiesGeom:
                                 else:
                                     mDiff = ring2.GetPointCount() - currKM[1] + lastKM[1] - 1
 
-                                if kDiff != mDiff:
+                                if kDiff != mDiff or kDiff > 1:
                                     print("Loch zwischen k" + str(lastKM[0]) + "/m" + str(lastKM[1]) + " und k" + str(currKM[0]) + "/m" + str(currKM[1]))
                                     ringHole = ogr.Geometry(ogr.wkbLinearRing)
                                     if currKM[0] > lastKM[0]:
@@ -398,11 +401,31 @@ class UtilitiesGeom:
                                                 pt = ring2.GetPoint(t)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
                                         else:
-                                            pass
-                                            # TODO
+                                            for t in range(currKM[1], ring2.GetPointCount()-1):
+                                                pt = ring2.GetPoint(t)
+                                                ringHole.AddPoint(pt[0], pt[1], pt[2])
+                                            for u in range(0, lastKM[1]):
+                                                pt = ring2.GetPoint(t)
+                                                ringHole.AddPoint(pt[0], pt[1], pt[2])
                                     else:
-                                        pass
-                                        # TODO
+                                        for s in range(lastKM[0], ring1.GetPointCount()-1):
+                                            pt = ring1.GetPoint(s)
+                                            ringHole.AddPoint(pt[0], pt[1], pt[2])
+                                        for t in range(0, currKM[0]):
+                                            pt = ring1.GetPoint(s)
+                                            ringHole.AddPoint(pt[0], pt[1], pt[2])
+                                        if currKM[1] < lastKM[0]:
+                                            for u in range(currKM[1], lastKM[1]):
+                                                pt = ring2.GetPoint(u)
+                                                ringHole.AddPoint(pt[0], pt[1], pt[2])
+                                        else:
+                                            for u in range(currKM[1], ring2.GetPointCount()-1):
+                                                pt = ring2.GetPoint(u)
+                                                ringHole.AddPoint(pt[0], pt[1], pt[2])
+                                            for v in range(0, lastKM[1]):
+                                                pt = ring2.GetPoint(v)
+                                                ringHole.AddPoint(pt[0], pt[1], pt[2])
+
                                     ringHole.CloseRings()
                                     ringsHole.append(ringHole)
 
@@ -412,6 +435,7 @@ class UtilitiesGeom:
                                 print("k" + str(k) + ": " + str(point1) + " gesetzt")
 
                                 # Wenn gleicher Eckpunkt: Anbinden der zweiten Geometrie
+                                # TODO: Fehler bei Innenwand beheben
                                 if point1 in samePts:
                                     for m in range(0, ring2.GetPointCount() - 1):
                                         point2 = ring2.GetPoint(m)
@@ -454,6 +478,8 @@ class UtilitiesGeom:
                             ring.CloseRings()
                             geometry.AddGeometry(ring)
                             for ringHole in ringsHole:
+                                # TODO: Testen, ob Fläche die der gesamten Geometrie entspricht
+                                # TODO: Löcher aus Ursprungsgeometrien einbauen
                                 geometry.AddGeometry(ringHole)
                             geomsOut.append(geometry)
                             done.append(i)

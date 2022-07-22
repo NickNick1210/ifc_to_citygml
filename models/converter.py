@@ -1956,7 +1956,6 @@ class Converter(QgsTask):
 
         # IFC-Elemente der Wände
         ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
-        ifcWalls += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWallStandardCase", result=[])
         if len(ifcWalls) == 0:
             self.parent.dlg.log(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
             return []

@@ -1961,7 +1961,7 @@ class Converter(QgsTask):
             return []
 
         print(len(ifcWalls))
-        ifcWalls = ifcWalls[9:10]
+        #ifcWalls = ifcWalls[9:10]
         for ifcWall in ifcWalls:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)

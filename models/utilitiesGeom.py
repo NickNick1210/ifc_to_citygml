@@ -11,6 +11,7 @@
 #####
 
 # Standard-Bibliotheken
+import math
 import sys
 
 import numpy as np
@@ -217,10 +218,6 @@ class UtilitiesGeom:
                     geomNewLine.AddPoint(geomNew.GetPoint(1)[0], geomNew.GetPoint(1)[1], geomNew.GetPoint(1)[2])
                     simpList.append(geomNewLine)
 
-                    print(ringNew)
-                    print(distTol)
-                    print(tol)
-
                 # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
                 elif ringNew.GetPointCount() < count:
                     simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol))
@@ -286,10 +283,9 @@ class UtilitiesGeom:
                 if len(samePts) > 1:
 
                     # Auf Parallität prüfen
-                    geom1Simp = UtilitiesGeom.simplify(geom1, 0.001, .001)
-                    ring1Simp = geom1Simp.GetGeometryRef(0)
+                    geom1Simp = UtilitiesGeom.simplify(geom1, 0.001, 0.001)
                     geom2Simp = UtilitiesGeom.simplify(geom2, 0.001, 0.001)
-                    ring2Simp = geom2Simp.GetGeometryRef(0)
+                    ring1Simp, ring2Simp = geom1Simp.GetGeometryRef(0), geom2Simp.GetGeometryRef(0)
                     pt11, pt12, pt13 = ring1Simp.GetPoint(0), ring1Simp.GetPoint(1), ring1Simp.GetPoint(2)
                     pt21, pt22, pt23 = ring2Simp.GetPoint(0), ring2Simp.GetPoint(1), ring2Simp.GetPoint(2)
                     r11 = [pt12[0] - pt11[0], pt12[1] - pt11[1], pt12[2] - pt11[2]]
@@ -300,7 +296,7 @@ class UtilitiesGeom:
                     unit1, unit2 = norm1 / np.linalg.norm(norm1), norm2 / np.linalg.norm(norm2)
                     unit2Neg = np.negative(unit2)
 
-                    tol = 0.000001
+                    tol = 0.0001
                     if (unit1[0] - tol < unit2[0] < unit1[0] + tol and unit1[1] - tol < unit2[1] < unit1[1] + tol and \
                         unit1[2] - tol < unit2[2] < unit1[2] + tol) or (
                             unit1[0] - tol < unit2Neg[0] < unit1[0] + tol and unit1[1] - tol < unit2Neg[1] < unit1[
@@ -365,11 +361,6 @@ class UtilitiesGeom:
 
                         # Spezialfall: Loch zwischen den beiden Polygonen
                         else:
-                            print("Hier")
-                            print(ks)
-                            print(samePts)
-                            print(ring1.GetPointCount())
-
                             maxHeightX = -sys.maxsize
                             maxHeightXK = None
                             for x in range(0, ring1.GetPointCount() - 1):
@@ -405,8 +396,6 @@ class UtilitiesGeom:
                                         if point2 == point1:
                                             sameKMs.append([k, m])
 
-                            print("SameKMs: " + str(sameKMs))
-
                             ringsHole = []
                             for r in range(0, len(sameKMs)):
                                 currKM = sameKMs[r]
@@ -425,8 +414,6 @@ class UtilitiesGeom:
                                     mDiff = ring2.GetPointCount() - currKM[1] + lastKM[1] - 1
 
                                 if kDiff != mDiff or kDiff > 1:
-                                    print("Loch zwischen k" + str(lastKM[0]) + "/m" + str(lastKM[1]) + " und k" + str(
-                                        currKM[0]) + "/m" + str(currKM[1]))
                                     ringHole = ogr.Geometry(ogr.wkbLinearRing)
                                     if currKM[0] > lastKM[0]:
                                         for s in range(lastKM[0], currKM[0]):
@@ -472,7 +459,6 @@ class UtilitiesGeom:
                                     for k in range(startK, ring1.GetPointCount() - 1):
                                         point1 = ring1.GetPoint(k)
                                         ring.AddPoint(point1[0], point1[1], point1[2])
-                                        print("k" + str(k) + ": " + str(point1) + " gesetzt")
 
                                         # Wenn gleicher Eckpunkt: Anbinden der zweiten Geometrie
                                         if point1 in samePts and k != maxHeightK:
@@ -486,33 +472,25 @@ class UtilitiesGeom:
                                                             stop = True
                                                             break
                                                         ring.AddPoint(point3[0], point3[1], point3[2])
-                                                        print("n" + str(n) + ": " + str(point3) + " gesetzt")
                                                         if point3 in samePts:
                                                             for p in range(0, ring1.GetPointCount() - 1):
                                                                 point4 = ring1.GetPoint(p)
                                                                 if point3 == point4:
-                                                                    print("p" + str(p) + " zu max" + str(maxHeightK))
                                                                     if p <= maxHeightK:
                                                                         for q in range(p + 1, maxHeightK):
                                                                             point5 = ring1.GetPoint(q)
                                                                             ring.AddPoint(point5[0], point5[1],
                                                                                           point5[2])
-                                                                            print("q" + str(q) + ": " + str(
-                                                                                point5) + " gesetzt")
                                                                     else:
                                                                         for q in range(p + 1,
                                                                                        ring1.GetPointCount() - 1):
                                                                             point5 = ring1.GetPoint(q)
                                                                             ring.AddPoint(point5[0], point5[1],
                                                                                           point5[2])
-                                                                            print("q" + str(q) + ": " + str(
-                                                                                point5) + " gesetzt")
                                                                         for q in range(0, maxHeightK):
                                                                             point5 = ring1.GetPoint(q)
                                                                             ring.AddPoint(point5[0], point5[1],
                                                                                           point5[2])
-                                                                            print("q" + str(q) + ": " + str(
-                                                                                point5) + " gesetzt")
                                                                     break
                                                             stop = True
                                                             break
@@ -520,7 +498,6 @@ class UtilitiesGeom:
                                                         for o in range(0, m):
                                                             point3 = ring2.GetPoint(o)
                                                             ring.AddPoint(point3[0], point3[1], point3[2])
-                                                            print("o" + str(o) + ": " + str(point3) + " gesetzt")
                                                             if point3 in samePts:
                                                                 for p in range(0, ring1.GetPointCount() - 1):
                                                                     point4 = ring1.GetPoint(p)
@@ -530,22 +507,16 @@ class UtilitiesGeom:
                                                                                 point5 = ring1.GetPoint(q)
                                                                                 ring.AddPoint(point5[0], point5[1],
                                                                                               point5[2])
-                                                                                print("q" + str(q) + ": " + str(
-                                                                                    point5) + " gesetzt")
                                                                         else:
                                                                             for q in range(p + 1,
                                                                                            ring1.GetPointCount() - 1):
                                                                                 point5 = ring1.GetPoint(q)
                                                                                 ring.AddPoint(point5[0], point5[1],
                                                                                               point5[2])
-                                                                                print("q" + str(q) + ": " + str(
-                                                                                    point5) + " gesetzt")
                                                                             for q in range(0, maxHeightK):
                                                                                 point5 = ring1.GetPoint(q)
                                                                                 ring.AddPoint(point5[0], point5[1],
                                                                                               point5[2])
-                                                                                print("q" + str(q) + ": " + str(
-                                                                                    point5) + " gesetzt")
                                                                         break
                                                                 break
                                                         break
@@ -557,14 +528,12 @@ class UtilitiesGeom:
 
                             # Geometrie abschließen
                             ring.CloseRings()
-                            print("Geom: " + str(ring.Length()))
                             geometry.AddGeometry(ring)
                             for m in range(1, geom1.GetGeometryCount()):
                                 geometry.AddGeometry(geom1.GetGeometryRef(m))
                             for n in range(1, geom2.GetGeometryCount()):
                                 geometry.AddGeometry(geom2.GetGeometryRef(n))
                             for ringHole in ringsHole:
-                                print("Hole: " + str(ringHole.Length()))
                                 if not ring.Length() - 0.00001 < ringHole.Length() < ring.Length() + 0.00001:
                                     geometry.AddGeometry(ringHole)
                             geomsOut.append(geometry)
@@ -578,7 +547,7 @@ class UtilitiesGeom:
                 geomsOut.append(geomsIn[i])
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
-        if len(geomsOut) < len(geomsIn) and count < 5:
+        if len(geomsOut) < len(geomsIn):
             print("von " + str(len(geomsIn)) + " zu " + str(len(geomsOut)))
             return UtilitiesGeom.union3D(geomsOut, count + 1)
 

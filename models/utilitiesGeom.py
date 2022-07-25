@@ -11,6 +11,8 @@
 #####
 
 # Standard-Bibliotheken
+import sys
+
 import numpy as np
 
 # XML-Bibliotheken
@@ -349,6 +351,10 @@ class UtilitiesGeom:
                             # Geometrie abschließen
                             ring.CloseRings()
                             geometry.AddGeometry(ring)
+                            for m in range(1, geom1.GetGeometryCount()):
+                                geometry.AddGeometry(geom1.GetGeometryRef(m))
+                            for n in range(1, geom2.GetGeometryCount()):
+                                geometry.AddGeometry(geom2.GetGeometryRef(n))
                             geomsOut.append(geometry)
                             done.append(i)
                             done.append(j)
@@ -376,8 +382,11 @@ class UtilitiesGeom:
                             print("SameKMs: " + str(sameKMs))
 
                             ringsHole = []
-                            for r in range(1, len(sameKMs)):
+                            for r in range(0, len(sameKMs)):
                                 currKM = sameKMs[r]
+                                #if r == 0:
+                                #    lastKM = sameKMs[len(sameKMs)-1]
+                                #else:
                                 lastKM = sameKMs[r-1]
 
                                 if currKM[0] > lastKM[0]:
@@ -396,16 +405,18 @@ class UtilitiesGeom:
                                         for s in range(lastKM[0], currKM[0]):
                                             pt = ring1.GetPoint(s)
                                             ringHole.AddPoint(pt[0], pt[1], pt[2])
-                                        if currKM[1] < lastKM[0]:
+                                            print("s: " + str(s))
+                                        if currKM[1] < lastKM[1]:
                                             for t in range(currKM[1], lastKM[1]):
                                                 pt = ring2.GetPoint(t)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
+                                                print("t: " + str(s))
                                         else:
                                             for t in range(currKM[1], ring2.GetPointCount()-1):
                                                 pt = ring2.GetPoint(t)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
-                                            for u in range(0, lastKM[1]):
-                                                pt = ring2.GetPoint(t)
+                                            for u in range(0, lastKM[1]+1):
+                                                pt = ring2.GetPoint(u)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
                                     else:
                                         for s in range(lastKM[0], ring1.GetPointCount()-1):
@@ -414,7 +425,7 @@ class UtilitiesGeom:
                                         for t in range(0, currKM[0]):
                                             pt = ring1.GetPoint(s)
                                             ringHole.AddPoint(pt[0], pt[1], pt[2])
-                                        if currKM[1] < lastKM[0]:
+                                        if currKM[1] < lastKM[1]:
                                             for u in range(currKM[1], lastKM[1]):
                                                 pt = ring2.GetPoint(u)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
@@ -422,12 +433,20 @@ class UtilitiesGeom:
                                             for u in range(currKM[1], ring2.GetPointCount()-1):
                                                 pt = ring2.GetPoint(u)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
-                                            for v in range(0, lastKM[1]):
+                                            for v in range(0, lastKM[1]+1):
                                                 pt = ring2.GetPoint(v)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
 
                                     ringHole.CloseRings()
                                     ringsHole.append(ringHole)
+
+                            maxHeight = -sys.maxsize
+                            maxHeightK = None
+                            for k in range(0, ring1.GetPointCount() - 1):
+                                pt = ring1.GetPoint(k)
+                                if pt[2] > maxHeight:
+                                    maxHeight = pt[2]
+                                    maxHeightK = k
 
                             for k in range(0, ring1.GetPointCount() - 1):
                                 point1 = ring1.GetPoint(k)
@@ -435,14 +454,16 @@ class UtilitiesGeom:
                                 print("k" + str(k) + ": " + str(point1) + " gesetzt")
 
                                 # Wenn gleicher Eckpunkt: Anbinden der zweiten Geometrie
-                                # TODO: Fehler bei Innenwand beheben
-                                if point1 in samePts:
+                                if point1 in samePts and k != 0:
                                     for m in range(0, ring2.GetPointCount() - 1):
                                         point2 = ring2.GetPoint(m)
                                         if point2 == point1:
                                             stop = False
                                             for n in range(m+1, ring2.GetPointCount()):
                                                 point3 = ring2.GetPoint(n)
+                                                if point3 == ring1.GetPoint(0):
+                                                    stop = True
+                                                    break
                                                 ring.AddPoint(point3[0], point3[1], point3[2])
                                                 print("n" + str(n) + ": " + str(point3) + " gesetzt")
                                                 if point3 in samePts:
@@ -477,10 +498,13 @@ class UtilitiesGeom:
                             # Geometrie abschließen
                             ring.CloseRings()
                             geometry.AddGeometry(ring)
+                            for m in range(1, geom1.GetGeometryCount()):
+                                geometry.AddGeometry(geom1.GetGeometryRef(m))
+                            for n in range(1, geom2.GetGeometryCount()):
+                                geometry.AddGeometry(geom2.GetGeometryRef(n))
                             for ringHole in ringsHole:
-                                # TODO: Testen, ob Fläche die der gesamten Geometrie entspricht
-                                # TODO: Löcher aus Ursprungsgeometrien einbauen
-                                geometry.AddGeometry(ringHole)
+                                if not ring.Equals(ringHole):
+                                    geometry.AddGeometry(ringHole)
                             geomsOut.append(geometry)
                             done.append(i)
                             done.append(j)
@@ -492,7 +516,7 @@ class UtilitiesGeom:
                 geomsOut.append(geomsIn[i])
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
-        if len(geomsOut) < len(geomsIn) and count < 5:
+        if len(geomsOut) < len(geomsIn) and count < 4:
             print("von " + str(len(geomsIn)) + " zu " + str(len(geomsOut)))
             return UtilitiesGeom.union3D(geomsOut, count+1)
 

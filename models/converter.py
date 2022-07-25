@@ -1751,8 +1751,7 @@ class Converter(QgsTask):
         """
         # Berechnung
         geomBases = self.calcLoD3Bases(ifcBuilding)
-        #geomRoofs = self.calcLoD3Roofs(ifcBuilding)
-        geomRoofs = []
+        geomRoofs = self.calcLoD3Roofs(ifcBuilding)
         geomWalls = self.calcLoD3Walls(ifcBuilding)
 
         # Geometrie
@@ -1764,8 +1763,6 @@ class Converter(QgsTask):
             link = self.setElementGroup(chBldg, geomRoof, "RoofSurface", 3)
             links.append(link)
         for geomWall in geomWalls:
-            # TODO: Openings hinzufügen
-            # TODO: Namen
             link = self.setElementGroup(chBldg, geomWall, "WallSurface", 3, openings=[])
             links.append(link)
         return links
@@ -1807,7 +1804,6 @@ class Converter(QgsTask):
         # Öffnungen
         for opening in openings:
             chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
-            # TODO: Openings
 
         # Geometrie
         for geometry in geometries:
@@ -1902,6 +1898,8 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u"Due to the missing roofs, it will also be missing in CityGML"))
             return []
 
+        # TODO: Nur Außen-Oberflächen der Dächer herausfiltern (größte Fläche?)
+
         for ifcRoof in ifcRoofs:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -1960,8 +1958,11 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
             return []
 
-        print(len(ifcWalls))
-        #ifcWalls = ifcWalls[9:10]
+        # TODO: Name der Wände (Ifc-Attribut Nr. 3, oder AC_Pset_Name mit Attribut Name)
+        # TODO: Openings
+        # TODO: Nur Außenwände herausfiltern (Pset_WallCommon Attribut IsExternal, IfcRelSpaceBoundary Attribut 9, alternativ: gleicher Eckpunkt mit GroundSurface oder Roof)
+        # TODO: Nur Außen-Oberflächen der Wände herausfiltern (größte Fläche?)
+
         for ifcWall in ifcWalls:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -1996,9 +1997,9 @@ class Converter(QgsTask):
                 geometries.append(geometry)
 
             # Alle Flächen in der gleichen Ebene vereinigen
-            wallGeom = UtilitiesGeom.union3D(geometries, 1)
+            wallGeom = UtilitiesGeom.union3D(geometries)
             #wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
-            #wallGeom = geometries
+            # TODO: Simplify für Polygone mit Löchern umbauen
             walls.append(wallGeom)
 
         return walls

@@ -11,9 +11,7 @@
 #####
 
 # Standard-Bibliotheken
-import math
 import sys
-
 import numpy as np
 
 # XML-Bibliotheken
@@ -24,10 +22,10 @@ from lxml.etree import QName
 # Geo-Bibliotheken
 from osgeo import ogr
 from sympy import Point3D, Plane, Line
-from shapely.geometry import Point, Polygon
 
 
 #####
+
 
 class UtilitiesGeom:
     """ Model-Klasse mit nützlichen Geometrie-Tools """
@@ -141,10 +139,12 @@ class UtilitiesGeom:
 
         Args:
             geom: Die zu vereinfachende Geometrie, einzeln oder als Liste
-            zd: Ob nur zweidimensional vereinfacht werden soll
-                default: False
             distTol: Die erlaubte Toleranz bei der Vereinfachung der Punktnähe (in Einheit der Geometrie)
                 default: 0.1
+            angTol: Die erlaubte Toleranz bei der Vereinfachung von Punkten auf vorhandenen Linien
+                default: False
+            zd: Ob nur zweidimensional vereinfacht werden soll
+                default: False
 
         Returns:
             Die vereinfachte Geometrie, einzeln oder als Liste, oder None falls ungültig
@@ -235,7 +235,7 @@ class UtilitiesGeom:
             return simpList
 
     @staticmethod
-    def union3D(geomsIn, count=1):
+    def union3D(geomsIn):
         """ Vereinigen von OGR-Polygonen, sofern möglich
 
         Args:
@@ -244,11 +244,12 @@ class UtilitiesGeom:
         Returns:
             Die vereinigten Polygone in einer Liste
         """
-        geomsOut = []
-        done = []
+        geomsOut, done = [], []
 
         # Alle Geometrie miteinander auf Berührung testen
         for i in range(0, len(geomsIn)):
+
+            # Testen, ob die Geometrien in diesem Durchlauf zur Vereinigung genutzt wurden und ob sie valide sind
             if i in done:
                 continue
             geom1 = geomsIn[i]
@@ -256,7 +257,6 @@ class UtilitiesGeom:
                 done.append(i)
                 continue
             ring1 = geom1.GetGeometryRef(0)
-
             for j in range(i + 1, len(geomsIn)):
                 if j in done:
                     continue
@@ -295,16 +295,11 @@ class UtilitiesGeom:
                     norm1, norm2 = np.cross(r11, r12), np.cross(r21, r22)
                     unit1, unit2 = norm1 / np.linalg.norm(norm1), norm2 / np.linalg.norm(norm2)
                     unit2Neg = np.negative(unit2)
-
                     tol = 0.0001
-                    if (unit1[0] - tol < unit2[0] < unit1[0] + tol and unit1[1] - tol < unit2[1] < unit1[1] + tol and \
-                        unit1[2] - tol < unit2[2] < unit1[2] + tol) or (
-                            unit1[0] - tol < unit2Neg[0] < unit1[0] + tol and unit1[1] - tol < unit2Neg[1] < unit1[
-                        1] + tol and unit1[2] - tol < unit2Neg[2] < unit1[2] + tol):
+                    if UtilitiesGeom.isEqual(unit1, unit2, tol) or UtilitiesGeom.isEqual(unit1, unit2Neg, tol):
 
                         # Vereinigungs-Geometrie erstellen
-                        geometry = ogr.Geometry(ogr.wkbPolygon)
-                        ring = ogr.Geometry(ogr.wkbLinearRing)
+                        geometry, ring = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
 
                         # Testen, ob alle übereinstimmenden Eckpunkte hintereinander liegen
                         row = True
@@ -315,11 +310,12 @@ class UtilitiesGeom:
                                         if q + 1 != len(ks) and ks[q] + 1 != ks[q + 1]:
                                             row = False
                                             break
-                                break
+                                    break
                         else:
                             if firstK + len(samePts) - 1 != lastK:
                                 row = False
 
+                        # Normalfall: Zwei Polygone grenzen mit einer Schnittgeraden aneinander
                         if len(samePts) < 4 or row:
                             for k in range(0, ring1.GetPointCount() - 1):
                                 point1 = ring1.GetPoint(k)
@@ -347,7 +343,7 @@ class UtilitiesGeom:
                                                         ring.AddPoint(point3[0], point3[1], point3[2])
                                                 break
 
-                            # Geometrie abschließen
+                            # Geometrie abschließen und Löcher aus Ursprungsgeometrie übernehmen
                             ring.CloseRings()
                             geometry.AddGeometry(ring)
                             for m in range(1, geom1.GetGeometryCount()):
@@ -361,32 +357,27 @@ class UtilitiesGeom:
 
                         # Spezialfall: Loch zwischen den beiden Polygonen
                         else:
-                            maxHeightX = -sys.maxsize
-                            maxHeightXK = None
+
+                            # Höhere Geometrie herausfinden, ggf. tauschen
+                            maxHeightX, maxHeightY = -sys.maxsize, -sys.maxsize
+                            maxHeightXK, maxHeightYK = None, None
                             for x in range(0, ring1.GetPointCount() - 1):
                                 pt = ring1.GetPoint(x)
                                 if pt[2] > maxHeightX:
                                     maxHeightX = pt[2]
                                     maxHeightXK = x
-                            maxHeightY = -sys.maxsize
-                            maxHeightYK = None
-                            for y in range(0, ring1.GetPointCount() - 1):
-                                pt = ring1.GetPoint(y)
+                            for y in range(0, ring2.GetPointCount() - 1):
+                                pt = ring2.GetPoint(y)
                                 if pt[2] > maxHeightY:
                                     maxHeightY = pt[2]
                                     maxHeightYK = y
-                            if maxHeightX >= maxHeightY:
-                                maxHeightK = maxHeightXK
-                            else:
-                                maxHeightK = maxHeightYK
-                                geomTemp = geom1
-                                geom1 = geom2
-                                geom2 = geomTemp
-                                ringTemp = ring1
-                                ring1 = ring2
-                                ring2 = ringTemp
+                            maxHeightK = maxHeightXK if maxHeightX >= maxHeightY else maxHeightYK
+                            if maxHeightX < maxHeightY:
+                                geom1, geom2 = geom2, geom1
+                                ring1, ring2 = ring2, ring1
 
-                            # Zwei k-m-Paare mit unterschied zwischen k2-k1 und m2-m1
+                            # Neue Löcher finden
+                            # Liste aller Kontaktpunkte machen
                             sameKMs = []
                             for k in range(0, ring1.GetPointCount() - 1):
                                 point1 = ring1.GetPoint(k)
@@ -396,25 +387,20 @@ class UtilitiesGeom:
                                         if point2 == point1:
                                             sameKMs.append([k, m])
 
+                            # Kontaktpunkt-Differenz ohne Schnitt dazwischen
                             ringsHole = []
                             for r in range(0, len(sameKMs)):
                                 currKM = sameKMs[r]
-                                if r == 0:
-                                    lastKM = sameKMs[len(sameKMs) - 1]
-                                else:
-                                    lastKM = sameKMs[r - 1]
-
-                                if currKM[0] > lastKM[0]:
-                                    kDiff = currKM[0] - lastKM[0]
-                                else:
-                                    kDiff = ring1.GetPointCount() - lastKM[0] + currKM[0] - 1
-                                if currKM[1] < lastKM[1]:
-                                    mDiff = abs(currKM[1] - lastKM[1])
-                                else:
-                                    mDiff = ring2.GetPointCount() - currKM[1] + lastKM[1] - 1
-
+                                lastKM = sameKMs[len(sameKMs) - 1] if r == 0 else sameKMs[r - 1]
+                                kDiff = currKM[0] - lastKM[0] if currKM[0] > lastKM[0] \
+                                    else ring1.GetPointCount() - lastKM[0] + currKM[0] - 1
+                                mDiff = abs(currKM[1] - lastKM[1]) if currKM[1] < lastKM[1] \
+                                    else ring2.GetPointCount() - currKM[1] + lastKM[1] - 1
                                 if kDiff != mDiff or kDiff > 1:
+
+                                    # Loch-Geometrie erstellen
                                     ringHole = ogr.Geometry(ogr.wkbLinearRing)
+                                    # Erste Geometrie entlang gehen, dann zweite
                                     if currKM[0] > lastKM[0]:
                                         for s in range(lastKM[0], currKM[0]):
                                             pt = ring1.GetPoint(s)
@@ -449,11 +435,12 @@ class UtilitiesGeom:
                                                 pt = ring2.GetPoint(v)
                                                 ringHole.AddPoint(pt[0], pt[1], pt[2])
 
+                                    # Loch-Geometrie abschließen
                                     ringHole.CloseRings()
                                     ringsHole.append(ringHole)
 
-                            fin = False
-                            startK = maxHeightK
+                            # Eigentliche Geometrie erstellen
+                            fin, startK = False, maxHeightK
                             while True:
                                 if not fin:
                                     for k in range(startK, ring1.GetPointCount() - 1):
@@ -466,37 +453,13 @@ class UtilitiesGeom:
                                                 point2 = ring2.GetPoint(m)
                                                 if point2 == point1:
                                                     stop = False
-                                                    for n in range(m + 1, ring2.GetPointCount()):
-                                                        point3 = ring2.GetPoint(n)
-                                                        if point3 == ring1.GetPoint(maxHeightK):
-                                                            stop = True
-                                                            break
-                                                        ring.AddPoint(point3[0], point3[1], point3[2])
-                                                        if point3 in samePts:
-                                                            for p in range(0, ring1.GetPointCount() - 1):
-                                                                point4 = ring1.GetPoint(p)
-                                                                if point3 == point4:
-                                                                    if p <= maxHeightK:
-                                                                        for q in range(p + 1, maxHeightK):
-                                                                            point5 = ring1.GetPoint(q)
-                                                                            ring.AddPoint(point5[0], point5[1],
-                                                                                          point5[2])
-                                                                    else:
-                                                                        for q in range(p + 1,
-                                                                                       ring1.GetPointCount() - 1):
-                                                                            point5 = ring1.GetPoint(q)
-                                                                            ring.AddPoint(point5[0], point5[1],
-                                                                                          point5[2])
-                                                                        for q in range(0, maxHeightK):
-                                                                            point5 = ring1.GetPoint(q)
-                                                                            ring.AddPoint(point5[0], point5[1],
-                                                                                          point5[2])
-                                                                    break
-                                                            stop = True
-                                                            break
-                                                    if not stop:
-                                                        for o in range(0, m):
-                                                            point3 = ring2.GetPoint(o)
+                                                    rangeS, rangeE = m + 1, ring2.GetPointCount()
+                                                    while True:
+                                                        for n in range(rangeS, rangeE):
+                                                            point3 = ring2.GetPoint(n)
+                                                            if point3 == ring1.GetPoint(maxHeightK):
+                                                                stop = True
+                                                                break
                                                             ring.AddPoint(point3[0], point3[1], point3[2])
                                                             if point3 in samePts:
                                                                 for p in range(0, ring1.GetPointCount() - 1):
@@ -518,21 +481,28 @@ class UtilitiesGeom:
                                                                                 ring.AddPoint(point5[0], point5[1],
                                                                                               point5[2])
                                                                         break
+                                                                stop = True
                                                                 break
-                                                        break
+                                                        if stop:
+                                                            break
+                                                        else:
+                                                            stop = True
+                                                            rangeS, rangeE = 0, m
                                             fin = True
                                             break
                                     startK = 0
                                 else:
                                     break
 
-                            # Geometrie abschließen
+                            # Geometrie abschließen und Löcher der ursprünglichen Geometrien hinzufügen
                             ring.CloseRings()
                             geometry.AddGeometry(ring)
                             for m in range(1, geom1.GetGeometryCount()):
                                 geometry.AddGeometry(geom1.GetGeometryRef(m))
                             for n in range(1, geom2.GetGeometryCount()):
                                 geometry.AddGeometry(geom2.GetGeometryRef(n))
+
+                            # Neue Löcher hinzufügen
                             for ringHole in ringsHole:
                                 if not ring.Length() - 0.00001 < ringHole.Length() < ring.Length() + 0.00001:
                                     geometry.AddGeometry(ringHole)
@@ -548,8 +518,7 @@ class UtilitiesGeom:
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
         if len(geomsOut) < len(geomsIn):
-            print("von " + str(len(geomsIn)) + " zu " + str(len(geomsOut)))
-            return UtilitiesGeom.union3D(geomsOut, count + 1)
+            return UtilitiesGeom.union3D(geomsOut)
 
         # Wenn fertig: Zurückgeben
         else:
@@ -619,3 +588,18 @@ class UtilitiesGeom:
             return bufferList[0]
         else:
             return bufferList
+
+    @staticmethod
+    def isEqual(pt1, pt2, tol):
+        """ Prüfen auf Gleichheit zweier Punkte, mit gegebener Toleranz
+
+        Args:
+            pt1: Erster Punkt, der verglichen werden soll
+            pt2: Zweiter Punkt, der verglichen werden soll
+            tol: Toleranz, um die die beiden Punkte verschieden sein dürfen
+
+        Returns:
+            Ob die Punkte gleich sind oder nicht, als Boolean
+        """
+        return pt1[0] - tol < pt2[0] < pt1[0] + tol and pt1[1] - tol < pt2[1] < pt1[1] + tol and \
+               pt1[2] - tol < pt2[2] < pt1[2] + tol

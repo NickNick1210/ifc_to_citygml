@@ -1751,22 +1751,20 @@ class Converter(QgsTask):
         """
         # Berechnung
         bases = self.calcLoD3Bases(ifcBuilding)
-        #roofs = self.calcLoD3Roofs(ifcBuilding)
-        roofs = []
+        roofs = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
-        openings = self.calcLoD3Openings(ifcBuilding)
+        openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        roofs, walls = self.assignOpenings(openings, roofs, walls)
 
         # Geometrie
         links = []
         for base in bases:
-            link = self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1])
-            links.append(link)
+            links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
         for roof in roofs:
-            link = self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1])
-            links.append(link)
+            links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
         for wall in walls:
-            link = self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=[])
-            links.append(link)
+            links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
         return links
 
     def setElementGroup(self, chBldg, geometries, type, lod, name=None, openings=[]):
@@ -1802,10 +1800,7 @@ class Converter(QgsTask):
         chBldgCS = etree.SubElement(chBldgSM, QName(XmlNs.gml, "CompositeSurface"))
         gmlId = "PolyID" + str(uuid.uuid4())
         chBldgCS.set(QName(XmlNs.gml, "id"), gmlId)
-
-        # Öffnungen
-        for opening in openings:
-            chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
+        gmlIds = [gmlId]
 
         # Geometrie
         for geometry in geometries:
@@ -1814,11 +1809,38 @@ class Converter(QgsTask):
             chBldgCSSM.append(geomXML)
 
             # GML-ID
-            chBldgPol = chBldgSM[0]
+            chBldgPol = chBldgCSSM[0]
             gmlIdPoly = "PolyID" + str(uuid.uuid4())
             chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
 
-        return gmlId
+        # Öffnungen
+        for opening in openings:
+            chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
+            name = "Door" if opening[2] == "ifcDoor" else "Window"
+            chBldgSurfSOE = etree.SubElement(chBldgSurfSO, QName(XmlNs.bldg, name))
+            gmlId = "PolyID" + str(uuid.uuid4())
+            chBldgSurfSOE.set(QName(XmlNs.gml, "id"), gmlId)
+            if opening[1] is not None:
+                chBldgSurfSOName = etree.SubElement(chBldgSurfSOE, QName(XmlNs.gml, "name"))
+                chBldgSurfSOName.text = opening[1]
+            chBldgSurfSOMS = etree.SubElement(chBldgSurfSOE, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
+            chBldgOMS = etree.SubElement(chBldgSurfSOMS, QName(XmlNs.gml, "MultiSurface"))
+            chBldgOSM = etree.SubElement(chBldgOMS, QName(XmlNs.gml, "surfaceMember"))
+            chBldgOCS = etree.SubElement(chBldgOSM, QName(XmlNs.gml, "CompositeSurface"))
+            gmlId = "PolyID" + str(uuid.uuid4())
+            chBldgOCS.set(QName(XmlNs.gml, "id"), gmlId)
+            gmlIds.append(gmlId)
+            for geometry in opening[0]:
+                chBldgOCSSM = etree.SubElement(chBldgOCS, QName(XmlNs.gml, "surfaceMember"))
+                geomXML = UtilitiesGeom.geomToGml(geometry)
+                chBldgOCSSM.append(geomXML)
+
+                # GML-ID
+                chBldgPol = chBldgOCSSM[0]
+                gmlIdPoly = "PolyID" + str(uuid.uuid4())
+                chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
+
+        return gmlIds
 
     # noinspection PyMethodMayBeStatic
     def calcLoD3Bases(self, ifcBuilding):
@@ -1883,7 +1905,7 @@ class Converter(QgsTask):
             # Alle Flächen in der gleichen Ebene vereinigen
             slabGeom = UtilitiesGeom.union3D(geometries)
             slabGeom = UtilitiesGeom.simplify(slabGeom, 0.001, 0.05)
-            bases.append([slabGeom, baseNames[i]])
+            bases.append([slabGeom, baseNames[i], []])
 
         return bases
 
@@ -1950,7 +1972,7 @@ class Converter(QgsTask):
             # Alle Flächen in der gleichen Ebene vereinigen
             roofGeom = UtilitiesGeom.union3D(geometries)
             roofGeom = UtilitiesGeom.simplify(roofGeom, 0.001, 0.05)
-            roofs.append([roofGeom, roofNames[i]])
+            roofs.append([roofGeom, roofNames[i], []])
 
         return roofs
 
@@ -2036,11 +2058,11 @@ class Converter(QgsTask):
             wallGeom = UtilitiesGeom.union3D(geometries)
             #wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
             # TODO: Simplify für Polygone mit Löchern umbauen
-            walls.append([wallGeom, wallNames[i]])
+            walls.append([wallGeom, wallNames[i], []])
 
         return walls
 
-    def calcLoD3Openings(self, ifcBuilding):
+    def calcLoD3Openings(self, ifcBuilding, type):
         """ Berechnen der Öffnungen (Türen und Fenster) in Level of Detail (LoD) 3
 
         Args:
@@ -2049,16 +2071,110 @@ class Converter(QgsTask):
         Returns:
             Die berechneten Öffnungs-Geometrien als Liste
         """
-        doors, windows = [], []
-        doorNames, windowNames = [], []
+        openings = []
+        openingNames = []
 
-        # IFC-Elemente der Wände
-        ifcDoors = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDoor", result=[])
-        ifcWindows = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWindow", result=[])
+        # IFC-Elemente der Öffnungen
+        ifcOpenings = UtilitiesIfc.findElement(self.ifc, ifcBuilding, type, result=[])
+        print(datetime.now().strftime("%H:%M:%S") + "find")
 
+        # Heraussuchen der Außenöffnungen
+        ifcOpeningsExt = []
+        ifcRelSpaceBoundaries = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
+        psetCommon = "Pset_DoorCommon" if type == "ifcDoor" else "Pset_WindowCommon"
+        for ifcOpening in ifcOpenings:
+            extCount, intCount = 0, 0
+            for ifcRelSpaceBoundary in ifcRelSpaceBoundaries:
+                relElem = ifcRelSpaceBoundary.RelatedBuildingElement
+                if relElem == ifcOpening:
+                    if ifcRelSpaceBoundary.InternalOrExternalBoundary == "EXTERNAL":
+                        extCount += 1
+                    elif ifcRelSpaceBoundary.InternalOrExternalBoundary == "INTERNAL":
+                        intCount += 1
+            if extCount > 0:
+                ifcOpeningsExt.append(ifcOpening)
+            elif intCount == 0 and UtilitiesIfc.findPset(ifcOpening, psetCommon, "IsExternal"):
+                ifcOpeningsExt.append(ifcOpening)
+        print(datetime.now().strftime("%H:%M:%S") + "external")
 
-        for ifcDoor in ifcDoors:
-            print(ifcDoor)
+        # Namen der Öffnungen heraussuchen
+        for ifcOpening in ifcOpeningsExt:
+            openingNames.append(ifcOpening.Name)
+        print(datetime.now().strftime("%H:%M:%S") + "names")
 
-        for ifcWindow in ifcWindows:
-            print(ifcWindow)
+        # Geometrie
+        for i in range(0, len(ifcOpeningsExt)):
+            ifcOpening = ifcOpeningsExt[i]
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            shape = ifcopenshell.geom.create_shape(settings, ifcOpening)
+            # Vertizes
+            verts = shape.geometry.verts
+            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
+                           range(0, len(verts), 3)]
+            # Flächen
+            faces = shape.geometry.faces
+            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
+            # Vertizes der Flächen
+            grVertsList = []
+            for face in grFacesCurr:
+                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
+                points = []
+                for facePoint in facePoints:
+                    point = self.trans.georeferencePoint(facePoint)
+                    points.append(point)
+                grVertsList.append(points)
+
+            # Geometrien erstellen
+            geometries = []
+            for grVerts in grVertsList:
+                # Polygon aus Ring aus Punkten erstellen
+                geometry = ogr.Geometry(ogr.wkbPolygon)
+                ring = ogr.Geometry(ogr.wkbLinearRing)
+                for grVert in grVerts:
+                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
+                ring.CloseRings()
+                geometry.AddGeometry(ring)
+                geometries.append(geometry)
+
+            # Alle Flächen in der gleichen Ebene vereinigen
+            openingGeom = UtilitiesGeom.union3D(geometries)
+            #openingGeom = UtilitiesGeom.simplify(openingGeom, 0.001, 0.05)
+            openings.append([openingGeom, openingNames[i], type])
+        print(datetime.now().strftime("%H:%M:%S") + "geom")
+
+        return openings
+
+    def assignOpenings(self, openings, roofs, walls):
+        for opening in openings:
+            print(datetime.now().strftime("%H:%M:%S") + opening[1])
+            ptOp = opening[0][0].GetGeometryRef(0).GetPoint(0)
+
+            minDist = sys.maxsize
+            minDistElem = None
+
+            for roof in roofs:
+                for geom in roof[0]:
+                    for i in range(0, geom.GetGeometryCount()):
+                        ring = geom.GetGeometryRef(i)
+                        for j in range(0, ring.GetPointCount()):
+                            pt = ring.GetPoint(j)
+                            dist = math.sqrt((ptOp[0]-pt[0]) ** 2 + (ptOp[1]-pt[1]) ** 2 + (ptOp[2]-pt[2]) ** 2)
+                            if dist < minDist:
+                                minDist = dist
+                                minDistElem = roof
+
+            for wall in walls:
+                for geom in wall[0]:
+                    for i in range(0, geom.GetGeometryCount()):
+                        ring = geom.GetGeometryRef(i)
+                        for j in range(0, ring.GetPointCount()):
+                            pt = ring.GetPoint(j)
+                            dist = math.sqrt((ptOp[0]-pt[0]) ** 2 + (ptOp[1]-pt[1]) ** 2 + (ptOp[2]-pt[2]) ** 2)
+                            if dist < minDist:
+                                minDist = dist
+                                minDistElem = wall
+
+            minDistElem[2].append(opening)
+
+        return roofs, walls

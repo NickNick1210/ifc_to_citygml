@@ -304,7 +304,7 @@ class UtilitiesGeom:
                         # Testen, ob alle übereinstimmenden Eckpunkte hintereinander liegen
                         row = True
                         if firstK == 0 and lastK == ring1.GetPointCount() - 2:
-                            for p in range(0, len(ks)):
+                            for p in range(0, len(ks)-1):
                                 if ks[p] + 1 != ks[p + 1]:
                                     for q in range(p + 1, len(ks)):
                                         if q + 1 != len(ks) and ks[q] + 1 != ks[q + 1]:

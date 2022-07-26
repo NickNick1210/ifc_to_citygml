@@ -1754,7 +1754,7 @@ class Converter(QgsTask):
         roofs = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
 
         # Geometrie
@@ -1905,7 +1905,37 @@ class Converter(QgsTask):
             # Alle Flächen in der gleichen Ebene vereinigen
             slabGeom = UtilitiesGeom.union3D(geometries)
             slabGeom = UtilitiesGeom.simplify(slabGeom, 0.001, 0.05)
-            bases.append([slabGeom, baseNames[i], []])
+
+            # Höhen und Flächen der einzelnen Oberflächen heraussuchen
+            heights, areas = [], []
+            for geom in slabGeom:
+                ring = geom.GetGeometryRef(0)
+                # Höhe herausfinden
+                minHeight, maxHeight = sys.maxsize, -sys.maxsize
+                for k in range(0, ring.GetPointCount()):
+                    point = ring.GetPoint(k)
+                    if point[2] > maxHeight:
+                        maxHeight = point[2]
+                    if point[2] < minHeight:
+                        minHeight = point[2]
+                height = maxHeight - minHeight
+                heights.append(minHeight)
+
+                # Ungefähre Fläche
+                area = geom.GetArea()
+                area3d = height * height + area
+                areas.append(area3d)
+
+            # Aus den vorhandenen Flächen die benötigten heraussuchen
+            finalSlab = []
+            for j in range(0, len(areas)):
+                if areas[j] > 0.9 * max(areas) and round(heights[j], 2) >= round(min(heights) - 0.01, 2):
+                    finalSlab.append(slabGeom[j])
+            if len(slabGeom) > 6:
+                print("ToDO!")
+                # TODO
+
+            bases.append([finalSlab, baseNames[i], []])
 
         return bases
 
@@ -1933,8 +1963,7 @@ class Converter(QgsTask):
         for ifcRoof in ifcRoofs:
             roofNames.append(ifcRoof.Name)
 
-        # TODO: Nur Außen-Oberflächen der Dächer herausfiltern (größte Fläche?)
-
+        # Geometrie
         for i in range(0, len(ifcRoofs)):
             ifcRoof = ifcRoofs[i]
             settings = ifcopenshell.geom.settings()
@@ -1972,7 +2001,37 @@ class Converter(QgsTask):
             # Alle Flächen in der gleichen Ebene vereinigen
             roofGeom = UtilitiesGeom.union3D(geometries)
             roofGeom = UtilitiesGeom.simplify(roofGeom, 0.001, 0.05)
-            roofs.append([roofGeom, roofNames[i], []])
+
+            # Höhen und Flächen der einzelnen Oberflächen heraussuchen
+            heights, areas = [], []
+            for geom in roofGeom:
+                ring = geom.GetGeometryRef(0)
+                # Höhe herausfinden
+                minHeight, maxHeight = sys.maxsize, -sys.maxsize
+                for k in range(0, ring.GetPointCount()):
+                    point = ring.GetPoint(k)
+                    if point[2] > maxHeight:
+                        maxHeight = point[2]
+                    if point[2] < minHeight:
+                        minHeight = point[2]
+                height = maxHeight - minHeight
+                heights.append(maxHeight)
+
+                # Ungefähre Fläche
+                area = geom.GetArea()
+                area3d = height * height + area
+                areas.append(area3d)
+
+            # Aus den vorhandenen Flächen die benötigten heraussuchen
+            finalRoof = []
+            for j in range(0, len(areas)):
+                if areas[j] > 0.9 * max(areas) and round(heights[j], 2) >= round(max(heights) - 0.01, 2):
+                    finalRoof.append(roofGeom[j])
+            if len(roofGeom) > 6:
+                print("ToDO!")
+                # TODO
+
+            roofs.append([finalRoof, roofNames[i], []])
 
         return roofs
 
@@ -1994,9 +2053,6 @@ class Converter(QgsTask):
         if len(ifcWalls) == 0:
             self.parent.dlg.log(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
             return []
-
-        # TODO: Openings: Testen, zu welcher Wand; Testen, ob internal oder external
-        # TODO: Nur Außen-Oberflächen der Wände herausfiltern (größte Fläche?)
 
         # Heraussuchen der Außenwände
         ifcWallsExt = []
@@ -2058,6 +2114,10 @@ class Converter(QgsTask):
             wallGeom = UtilitiesGeom.union3D(geometries)
             #wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
             # TODO: Simplify für Polygone mit Löchern umbauen
+
+            # TODO: Nur Außen-Oberflächen der Wände herausfiltern (Beachtung der Openings)
+            # TODO: Wände an Ground und Roof anschließen
+
             walls.append([wallGeom, wallNames[i], []])
 
         return walls
@@ -2076,7 +2136,6 @@ class Converter(QgsTask):
 
         # IFC-Elemente der Öffnungen
         ifcOpenings = UtilitiesIfc.findElement(self.ifc, ifcBuilding, type, result=[])
-        print(datetime.now().strftime("%H:%M:%S") + "find")
 
         # Heraussuchen der Außenöffnungen
         ifcOpeningsExt = []
@@ -2095,12 +2154,10 @@ class Converter(QgsTask):
                 ifcOpeningsExt.append(ifcOpening)
             elif intCount == 0 and UtilitiesIfc.findPset(ifcOpening, psetCommon, "IsExternal"):
                 ifcOpeningsExt.append(ifcOpening)
-        print(datetime.now().strftime("%H:%M:%S") + "external")
 
         # Namen der Öffnungen heraussuchen
         for ifcOpening in ifcOpeningsExt:
             openingNames.append(ifcOpening.Name)
-        print(datetime.now().strftime("%H:%M:%S") + "names")
 
         # Geometrie
         for i in range(0, len(ifcOpeningsExt)):
@@ -2140,14 +2197,16 @@ class Converter(QgsTask):
             # Alle Flächen in der gleichen Ebene vereinigen
             openingGeom = UtilitiesGeom.union3D(geometries)
             #openingGeom = UtilitiesGeom.simplify(openingGeom, 0.001, 0.05)
+
+            # TODO: Simplify ausprobieren
+            # TODO: Nur Außen-Oberflächen der Öffnungen herausfiltern bzw. berechnen (An Wände anschließen)
+
             openings.append([openingGeom, openingNames[i], type])
-        print(datetime.now().strftime("%H:%M:%S") + "geom")
 
         return openings
 
     def assignOpenings(self, openings, roofs, walls):
         for opening in openings:
-            print(datetime.now().strftime("%H:%M:%S") + opening[1])
             ptOp = opening[0][0].GetGeometryRef(0).GetPoint(0)
 
             minDist = sys.maxsize

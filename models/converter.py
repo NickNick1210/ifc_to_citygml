@@ -1756,6 +1756,7 @@ class Converter(QgsTask):
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
+        walls = self.adjustWalls(walls)
 
         # Geometrie
         links = []
@@ -2115,9 +2116,6 @@ class Converter(QgsTask):
             #wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
             # TODO: Simplify für Polygone mit Löchern umbauen
 
-            # TODO: Nur Außen-Oberflächen der Wände herausfiltern (Beachtung der Openings)
-            # TODO: Wände an Ground und Roof anschließen
-
             walls.append([wallGeom, wallNames[i], []])
 
         return walls
@@ -2235,5 +2233,102 @@ class Converter(QgsTask):
                                 minDistElem = wall
 
             minDistElem[2].append(opening)
-
         return roofs, walls
+
+    def adjustWalls(self, walls):
+        for wall in walls:
+            dists = []
+            for wallGeom in wall[0]:
+                # Höhen und Flächen der einzelnen Oberflächen heraussuchen
+                maxDist = -sys.maxsize
+                ring = wallGeom.GetGeometryRef(0)
+                for k in range(0, ring.GetPointCount()):
+                    pt1 = ring.GetPoint(k)
+                    for m in range(k + 1, ring.GetPointCount()):
+                        pt2 = ring.GetPoint(m)
+                        dist = math.sqrt((pt2[0] - pt1[0]) ** 2 + (pt2[1] - pt1[1]) ** 2 + (pt2[2] - pt1[2]) ** 2)
+                        if dist > maxDist:
+                            maxDist = dist
+                dists.append(maxDist)
+
+            # Aus den vorhandenen Flächen die benötigten heraussuchen
+            finalRoof = []
+            ix = dists.index(max(dists))
+            finalRoof.append(wall[0][ix])
+            if len(wall[0]) > 6:
+
+                test = 0
+                for wallGeom in wall[0]:
+                    if wallGeom in finalRoof:
+                        continue
+                    same = False
+                    ring = wallGeom.GetGeometryRef(0)
+                    for k in range(1, finalRoof[0].GetGeometryCount()):
+                        ringHole = finalRoof[0].GetGeometryRef(k)
+                        if same:
+                            break
+                        for m in range(0, ringHole.GetPointCount()):
+                            pt = ringHole.GetPoint(m)
+                            if pt in ring.GetPoints():
+                                same = True
+                                break
+                    for opening in wall[2]:
+                        if same:
+                            break
+                        for k in range(0, len(opening[0])):
+                            geomOpening = opening[0][k]
+                            if wallGeom.Intersects(geomOpening):
+                                maxZWall, minZWall = -sys.maxsize, sys.maxsize
+                                maxWidthWall = -sys.maxsize
+                                wallRing = wallGeom.GetGeometryRef(0)
+                                for m in range(0, wallRing.GetPointCount()):
+                                    wallPt = wallRing.GetPoint(m)
+                                    if wallPt[2] > maxZWall:
+                                        maxZWall = wallPt[2]
+                                    if wallPt[2] < minZWall:
+                                        minZWall = wallPt[2]
+
+                                    if m < wallRing.GetPointCount()-1:
+                                        wallPtNext = wallRing.GetPoint(m+1)
+                                    else:
+                                        wallPtNext = wallRing.GetPoint(0)
+                                    width = math.sqrt((wallPtNext[0]-wallPt[0]) ** 2 + (wallPtNext[1]-wallPt[1]) ** 2)
+                                    if width > maxWidthWall:
+                                        maxWidthWall = width
+
+                                maxZOpen, minZOpen = -sys.maxsize, sys.maxsize
+                                maxWidthOpen = -sys.maxsize
+                                for n in range(0, len(opening[0])):
+                                    geomOpen = opening[0][n]
+                                    ringOpen = geomOpen.GetGeometryRef(0)
+                                    for o in range(0, ringOpen.GetPointCount()):
+                                        ptOpening = ringOpen.GetPoint(o)
+                                        if ptOpening[2] > maxZOpen:
+                                            maxZOpen = ptOpening[2]
+                                        if ptOpening[2] < minZOpen:
+                                            minZOpen = ptOpening[2]
+
+                                        if o < ringOpen.GetPointCount() - 1:
+                                            ptOpenNext = ringOpen.GetPoint(o + 1)
+                                        else:
+                                            ptOpenNext = ringOpen.GetPoint(0)
+                                        width = math.sqrt(
+                                            (ptOpenNext[0] - ptOpening[0]) ** 2 + (ptOpenNext[1] - ptOpening[1]) ** 2)
+                                        if width > maxWidthOpen:
+                                            maxWidthOpen = width
+
+                                if minZWall - 0.01 < minZOpen < minZWall + 0.01 and maxZWall - 0.01 < maxZOpen < maxZWall + 0.01:
+                                    same = True
+                                    break
+                                elif maxWidthWall - 0.01 < maxWidthOpen < maxWidthWall + 0.01:
+                                    same = True
+                                    break
+                    if same:
+                        test += 1
+                        finalRoof.append(wallGeom)
+
+                # TODO: Diese Opening-Flächen kürzen
+                # TODO: Wände an Ground und Roof anschließen
+
+            wall[0] = finalRoof
+        return walls

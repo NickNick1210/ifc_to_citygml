@@ -69,6 +69,10 @@ class UtilitiesIfc:
         rels = ifc.get_inverse(inElement)
         for rel in rels:
 
+            if rel.is_a(outElement):
+                if rel not in result:
+                    result.append(rel)
+
             # Bei Aggregierungen
             if rel.is_a('IfcRelAggregates') and rel.RelatingObject == inElement:
                 objs = rel.RelatedObjects

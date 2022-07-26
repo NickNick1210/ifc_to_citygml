@@ -1751,7 +1751,8 @@ class Converter(QgsTask):
         """
         # Berechnung
         geomBases = self.calcLoD3Bases(ifcBuilding)
-        geomRoofs = self.calcLoD3Roofs(ifcBuilding)
+        #geomRoofs = self.calcLoD3Roofs(ifcBuilding)
+        geomRoofs = []
         geomWalls = self.calcLoD3Walls(ifcBuilding)
 
         # Geometrie
@@ -1951,6 +1952,7 @@ class Converter(QgsTask):
             Die berechneten Wand-Geometrien als Liste
         """
         walls = []
+        wallNames = []
 
         # IFC-Elemente der Wände
         ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
@@ -1959,11 +1961,30 @@ class Converter(QgsTask):
             return []
 
         # TODO: Name der Wände (Ifc-Attribut Nr. 3, oder AC_Pset_Name mit Attribut Name)
-        # TODO: Openings
-        # TODO: Nur Außenwände herausfiltern (Pset_WallCommon Attribut IsExternal, IfcRelSpaceBoundary Attribut 9, alternativ: gleicher Eckpunkt mit GroundSurface oder Roof)
+        # TODO: Openings: Testen, zu welcher Wand; Testen, ob internal oder external
         # TODO: Nur Außen-Oberflächen der Wände herausfiltern (größte Fläche?)
 
+        # Heraussuchen der Außenwände
+        ifcWallsExt = []
+        ifcRelSpaceBoundaries = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
         for ifcWall in ifcWalls:
+            extCount, intCount = 0, 0
+            for ifcRelSpaceBoundary in ifcRelSpaceBoundaries:
+                relElem = ifcRelSpaceBoundary.RelatedBuildingElement
+                if relElem == ifcWall:
+                    if ifcRelSpaceBoundary.InternalOrExternalBoundary == "EXTERNAL":
+                        extCount += 1
+                    elif ifcRelSpaceBoundary.InternalOrExternalBoundary == "INTERNAL":
+                        intCount += 1
+            if extCount > 0:
+                ifcWallsExt.append(ifcWall)
+            elif intCount == 0 and UtilitiesIfc.findPset(ifcWall, "Pset_WallCommon", "IsExternal"):
+                ifcWallsExt.append(ifcWall)
+
+        print("Aus " + str(len(ifcWalls)) + " wurden " + str(len(ifcWallsExt)))
+
+        # Geometrie
+        for ifcWall in ifcWallsExt:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcWall)

@@ -1750,21 +1750,22 @@ class Converter(QgsTask):
             height: Gebäudehöhe
         """
         # Berechnung
-        geomBases = self.calcLoD3Bases(ifcBuilding)
-        #geomRoofs = self.calcLoD3Roofs(ifcBuilding)
-        geomRoofs = []
-        geomWalls = self.calcLoD3Walls(ifcBuilding)
+        bases = self.calcLoD3Bases(ifcBuilding)
+        #roofs = self.calcLoD3Roofs(ifcBuilding)
+        roofs = []
+        walls = self.calcLoD3Walls(ifcBuilding)
+        openings = self.calcLoD3Openings(ifcBuilding)
 
         # Geometrie
         links = []
-        for geomBase in geomBases:
-            link = self.setElementGroup(chBldg, geomBase, "GroundSurface", 3)
+        for base in bases:
+            link = self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1])
             links.append(link)
-        for geomRoof in geomRoofs:
-            link = self.setElementGroup(chBldg, geomRoof, "RoofSurface", 3)
+        for roof in roofs:
+            link = self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1])
             links.append(link)
-        for geomWall in geomWalls:
-            link = self.setElementGroup(chBldg, geomWall, "WallSurface", 3, openings=[])
+        for wall in walls:
+            link = self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=[])
             links.append(link)
         return links
 
@@ -1830,6 +1831,7 @@ class Converter(QgsTask):
             Die berechneten Grundflächen-Geometrien als Liste
         """
         bases = []
+        baseNames = []
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -1840,7 +1842,12 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, it will also be missing in CityGML"))
                 return []
 
+        # Namen der Grundflächen heraussuchen
         for ifcSlab in ifcSlabs:
+            baseNames.append(ifcSlab.Name)
+
+        for i in range(0, len(ifcSlabs)):
+            ifcSlab = ifcSlabs[i]
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
@@ -1876,7 +1883,7 @@ class Converter(QgsTask):
             # Alle Flächen in der gleichen Ebene vereinigen
             slabGeom = UtilitiesGeom.union3D(geometries)
             slabGeom = UtilitiesGeom.simplify(slabGeom, 0.001, 0.05)
-            bases.append(slabGeom)
+            bases.append([slabGeom, baseNames[i]])
 
         return bases
 
@@ -1891,6 +1898,7 @@ class Converter(QgsTask):
             Die berechneten Dächer als Liste
         """
         roofs = []
+        roofNames = []
 
         # IFC-Elemente des Daches
         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
@@ -1899,9 +1907,14 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u"Due to the missing roofs, it will also be missing in CityGML"))
             return []
 
+        # Namen der Dächer heraussuchen
+        for ifcRoof in ifcRoofs:
+            roofNames.append(ifcRoof.Name)
+
         # TODO: Nur Außen-Oberflächen der Dächer herausfiltern (größte Fläche?)
 
-        for ifcRoof in ifcRoofs:
+        for i in range(0, len(ifcRoofs)):
+            ifcRoof = ifcRoofs[i]
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
@@ -1937,7 +1950,7 @@ class Converter(QgsTask):
             # Alle Flächen in der gleichen Ebene vereinigen
             roofGeom = UtilitiesGeom.union3D(geometries)
             roofGeom = UtilitiesGeom.simplify(roofGeom, 0.001, 0.05)
-            roofs.append(roofGeom)
+            roofs.append([roofGeom, roofNames[i]])
 
         return roofs
 
@@ -1960,7 +1973,6 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
             return []
 
-        # TODO: Name der Wände (Ifc-Attribut Nr. 3, oder AC_Pset_Name mit Attribut Name)
         # TODO: Openings: Testen, zu welcher Wand; Testen, ob internal oder external
         # TODO: Nur Außen-Oberflächen der Wände herausfiltern (größte Fläche?)
 
@@ -1981,10 +1993,13 @@ class Converter(QgsTask):
             elif intCount == 0 and UtilitiesIfc.findPset(ifcWall, "Pset_WallCommon", "IsExternal"):
                 ifcWallsExt.append(ifcWall)
 
-        print("Aus " + str(len(ifcWalls)) + " wurden " + str(len(ifcWallsExt)))
+        # Namen der Wände heraussuchen
+        for ifcWall in ifcWallsExt:
+            wallNames.append(ifcWall.Name)
 
         # Geometrie
-        for ifcWall in ifcWallsExt:
+        for i in range(0, len(ifcWallsExt)):
+            ifcWall = ifcWallsExt[i]
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcWall)
@@ -2021,6 +2036,29 @@ class Converter(QgsTask):
             wallGeom = UtilitiesGeom.union3D(geometries)
             #wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
             # TODO: Simplify für Polygone mit Löchern umbauen
-            walls.append(wallGeom)
+            walls.append([wallGeom, wallNames[i]])
 
         return walls
+
+    def calcLoD3Openings(self, ifcBuilding):
+        """ Berechnen der Öffnungen (Türen und Fenster) in Level of Detail (LoD) 3
+
+        Args:
+            ifcBuilding: Das Gebäude, aus dem die Öffnungen entnommen werden sollen
+
+        Returns:
+            Die berechneten Öffnungs-Geometrien als Liste
+        """
+        doors, windows = [], []
+        doorNames, windowNames = [], []
+
+        # IFC-Elemente der Wände
+        ifcDoors = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDoor", result=[])
+        ifcWindows = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWindow", result=[])
+
+
+        for ifcDoor in ifcDoors:
+            print(ifcDoor)
+
+        for ifcWindow in ifcWindows:
+            print(ifcWindow)

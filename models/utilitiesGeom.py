@@ -153,6 +153,11 @@ class UtilitiesGeom:
         geomList = geom if isinstance(geom, list) else [geom]
         simpList = []
 
+        # TODO: Simplify für Polygone mit Löchern umbauen
+        # über alle .GetGeometryRef iterieren
+        # Auch dort Simplifien
+
+
         for geom in geomList:
 
             # Wenn nicht unterstützt: Direkt zurückgeben
@@ -168,6 +173,13 @@ class UtilitiesGeom:
                     ring = geom
                     ringNew = ogr.Geometry(ogr.wkbLineString)
                 count = ring.GetPointCount()
+
+                #####
+                # Experimentell:
+                for h in range(0, geom.GetGeometryCount()):
+                    ring = geom.GetGeometryRef(h)
+
+                #####
 
                 # Anfangspunkt
                 ringNew.AddPoint(ring.GetPoint(0)[0], ring.GetPoint(0)[1], ring.GetPoint(0)[2])

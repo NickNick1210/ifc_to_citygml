@@ -284,7 +284,7 @@ class Converter(QgsTask):
 
             # Konvertierung
             height = self.convertBldgAttr(ifcBuilding, chBldg)
-            links = self.convertLoD3BldgBound(ifcBuilding, chBldg, height)
+            links = self.convertLoD3BldgBound(ifcBuilding, chBldg)
             self.convertLoDSolid(chBldg, links, 3)
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.convertBound(self.geom, chBound)
@@ -1402,6 +1402,7 @@ class Converter(QgsTask):
 
         Returns:
             Die berechneten neuen Wände als Liste
+            Die angepassten Dächer als Liste
         """
         roofsOut = roofs.copy()
         walls, wallsLine = [], []
@@ -1471,7 +1472,7 @@ class Converter(QgsTask):
                             sPoint2 = r2Plane.intersection(wLine2)[0]
                             z2 = float(sPoint2[2])
 
-                        ### NEUE WÄNDE ###
+                        # NEUE WÄNDE #
                         last = None
                         wallsInt = []
                         for n in range(0, ringInt.GetPointCount()):
@@ -1526,7 +1527,7 @@ class Converter(QgsTask):
 
                         walls += wallsInt
 
-                        ### ANPASSUNG DER DÄCHER ###
+                        # ANPASSUNG DER DÄCHER #
                         if z1 <= z2:
                             geomRoof = roofsOut[j]
                         else:
@@ -1565,7 +1566,7 @@ class Converter(QgsTask):
                         else:
                             roofsOut[i] = geomRoofOut
 
-        ### ÜBERPRÜFUNG DER WÄNDE ###
+        # ÜBERPRÜFUNG DER WÄNDE #
         walls += wallsLine
         wallsCheck, wallsMod = walls.copy(), {}
 
@@ -1723,6 +1724,7 @@ class Converter(QgsTask):
         wallsOut = UtilitiesGeom.union3D(wallsChecked)
         return wallsOut
 
+    # noinspection PyMethodMayBeStatic
     def convertLoDSolid(self, chBldg, links, lod):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds
 
@@ -1741,20 +1743,19 @@ class Converter(QgsTask):
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
                 chBldgSolidSM.set(QName(XmlNs.xlink, "href"), link)
 
-    def convertLoD3BldgBound(self, ifcBuilding, chBldg, height):
+    def convertLoD3BldgBound(self, ifcBuilding, chBldg):
         """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 3
 
         Args:
             ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
-            height: Gebäudehöhe
         """
         # Berechnung
         bases = self.calcLoD3Bases(ifcBuilding)
         roofs = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
         walls = self.adjustWalls(walls)
 
@@ -1768,7 +1769,7 @@ class Converter(QgsTask):
             links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
         return links
 
-    def setElementGroup(self, chBldg, geometries, type, lod, name=None, openings=[]):
+    def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
         """ Setzen eines CityGML-Objekts, bestehend aus mehreren Geometrien
 
         Args:
@@ -1932,9 +1933,6 @@ class Converter(QgsTask):
             for j in range(0, len(areas)):
                 if areas[j] > 0.9 * max(areas) and round(heights[j], 2) >= round(min(heights) - 0.01, 2):
                     finalSlab.append(slabGeom[j])
-            if len(slabGeom) > 6:
-                print("ToDO!")
-                # TODO
 
             bases.append([finalSlab, baseNames[i], []])
 
@@ -2028,9 +2026,6 @@ class Converter(QgsTask):
             for j in range(0, len(areas)):
                 if areas[j] > 0.9 * max(areas) and round(heights[j], 2) >= round(max(heights) - 0.01, 2):
                     finalRoof.append(roofGeom[j])
-            if len(roofGeom) > 6:
-                print("ToDO!")
-                # TODO
 
             roofs.append([finalRoof, roofNames[i], []])
 
@@ -2113,7 +2108,7 @@ class Converter(QgsTask):
 
             # Alle Flächen in der gleichen Ebene vereinigen
             wallGeom = UtilitiesGeom.union3D(geometries)
-            #wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
+            # wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
             # TODO: Simplify für Polygone mit Löchern umbauen
 
             walls.append([wallGeom, wallNames[i], []])
@@ -2125,6 +2120,7 @@ class Converter(QgsTask):
 
         Args:
             ifcBuilding: Das Gebäude, aus dem die Öffnungen entnommen werden sollen
+            type: Öffnungs-Typ (ifcDoor oder IfcWindow)
 
         Returns:
             Die berechneten Öffnungs-Geometrien als Liste
@@ -2194,52 +2190,66 @@ class Converter(QgsTask):
 
             # Alle Flächen in der gleichen Ebene vereinigen
             openingGeom = UtilitiesGeom.union3D(geometries)
-            #openingGeom = UtilitiesGeom.simplify(openingGeom, 0.001, 0.05)
-
-            # TODO: Simplify ausprobieren
-            # TODO: Nur Außen-Oberflächen der Öffnungen herausfiltern bzw. berechnen (An Wände anschließen)
-
             openings.append([openingGeom, openingNames[i], type])
 
         return openings
 
+    # noinspection PyMethodMayBeStatic
     def assignOpenings(self, openings, roofs, walls):
+        """ Anfügen der Öffnungen (Fenster & Türen) an die zugehörigen Wände oder Dächer in Level of Detail (LoD) 3
+
+        Args:
+            openings: Die anzufügenden Öffnungen (Fenster & Türen) als Liste
+            roofs: Die Dächer, an die die Öffnungen angefügt werden sollen, als Liste
+            walls: Die Wände, an die die Öffnungen angefügt werden sollen, als Liste
+
+        Returns:
+            Die angepassten Dächer als Liste
+            Die angepassten Wände als Liste
+        """
         for opening in openings:
             ptOp = opening[0][0].GetGeometryRef(0).GetPoint(0)
 
-            minDist = sys.maxsize
-            minDistElem = None
-
+            # Wand bzw. Dach mit geringstem Abstand zur Öffnung berechnen
+            minDist, minDistElem = sys.maxsize, None
             for roof in roofs:
                 for geom in roof[0]:
                     for i in range(0, geom.GetGeometryCount()):
                         ring = geom.GetGeometryRef(i)
                         for j in range(0, ring.GetPointCount()):
                             pt = ring.GetPoint(j)
-                            dist = math.sqrt((ptOp[0]-pt[0]) ** 2 + (ptOp[1]-pt[1]) ** 2 + (ptOp[2]-pt[2]) ** 2)
+                            dist = math.sqrt((ptOp[0] - pt[0]) ** 2 + (ptOp[1] - pt[1]) ** 2 + (ptOp[2] - pt[2]) ** 2)
                             if dist < minDist:
-                                minDist = dist
-                                minDistElem = roof
-
+                                minDist, minDistElem = dist, roof
             for wall in walls:
                 for geom in wall[0]:
                     for i in range(0, geom.GetGeometryCount()):
                         ring = geom.GetGeometryRef(i)
                         for j in range(0, ring.GetPointCount()):
                             pt = ring.GetPoint(j)
-                            dist = math.sqrt((ptOp[0]-pt[0]) ** 2 + (ptOp[1]-pt[1]) ** 2 + (ptOp[2]-pt[2]) ** 2)
+                            dist = math.sqrt((ptOp[0] - pt[0]) ** 2 + (ptOp[1] - pt[1]) ** 2 + (ptOp[2] - pt[2]) ** 2)
                             if dist < minDist:
-                                minDist = dist
-                                minDistElem = wall
+                                minDist, minDistElem = dist, wall
 
+            # Öffnung hinzufügen
             minDistElem[2].append(opening)
         return roofs, walls
 
+    # noinspection PyMethodMayBeStatic
     def adjustWalls(self, walls):
+        """ Anpassen der Wände auf Grundlage der Dächer, Grundflächen und Öffnungen in Level of Detail (LoD) 3
+
+        Args:
+            walls: Die anzupassenden Wände als Liste
+
+        Returns:
+            Die angepassten Wände als Liste
+        """
         for wall in walls:
+
+            # Maximale Durchmesser der einzelnen Oberflächen heraussuchen
             dists = []
             for wallGeom in wall[0]:
-                # Höhen und Flächen der einzelnen Oberflächen heraussuchen
                 maxDist = -sys.maxsize
                 ring = wallGeom.GetGeometryRef(0)
                 for k in range(0, ring.GetPointCount()):
@@ -2251,18 +2261,18 @@ class Converter(QgsTask):
                             maxDist = dist
                 dists.append(maxDist)
 
-            # Aus den vorhandenen Flächen die benötigten heraussuchen
-            finalRoof = []
-            ix = dists.index(max(dists))
-            finalRoof.append(wall[0][ix])
-            if len(wall[0]) > 6:
+            # Größte Fläche als Außenfläche
+            finalRoof = [wall[0][dists.index(max(dists))]]
 
-                test = 0
+            # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
+            if len(wall[0]) > 6:
                 for wallGeom in wall[0]:
                     if wallGeom in finalRoof:
                         continue
                     same = False
                     ring = wallGeom.GetGeometryRef(0)
+
+                    # Auf Schnitt mit den Löchern der Außenfläche prüfen
                     for k in range(1, finalRoof[0].GetGeometryCount()):
                         ringHole = finalRoof[0].GetGeometryRef(k)
                         if same:
@@ -2272,14 +2282,17 @@ class Converter(QgsTask):
                             if pt in ring.GetPoints():
                                 same = True
                                 break
+
+                    # Auf Schnitt mit den Öffnungen (Türen und Fenster) prüfen
                     for opening in wall[2]:
                         if same:
                             break
                         for k in range(0, len(opening[0])):
                             geomOpening = opening[0][k]
                             if wallGeom.Intersects(geomOpening):
-                                maxZWall, minZWall = -sys.maxsize, sys.maxsize
-                                maxWidthWall = -sys.maxsize
+
+                                # Höhen und Breiten der Öffnungen berechnen
+                                maxZWall, minZWall, maxWidthWall = -sys.maxsize, sys.maxsize, -sys.maxsize
                                 wallRing = wallGeom.GetGeometryRef(0)
                                 for m in range(0, wallRing.GetPointCount()):
                                     wallPt = wallRing.GetPoint(m)
@@ -2287,48 +2300,56 @@ class Converter(QgsTask):
                                         maxZWall = wallPt[2]
                                     if wallPt[2] < minZWall:
                                         minZWall = wallPt[2]
-
-                                    if m < wallRing.GetPointCount()-1:
-                                        wallPtNext = wallRing.GetPoint(m+1)
-                                    else:
-                                        wallPtNext = wallRing.GetPoint(0)
-                                    width = math.sqrt((wallPtNext[0]-wallPt[0]) ** 2 + (wallPtNext[1]-wallPt[1]) ** 2)
+                                    wallPtN = wallRing.GetPoint(
+                                        m + 1) if m < wallRing.GetPointCount() - 1 else wallRing.GetPoint(0)
+                                    width = math.sqrt((wallPtN[0] - wallPt[0]) ** 2 + (wallPtN[1] - wallPt[1]) ** 2)
                                     if width > maxWidthWall:
                                         maxWidthWall = width
 
-                                maxZOpen, minZOpen = -sys.maxsize, sys.maxsize
-                                maxWidthOpen = -sys.maxsize
+                                # Höhen und Breiten der zu prüfenden Flächen berechnen
+                                maxZOpen, minZOpen, maxWidthOpen = -sys.maxsize, sys.maxsize, -sys.maxsize
                                 for n in range(0, len(opening[0])):
                                     geomOpen = opening[0][n]
                                     ringOpen = geomOpen.GetGeometryRef(0)
                                     for o in range(0, ringOpen.GetPointCount()):
-                                        ptOpening = ringOpen.GetPoint(o)
-                                        if ptOpening[2] > maxZOpen:
-                                            maxZOpen = ptOpening[2]
-                                        if ptOpening[2] < minZOpen:
-                                            minZOpen = ptOpening[2]
-
-                                        if o < ringOpen.GetPointCount() - 1:
-                                            ptOpenNext = ringOpen.GetPoint(o + 1)
-                                        else:
-                                            ptOpenNext = ringOpen.GetPoint(0)
-                                        width = math.sqrt(
-                                            (ptOpenNext[0] - ptOpening[0]) ** 2 + (ptOpenNext[1] - ptOpening[1]) ** 2)
+                                        ptOpen = ringOpen.GetPoint(o)
+                                        if ptOpen[2] > maxZOpen:
+                                            maxZOpen = ptOpen[2]
+                                        if ptOpen[2] < minZOpen:
+                                            minZOpen = ptOpen[2]
+                                        ptOpenN = ringOpen.GetPoint(
+                                            o + 1) if o < ringOpen.GetPointCount() - 1 else ringOpen.GetPoint(0)
+                                        width = math.sqrt((ptOpenN[0] - ptOpen[0]) ** 2 + (ptOpenN[1] - ptOpen[1]) ** 2)
                                         if width > maxWidthOpen:
                                             maxWidthOpen = width
 
-                                if minZWall - 0.01 < minZOpen < minZWall + 0.01 and maxZWall - 0.01 < maxZOpen < maxZWall + 0.01:
-                                    same = True
-                                    break
-                                elif maxWidthWall - 0.01 < maxWidthOpen < maxWidthWall + 0.01:
+                                # Wenn Übereinstimmung in Höhe und Breite prüfen
+                                if (minZWall - 0.01 < minZOpen < minZWall + 0.01 and
+                                    maxZWall - 0.01 < maxZOpen < maxZWall + 0.01) or (
+                                        maxWidthWall - 0.01 < maxWidthOpen < maxWidthWall + 0.01):
                                     same = True
                                     break
                     if same:
-                        test += 1
                         finalRoof.append(wallGeom)
 
+                # TODO: Nur Außen-Oberflächen der Öffnungen herausfiltern bzw. berechnen (An Wände anschließen)
+                # Maximale Höhe und Breite herausfinden
+                # Nach Fläche mit dieser suchen:
+                #   * Wenn genau eine Fläche: Neue Fläche
+                #   * Wenn mehrere Flächen: Äußere (Näher an Wand[0])
+                #   * Wenn keine: Größte Fläche nehmen und entsprechend erweitern
+                # Simplify
+
                 # TODO: Diese Opening-Flächen kürzen
+                # Zugehörige Opening suchen
+                # Schnitt suchen (Intersect)
+                # Außenhälfte übernehmen (Angrenzend an Wand[0])
+
                 # TODO: Wände an Ground und Roof anschließen
+                # siehe LoD2
+                # Prüfung auf Schnitt mit allen Bases und Roofs
+                # Ebenenschnitt berechnen, um Höhe zu erhalten
+                # Um diese Höhe erhöhen, bzw. erniedrigen
 
             wall[0] = finalRoof
         return walls

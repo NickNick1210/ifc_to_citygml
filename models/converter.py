@@ -1754,8 +1754,8 @@ class Converter(QgsTask):
         bases = self.calcLoD3Bases(ifcBuilding)
         roofs = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
-        openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        # openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        openings = self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
         walls = self.adjustWalls(walls)
 
@@ -2174,19 +2174,32 @@ class Converter(QgsTask):
                 grVertsList.append(points)
 
             # Geometrien erstellen
-            geometries = []
+            geometries, sizes = [], []
             for grVerts in grVertsList:
                 # Polygon aus Ring aus Punkten erstellen
                 geometry = ogr.Geometry(ogr.wkbPolygon)
                 ring = ogr.Geometry(ogr.wkbLinearRing)
                 for grVert in grVerts:
                     ring.AddPoint(grVert[0], grVert[1], grVert[2])
+                # Seitenlängen merken
+                r1 = math.sqrt((grVerts[1][0] - grVerts[0][0]) ** 2 + (grVerts[1][1] - grVerts[0][1]) ** 2 + (
+                        grVerts[1][2] - grVerts[0][2]) ** 2)
+                r2 = math.sqrt((grVerts[2][0] - grVerts[0][0]) ** 2 + (grVerts[2][1] - grVerts[0][1]) ** 2 + (
+                        grVerts[2][2] - grVerts[0][2]) ** 2)
+                sizes.append((r1 + r2))
+                # Geometrie abschließen
                 ring.CloseRings()
                 geometry.AddGeometry(ring)
                 geometries.append(geometry)
 
+            # Herausfiltern von zu kleinen Flächen
+            finalGeoms = []
+            for j in range(0, len(geometries)):
+                if sizes[j] > max(sizes) / 50:
+                    finalGeoms.append(geometries[j])
+
             # Alle Flächen in der gleichen Ebene vereinigen
-            openingGeom = UtilitiesGeom.union3D(geometries)
+            openingGeom = UtilitiesGeom.union3D(finalGeoms)
             openings.append([openingGeom, openingNames[i], type])
 
         return openings
@@ -2243,7 +2256,6 @@ class Converter(QgsTask):
             Die angepassten Wände als Liste
         """
         for wall in walls:
-
             # Maximale Durchmesser der einzelnen Oberflächen heraussuchen
             dists = []
             for wallGeom in wall[0]:
@@ -2259,38 +2271,29 @@ class Converter(QgsTask):
                 dists.append(maxDist)
 
             # Größte Fläche als Außenfläche
-            finalRoof = [wall[0][dists.index(max(dists))]]
+            finalWall = [wall[0][dists.index(max(dists))]]
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
-            if len(wall[0]) > 6:
+            if len(wall[2]) != 0:
+                openBounds = [[] for x in range(len(wall[2]))]
                 for wallGeom in wall[0]:
-                    if wallGeom in finalRoof:
+                    if wallGeom in finalWall:
                         continue
                     same = False
-                    ring = wallGeom.GetGeometryRef(0)
-
-                    # Auf Schnitt mit den Löchern der Außenfläche prüfen
-                    for k in range(1, finalRoof[0].GetGeometryCount()):
-                        ringHole = finalRoof[0].GetGeometryRef(k)
-                        if same:
-                            break
-                        for m in range(0, ringHole.GetPointCount()):
-                            pt = ringHole.GetPoint(m)
-                            if pt in ring.GetPoints():
-                                same = True
-                                break
+                    wallRing = wallGeom.GetGeometryRef(0)
 
                     # Auf Schnitt mit den Öffnungen (Türen und Fenster) prüfen
-                    for opening in wall[2]:
+                    for i in range(0, len(wall[2])):
                         if same:
                             break
+                        opening = wall[2][i]
                         for k in range(0, len(opening[0])):
                             geomOpening = opening[0][k]
+                            # TODO: Intersect funktioniert nicht bei vertikalen Wänden der Fenster: Kürzeste Distanz zwischen den Eckpunkten von Wand und Fenster berechnen
                             if wallGeom.Intersects(geomOpening):
 
                                 # Höhen und Breiten der Öffnungen berechnen
                                 maxZWall, minZWall, maxWidthWall = -sys.maxsize, sys.maxsize, -sys.maxsize
-                                wallRing = wallGeom.GetGeometryRef(0)
                                 for m in range(0, wallRing.GetPointCount()):
                                     wallPt = wallRing.GetPoint(m)
                                     if wallPt[2] > maxZWall:
@@ -2320,22 +2323,100 @@ class Converter(QgsTask):
                                         if width > maxWidthOpen:
                                             maxWidthOpen = width
 
-                                # Wenn Übereinstimmung in Höhe und Breite prüfen
-                                if (minZWall - 0.01 < minZOpen < minZWall + 0.01 and
-                                    maxZWall - 0.01 < maxZOpen < maxZWall + 0.01) or (
-                                        maxWidthWall - 0.01 < maxWidthOpen < maxWidthWall + 0.01):
-                                    same = True
-                                    break
-                    if same:
-                        finalRoof.append(wallGeom)
+                                # Übereinstimmung in Höhe und Breite prüfen
+                                # TODO: Toleranz wieder anpassen (0.01 ?)
+                                if (minZWall - 0.05 < minZOpen < minZWall + 0.05 and
+                                    maxZWall - 0.05 < maxZOpen < maxZWall + 0.05) or (
+                                        maxWidthWall - 0.05 < maxWidthOpen < maxWidthWall + 0.05):
+                                    openBounds[i].append(wallGeom)
+                                # TODO: Wieder in if einrücken
+                                finalWall.append(wallGeom)
+                                same = True
+                                break
 
-                # TODO: Nur Außen-Oberflächen der Öffnungen herausfiltern bzw. berechnen (An Wände anschließen)
-                # Maximale Höhe und Breite herausfinden
-                # Nach Fläche mit dieser suchen:
-                #   * Wenn genau eine Fläche: Neue Fläche
-                #   * Wenn mehrere Flächen: Äußere (Näher an Wand[0])
-                #   * Wenn keine: Größte Fläche nehmen und entsprechend erweitern
-                # Simplify
+                print(openBounds)
+
+                # Öffnungen durch eine gesamte Fläche darstellen
+                # über alle Öffnungen der Wand iterieren
+                for j in range(0, len(wall[2])):
+                    opening = wall[2][j]
+
+                    # Größte Fläche heraussuchen: Als Grundlage benutzen
+                    maxArea, maxGeom = -sys.maxsize, None
+                    for n in range(0, len(opening[0])):
+                        geomOpen = opening[0][n]
+                        ringOpen = geomOpen.GetGeometryRef(0)
+                        minZ, maxZ, maxWidth = sys.maxsize, -sys.maxsize, -sys.maxsize
+                        for o in range(0, ringOpen.GetPointCount()):
+                            ptOpen = ringOpen.GetPoint(o)
+                            if ptOpen[2] > maxZ:
+                                maxZ = ptOpen[2]
+                            if ptOpen[2] < minZ:
+                                minZ = ptOpen[2]
+                            ptOpenN = ringOpen.GetPoint(
+                                o + 1) if o < ringOpen.GetPointCount() - 1 else ringOpen.GetPoint(0)
+                            width = math.sqrt((ptOpenN[0] - ptOpen[0]) ** 2 + (ptOpenN[1] - ptOpen[1]) ** 2)
+                            if width > maxWidth:
+                                maxWidth = width
+                        area = maxWidth * (maxZ - minZ)
+                        if area > maxArea:
+                            maxArea = area
+                            maxGeom = ringOpen
+
+                    planeOpen = UtilitiesGeom.getPlane(maxGeom.GetPoint(0), maxGeom.GetPoint(1), maxGeom.GetPoint(2))
+                    sLines = []
+                    for geom in openBounds[j]:
+                        ring = geom.GetGeometryRef(0)
+                        plane = UtilitiesGeom.getPlane(ring.GetPoint(0), ring.GetPoint(1), ring.GetPoint(2))
+                        sLine = planeOpen.intersection(plane)[0]
+                        sLines.append(sLine)
+                    sPts = [[] for x in range(len(openBounds[j]))]
+                    for n in range(0, len(sLines)):
+                        for m in range(n + 1, len(sLines)):
+                            sPt = sLines[n].intersection(sLines[m])
+                            if len(sPt) != 0:
+                                sPts[n].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
+                                sPts[m].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
+
+                    openPts = []
+                    for o in range(0, len(sPts)):
+                        if len(sPts[o]) == 1:
+                            if o != 0:
+                                openPts.append(sPts[o][0])
+                            geom = openBounds[j][o]
+                            ring = geom.GetGeometryRef(0)
+                            minZ, maxZ = sys.maxsize, -sys.maxsize
+                            for p in range(0, ring.GetPointCount()):
+                                if ring.GetPoint(p)[2] < minZ:
+                                    minZ = ring.GetPoint(p)[2]
+                                if ring.GetPoint(p)[2] > maxZ:
+                                    maxZ = ring.GetPoint(p)[2]
+                            if sPts[o][0][2] == minZ:
+                                newPt = [sPts[o][0][0], sPts[o][0][1], maxZ]
+                                openPts.append(newPt)
+                            elif sPts[o][0][2] == maxZ:
+                                newPt = [sPts[o][0][0], sPts[o][0][1], minZ]
+                                openPts.append(newPt)
+                        else:
+                            try:
+                                if o == 0:
+                                    openPts.append(sPts[o][1])
+                                else:
+                                    openPts.append(sPts[o][0])
+                            except:
+                                #print(o)
+                                #print(sPts[o])
+                                #print(len(sPts[o]))
+                                pass
+
+                    newGeomOpen = ogr.Geometry(ogr.wkbPolygon)
+                    newGeomRing = ogr.Geometry(ogr.wkbLinearRing)
+                    for pt in openPts:
+                        newGeomRing.AddPoint(pt[0], pt[1], pt[2])
+                    newGeomRing.CloseRings()
+                    newGeomOpen.AddGeometry(newGeomRing)
+
+                    # opening[0] = [newGeomOpen]
 
                 # TODO: Diese Opening-Flächen kürzen
                 # Zugehörige Opening suchen
@@ -2348,5 +2429,5 @@ class Converter(QgsTask):
                 # Ebenenschnitt berechnen, um Höhe zu erhalten
                 # Um diese Höhe erhöhen, bzw. erniedrigen
 
-            wall[0] = finalRoof
+            wall[0] = finalWall
         return walls

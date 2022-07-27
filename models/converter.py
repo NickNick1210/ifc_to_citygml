@@ -1755,7 +1755,7 @@ class Converter(QgsTask):
         roofs = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
         walls = self.adjustWalls(walls)
 
@@ -2106,13 +2106,10 @@ class Converter(QgsTask):
                 geometry.AddGeometry(ring)
                 geometries.append(geometry)
 
-            # Alle Flächen in der gleichen Ebene vereinigen
+            # Vereinigen, Vereinfachen und Hinzufügen
             wallGeom = UtilitiesGeom.union3D(geometries)
-            # wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.05)
-            # TODO: Simplify für Polygone mit Löchern umbauen
-
+            wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.001)
             walls.append([wallGeom, wallNames[i], []])
-
         return walls
 
     def calcLoD3Openings(self, ifcBuilding, type):

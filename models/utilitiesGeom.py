@@ -153,11 +153,6 @@ class UtilitiesGeom:
         geomList = geom if isinstance(geom, list) else [geom]
         simpList = []
 
-        # TODO: Simplify für Polygone mit Löchern umbauen
-        # über alle .GetGeometryRef iterieren
-        # Auch dort Simplifien
-
-
         for geom in geomList:
 
             # Wenn nicht unterstützt: Direkt zurückgeben
@@ -166,72 +161,73 @@ class UtilitiesGeom:
             else:
                 # Auslesen der Geometrie und Erstellen der neuen Geometrie
                 if geom.GetGeometryName() == "POLYGON":
-                    ring = geom.GetGeometryRef(0)
                     geomNew = ogr.Geometry(ogr.wkbPolygon)
-                    ringNew = ogr.Geometry(ogr.wkbLinearRing)
-                else:
-                    ring = geom
-                    ringNew = ogr.Geometry(ogr.wkbLineString)
-                count = ring.GetPointCount()
+                    ring0 = geom.GetGeometryRef(0)
+                ringCount = geom.GetGeometryCount() if geom.GetGeometryName() == "POLYGON" else 1
+                count = ring0.GetPointCount() if geom.GetGeometryName() == "POLYGON" else geom.GetPointCount()
 
-                #####
-                # Experimentell:
-                for h in range(0, geom.GetGeometryCount()):
-                    ring = geom.GetGeometryRef(h)
+                # Über die verschiedenen Ringe iterieren (falls Polygone Löcher haben)
+                for h in range(0, ringCount):
+                    ring = geom.GetGeometryRef(h) if geom.GetGeometryName() == "POLYGON" else geom
+                    ringNew = ogr.Geometry(ogr.wkbLinearRing) if geom.GetGeometryName() == "POLYGON" else ogr.Geometry(
+                        ogr.wkbLineString)
 
-                #####
+                    # Anfangspunkt
+                    ringNew.AddPoint(ring.GetPoint(0)[0], ring.GetPoint(0)[1], ring.GetPoint(0)[2])
+                    ptSt = ring.GetPoint(0)
 
-                # Anfangspunkt
-                ringNew.AddPoint(ring.GetPoint(0)[0], ring.GetPoint(0)[1], ring.GetPoint(0)[2])
+                    # Vereinfachung: Betrachtung von drei Punkten hintereinander
+                    for i in range(2, ring.GetPointCount()):
+                        ptEnd, ptMid = ring.GetPoint(i), ring.GetPoint(i - 1)
 
-                # Vereinfachung: Betrachtung von drei Punkten hintereinander
-                for i in range(2, ring.GetPointCount()):
-                    ptEnd, ptMid, ptSt = ring.GetPoint(i), ring.GetPoint(i - 1), ring.GetPoint(i - 2)
+                        # Abstand zwischen erstem und mittlerem Punkt: Unter Toleranz = Überspringen
+                        sqXY = np.square(ptMid[0] - ptSt[0]) + np.square(ptMid[1] - ptSt[1])
+                        dist = np.sqrt(sqXY) if zd else np.sqrt(sqXY + np.square(ptMid[2] - ptSt[2]))
+                        if dist < distTol:
+                            continue
 
-                    # Abstand zwischen erstem und mittlerem Punkt: Unter Toleranz = Überspringen
-                    sqXY = np.square(ptMid[0] - ptSt[0]) + np.square(ptMid[1] - ptSt[1])
-                    dist = np.sqrt(sqXY) if zd else np.sqrt(sqXY + np.square(ptMid[2] - ptSt[2]))
-                    if dist < distTol:
-                        continue
+                        # Parallelität der Linien von Startpunkt zu Mittelpunkt und Mittelpunkt zu Endpunkt prüfen
+                        tol = angTol
+                        # Y-Steigung in Bezug auf X-Verlauf
+                        gradYSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[1] - ptSt[1]) / abs(ptMid[0] - ptSt[0])
+                        gradYEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[1] - ptMid[1]) / abs(ptEnd[0] - ptMid[0])
+                        if gradYSt - tol < gradYEnd < gradYSt + tol:
+                            # Z-Steigung in Bezug auf X-Verlauf
+                            gradZSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[0] - ptSt[0])
+                            gradZEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[2] - ptMid[2]) / abs(
+                                ptEnd[0] - ptMid[0])
+                            if gradZSt - tol < gradZEnd < gradZSt + tol:
+                                # Z-Steigung in Bezug auf Y-Verlauf
+                                gradYZSt = -1 if ptMid[1] - ptSt[1] == 0 else (ptMid[2] - ptSt[2]) / abs(
+                                    ptMid[1] - ptSt[1])
+                                gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(
+                                    ptEnd[1] - ptMid[1])
+                                if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
+                                    continue
 
-                    # Parallelität der Linien von Startpunkt zu Mittelpunkt und Mittelpunkt zu Endpunkt prüfen
-                    tol = angTol
-                    # Y-Steigung in Bezug auf X-Verlauf
-                    gradYSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[1] - ptSt[1]) / abs(ptMid[0] - ptSt[0])
-                    gradYEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[1] - ptMid[1]) / abs(ptEnd[0] - ptMid[0])
-                    if gradYSt - tol < gradYEnd < gradYSt + tol:
-                        # Z-Steigung in Bezug auf X-Verlauf
-                        gradZSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[0] - ptSt[0])
-                        gradZEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[2] - ptMid[2]) / abs(ptEnd[0] - ptMid[0])
-                        if gradZSt - tol < gradZEnd < gradZSt + tol:
-                            # Z-Steigung in Bezug auf Y-Verlauf
-                            gradYZSt = -1 if ptMid[1] - ptSt[1] == 0 else (ptMid[2] - ptSt[2]) / abs(ptMid[1] - ptSt[1])
-                            gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(
-                                ptEnd[1] - ptMid[1])
-                            if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
-                                continue
+                        # Wenn keine Vereinfachung: Mittelpunkt setzen
+                        ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+                        ptSt = ptMid
 
-                    # Wenn keine Vereinfachung: Mittelpunkt setzen
-                    ringNew.AddPoint(ptMid[0], ptMid[1], ptMid[2])
-
-                # Abschließen der Geometrie
-                if geom.GetGeometryName() == "POLYGON":
-                    ringNew.CloseRings()
-                    geomNew.AddGeometry(ringNew)
-                else:
-                    ptLineEnd = geom.GetPoint(geom.GetPointCount() - 1)
-                    ringNew.AddPoint(ptLineEnd[0], ptLineEnd[1], ptLineEnd[2])
-                    geomNew = ringNew
+                    # Abschließen der Geometrie
+                    if geom.GetGeometryName() == "POLYGON":
+                        ringNew.CloseRings()
+                        geomNew.AddGeometry(ringNew)
+                    else:
+                        ptLineEnd = geom.GetPoint(geom.GetPointCount() - 1)
+                        ringNew.AddPoint(ptLineEnd[0], ptLineEnd[1], ptLineEnd[2])
+                        geomNew = ringNew
+                ringTest = geomNew.GetGeometryRef(0) if geom.GetGeometryName() == "POLYGON" else geomNew
 
                 # Wenn Polygon weniger als vier Eckpunkte hat: Eigentlich ein LineString
-                if ringNew.GetPointCount() < 4 and geom.GetGeometryName() == "POLYGON":
+                if ringTest.GetPointCount() < 4 and geom.GetGeometryName() == "POLYGON":
                     geomNewLine = ogr.Geometry(ogr.wkbLineString)
-                    geomNewLine.AddPoint(geomNew.GetPoint(0)[0], geomNew.GetPoint(0)[1], geomNew.GetPoint(0)[2])
-                    geomNewLine.AddPoint(geomNew.GetPoint(1)[0], geomNew.GetPoint(1)[1], geomNew.GetPoint(1)[2])
+                    geomNewLine.AddPoint(ringTest.GetPoint(0)[0], ringTest.GetPoint(0)[1], ringTest.GetPoint(0)[2])
+                    geomNewLine.AddPoint(ringTest.GetPoint(1)[0], ringTest.GetPoint(1)[1], ringTest.GetPoint(1)[2])
                     simpList.append(geomNewLine)
 
                 # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
-                elif ringNew.GetPointCount() < count:
+                elif ringTest.GetPointCount() < count:
                     simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol))
 
                 # Wenn fertig: Zurückgeben
@@ -316,7 +312,7 @@ class UtilitiesGeom:
                         # Testen, ob alle übereinstimmenden Eckpunkte hintereinander liegen
                         row = True
                         if firstK == 0 and lastK == ring1.GetPointCount() - 2:
-                            for p in range(0, len(ks)-1):
+                            for p in range(0, len(ks) - 1):
                                 if ks[p] + 1 != ks[p + 1]:
                                     for q in range(p + 1, len(ks)):
                                         if q + 1 != len(ks) and ks[q] + 1 != ks[q + 1]:

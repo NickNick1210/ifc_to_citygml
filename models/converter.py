@@ -2343,8 +2343,6 @@ class Converter(QgsTask):
                                     same = True
                                     break
 
-                print(openBounds)
-
                 # Öffnungen durch eine gesamte Fläche darstellen
                 # über alle Öffnungen der Wand iterieren
                 for j in range(0, len(wall[2])):
@@ -2377,6 +2375,7 @@ class Converter(QgsTask):
                             maxArea = area
                             maxGeom = ringOpen
 
+                    # Nebeneinander liegende Flächen verschneiden
                     planeOpen = UtilitiesGeom.getPlane(maxGeom.GetPoint(0), maxGeom.GetPoint(1), maxGeom.GetPoint(2))
                     sLines = []
                     for geom in openBounds[j]:
@@ -2386,23 +2385,21 @@ class Converter(QgsTask):
                         sLines.append(sLine)
                     sPts = [[] for x in range(len(openBounds[j]))]
                     for n in range(0, len(sLines)):
-                        if n != len(sLines) - 1:
-                            sPt = sLines[n].intersection(sLines[n+1])
-                            if len(sPt) != 0 and minZG - 0.1 < float(sPt[0][2]) < maxZG + 0.1:
-                                sPts[n].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
-                                sPts[n+1].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
-                        else:
-                            sPt = sLines[n].intersection(sLines[0])
-                            if len(sPt) != 0 and minZG - 0.1 < float(sPt[0][2]) < maxZG + 0.1:
-                                sPts[n].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
-                                sPts[0].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
+                        o = 0 if n == len(sLines) - 1 else n+1
+                        sPt = sLines[n].intersection(sLines[o])
+                        if len(sPt) != 0 and minZG - 0.1 < float(sPt[0][2]) < maxZG + 0.1:
+                            sPts[n].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
+                            sPts[o].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
 
-                    print("sPts: " + str(sPts))
-                    openPts = []
+                    # Schnittpunkte auswerten und in neue Geometrie als Eckpunkte setzen
+                    newGeomOpen = ogr.Geometry(ogr.wkbPolygon)
+                    newGeomRing = ogr.Geometry(ogr.wkbLinearRing)
                     for o in range(0, len(sPts)):
+
+                        # Wenn nur 1 Schnittpunkt beim Wandstück
                         if len(sPts[o]) == 1:
                             if o != 0:
-                                openPts.append(sPts[o][0])
+                                newGeomRing.AddPoint(sPts[o][0][0], sPts[o][0][1], sPts[o][0][2])
                             geom = openBounds[j][o]
                             ring = geom.GetGeometryRef(0)
                             minZ, maxZ = sys.maxsize, -sys.maxsize
@@ -2412,26 +2409,18 @@ class Converter(QgsTask):
                                 if ring.GetPoint(p)[2] > maxZ:
                                     maxZ = ring.GetPoint(p)[2]
                             if sPts[o][0][2] == minZ:
-                                newPt = [sPts[o][0][0], sPts[o][0][1], maxZ]
-                                openPts.append(newPt)
+                                newGeomRing.AddPoint(sPts[o][0][0], sPts[o][0][1], maxZ)
                             elif sPts[o][0][2] == maxZ:
-                                newPt = [sPts[o][0][0], sPts[o][0][1], minZ]
-                                openPts.append(newPt)
+                                newGeomRing.AddPoint(sPts[o][0][0], sPts[o][0][1], minZ)
+
+                        # Wenn zwei Schnittpunkte beim Wandstück
                         elif len(sPts[o]) > 1:
-                            if o == 0:
-                                openPts.append(sPts[o][1])
-                            else:
-                                openPts.append(sPts[o][0])
+                            nr = 1 if o == 0 else 0
+                            newGeomRing.AddPoint(sPts[o][nr][0], sPts[o][nr][1], sPts[o][nr][2])
 
-                    print("openPts: " + str(openPts))
-
-                    newGeomOpen = ogr.Geometry(ogr.wkbPolygon)
-                    newGeomRing = ogr.Geometry(ogr.wkbLinearRing)
-                    for pt in openPts:
-                        newGeomRing.AddPoint(pt[0], pt[1], pt[2])
+                    # Geometrie abschließen und setzen
                     newGeomRing.CloseRings()
                     newGeomOpen.AddGeometry(newGeomRing)
-
                     opening[0] = [newGeomOpen]
 
                 # TODO: Diese Opening-Flächen kürzen

@@ -2276,7 +2276,8 @@ class Converter(QgsTask):
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
             if len(wall[2]) != 0:
                 openBounds = [[] for x in range(len(wall[2]))]
-                for wallGeom in wall[0]:
+                for h in range(0, len(wall[0])):
+                    wallGeom = wall[0][h]
                     if wallGeom in finalWall:
                         continue
                     same = False
@@ -2334,11 +2335,8 @@ class Converter(QgsTask):
                                             maxWidthOpen = width
 
                                 # Übereinstimmung in Höhe und Breite prüfen
-                                # if (minZWall - 0.01 < minZOpen < minZWall + 0.01 and
-                                #    maxZWall - 0.01 < maxZOpen < maxZWall + 0.01) or (
-                                #        maxWidthWall - 0.01 < maxWidthOpen < maxWidthWall + 0.01):
                                 if minZWall > minZOpen - 0.01 and maxZWall < maxZOpen + 0.01 and maxWidthWall < maxWidthOpen + 0.01:
-                                    openBounds[i].append(wallGeom)
+                                    openBounds[i].append([len(finalWall), wallGeom])
                                     finalWall.append(wallGeom)
                                     same = True
                                     break
@@ -2378,14 +2376,15 @@ class Converter(QgsTask):
                     # Nebeneinander liegende Flächen verschneiden
                     planeOpen = UtilitiesGeom.getPlane(maxGeom.GetPoint(0), maxGeom.GetPoint(1), maxGeom.GetPoint(2))
                     sLines = []
-                    for geom in openBounds[j]:
+                    for openBound in openBounds[j]:
+                        geom = openBound[1]
                         ring = geom.GetGeometryRef(0)
                         plane = UtilitiesGeom.getPlane(ring.GetPoint(0), ring.GetPoint(1), ring.GetPoint(2))
                         sLine = planeOpen.intersection(plane)[0]
                         sLines.append(sLine)
                     sPts = [[] for x in range(len(openBounds[j]))]
                     for n in range(0, len(sLines)):
-                        o = 0 if n == len(sLines) - 1 else n+1
+                        o = 0 if n == len(sLines) - 1 else n + 1
                         sPt = sLines[n].intersection(sLines[o])
                         if len(sPt) != 0 and minZG - 0.1 < float(sPt[0][2]) < maxZG + 0.1:
                             sPts[n].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
@@ -2396,11 +2395,16 @@ class Converter(QgsTask):
                     newGeomRing = ogr.Geometry(ogr.wkbLinearRing)
                     for o in range(0, len(sPts)):
 
+                        # Wenn zwei Schnittpunkte beim Wandstück
+                        if len(sPts[o]) > 1:
+                            nr = 1 if o == 0 else 0
+                            newGeomRing.AddPoint(sPts[o][nr][0], sPts[o][nr][1], sPts[o][nr][2])
+
                         # Wenn nur 1 Schnittpunkt beim Wandstück
-                        if len(sPts[o]) == 1:
+                        elif len(sPts[o]) == 1:
                             if o != 0:
                                 newGeomRing.AddPoint(sPts[o][0][0], sPts[o][0][1], sPts[o][0][2])
-                            geom = openBounds[j][o]
+                            geom = openBounds[j][o][1]
                             ring = geom.GetGeometryRef(0)
                             minZ, maxZ = sys.maxsize, -sys.maxsize
                             for p in range(0, ring.GetPointCount()):
@@ -2409,19 +2413,90 @@ class Converter(QgsTask):
                                 if ring.GetPoint(p)[2] > maxZ:
                                     maxZ = ring.GetPoint(p)[2]
                             if sPts[o][0][2] == minZ:
+                                sPts[o].append([sPts[o][0][0], sPts[o][0][1], maxZ])
                                 newGeomRing.AddPoint(sPts[o][0][0], sPts[o][0][1], maxZ)
                             elif sPts[o][0][2] == maxZ:
+                                sPts[o].append([sPts[o][0][0], sPts[o][0][1], minZ])
                                 newGeomRing.AddPoint(sPts[o][0][0], sPts[o][0][1], minZ)
-
-                        # Wenn zwei Schnittpunkte beim Wandstück
-                        elif len(sPts[o]) > 1:
-                            nr = 1 if o == 0 else 0
-                            newGeomRing.AddPoint(sPts[o][nr][0], sPts[o][nr][1], sPts[o][nr][2])
 
                     # Geometrie abschließen und setzen
                     newGeomRing.CloseRings()
                     newGeomOpen.AddGeometry(newGeomRing)
                     opening[0] = [newGeomOpen]
+
+                    # Wandflächen kürzen
+                    for q in range(0, len(sPts)):
+                        wallNr, geom = openBounds[j][q][0], openBounds[j][q][1]
+                        ring = geom.GetGeometryRef(0)
+
+                        newGeomWall1, newRingWall1 = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
+                        newGeomWall2, newRingWall2 = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
+
+                        swap = False
+                        for r in range(0, ring.GetPointCount()):
+                            ptSt = ring.GetPoint(r)
+                            nr = 0 if r == ring.GetPointCount() - 1 else r + 1
+                            ptEnd = ring.GetPoint(nr)
+
+                            if swap:
+                                newRingWall2.AddPoint(ptSt[0], ptSt[1], ptSt[2])
+                            else:
+                                newRingWall1.AddPoint(ptSt[0], ptSt[1], ptSt[2])
+
+                            for s in range(0, len(sPts[q])):
+                                ptMid = sPts[q][s]
+
+                                # Parallelität der Linien von Start- zu Mittelpunkt und Mittel- zu Endpunkt prüfen
+                                tol = 0.01
+                                # Y-Steigung in Bezug auf X-Verlauf
+                                gradYSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[1] - ptSt[1]) / abs(
+                                    ptMid[0] - ptSt[0])
+                                gradYEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[1] - ptMid[1]) / abs(
+                                    ptEnd[0] - ptMid[0])
+                                if gradYSt - tol < gradYEnd < gradYSt + tol:
+                                    # Z-Steigung in Bezug auf X-Verlauf
+                                    gradZSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[2] - ptSt[2]) / abs(
+                                        ptMid[0] - ptSt[0])
+                                    gradZEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[2] - ptMid[2]) / abs(
+                                        ptEnd[0] - ptMid[0])
+                                    if gradZSt - tol < gradZEnd < gradZSt + tol:
+                                        # Z-Steigung in Bezug auf Y-Verlauf
+                                        gradYZSt = -1 if ptMid[1] - ptSt[1] == 0 else (ptMid[2] - ptSt[2]) / abs(
+                                            ptMid[1] - ptSt[1])
+                                        gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(
+                                            ptEnd[1] - ptMid[1])
+                                        if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
+                                            newRingWall1.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+                                            newRingWall2.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+                                            swap = not swap
+                                            break
+
+                        # Geometrien abschließen
+                        newRingWall1.CloseRings()
+                        newGeomWall1.AddGeometry(newRingWall1)
+                        newRingWall2.CloseRings()
+                        newGeomWall2.AddGeometry(newRingWall2)
+
+                        print("Vorher: " + str(geom))
+                        print("Nachher: " + str(newGeomWall1))
+                        print("Nachher: " + str(newGeomWall2))
+
+                        minDist1, minDist2 = sys.maxsize, sys.maxsize
+                        ring = finalWall[0].GetGeometryRef(0)
+                        for t in range(0, ring.GetPointCount()):
+                            ptRef = ring.GetPoint(t)
+                            for u in range(0, newRingWall1.GetPointCount()):
+                                ptNew = newRingWall1.GetPoint(u)
+                                dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (ptRef[2] - ptNew[2]) ** 2)
+                                if dist < minDist1:
+                                    minDist1 = dist
+                            for u in range(0, newRingWall2.GetPointCount()):
+                                ptNew = newRingWall1.GetPoint(u)
+                                dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (ptRef[2] - ptNew[2]) ** 2)
+                                if dist < minDist2:
+                                    minDist2 = dist
+
+                        finalWall[wallNr] = newGeomWall1 if minDist1 < minDist2 else newGeomWall2
 
                 # TODO: Diese Opening-Flächen kürzen
                 # Zugehörige Opening suchen

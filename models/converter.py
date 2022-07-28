@@ -2511,16 +2511,49 @@ class Converter(QgsTask):
             wall[0] = finalWall
         return walls
 
-
     def adjustWallSize(self, walls, bases, roofs):
+
+        # TODO: Wände an Ground und Roof anschließen
+        # siehe LoD2
+        # Prüfung auf Schnitt mit allen Bases und Roofs
+        # Ebenenschnitt berechnen, um Höhe zu erhalten
+        # Um diese Höhe erhöhen, bzw. erniedrigen
 
         for i in range(0, len(walls)):
             wallGeom = walls[i][0][0]
+            wallRing = wallGeom.GetGeometryRef(0)
 
-            # TODO: Wände an Ground und Roof anschließen
-            # siehe LoD2
-            # Prüfung auf Schnitt mit allen Bases und Roofs
-            # Ebenenschnitt berechnen, um Höhe zu erhalten
-            # Um diese Höhe erhöhen, bzw. erniedrigen
+            # tiefste Höhe heraussuchen
+            minZ = sys.maxsize
+            for j in range(0, wallRing.GetPointCount()):
+                pt = wallRing.GetPoint(j)
+                if pt[2] < minZ:
+                    minZ = pt[2]
 
+            wallGeomTemp, wallRingTemp = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
+            for j in range(0, wallRing.GetPointCount()):
+                pt = wallRing.GetPoint(j)
+
+                if pt[2] < minZ + 0.01:
+                    wallRingTemp.AddPoint(pt[0], pt[1], pt[2]-1)
+                else:
+                    wallRingTemp.AddPoint(pt[0], pt[1], pt[2] + 1)
+
+            wallRingTemp.CloseRings()
+            wallGeomTemp.AddGeometry(wallRingTemp)
+            for j in range(1, wallGeom.GetGeometryCount()):
+                wallGeomTemp.AddGeometry(wallGeom.GetGeometryRef(j))
+
+            for j in range(0, len(bases)):
+                baseGeom = bases[j][0][0]
+                baseRing = baseGeom.GetGeometryRef(0)
+                baseHeight = baseRing.GetPoint(0)[2]
+
+                intersect = wallGeom.Intersection(baseGeom)
+                if not intersect.IsEmpty():
+                    print("Vorher: " + str(intersect))
+                    intersect = UtilitiesGeom.simplify(intersect, 0, 0)
+                    print("Nachher: " + str(intersect))
+
+            walls[i][0][0] = wallGeomTemp
         return walls

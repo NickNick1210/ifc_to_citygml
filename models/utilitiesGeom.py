@@ -149,16 +149,18 @@ class UtilitiesGeom:
         Returns:
             Die vereinfachte Geometrie, einzeln oder als Liste, oder None falls ungültig
         """
-        supported = ["POLYGON", "LINESTRING"]
+        supported = ["POLYGON", "LINESTRING", "MULTILINESTRING"]
         geomList = geom if isinstance(geom, list) else [geom]
         simpList = []
 
         for geom in geomList:
 
-            # Wenn nicht unterstützt: Direkt zurückgeben
+            # UNGÜLTIG #
             if geom is None or geom.IsEmpty() or geom.GetGeometryName() not in supported:
                 return geom
-            else:
+
+            # POLYGON oder LINESTRING #
+            elif geom.GetGeometryName() == "POLYGON" or geom.GetGeometryName() == "LINESTRING":
                 # Auslesen der Geometrie und Erstellen der neuen Geometrie
                 if geom.GetGeometryName() == "POLYGON":
                     geomNew = ogr.Geometry(ogr.wkbPolygon)
@@ -228,6 +230,48 @@ class UtilitiesGeom:
 
                 # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
                 elif ringTest.GetPointCount() < count:
+                    simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol))
+
+                # Wenn fertig: Zurückgeben
+                else:
+                    simpList.append(geomNew)
+
+            # MULTILINESTRING #
+            else:
+                count = geom.GetGeometryCount()
+                geomNew = ogr.Geometry(ogr.wkbMultiLineString)
+                skip = False
+                for i in range(0, geom.GetGeometryCount()):
+                    if skip:
+                        continue
+                    line = geom.GetGeometryRef(i)
+                    if i != geom.GetGeometryCount() - 1 and line.GetPoint(
+                            line.GetPointCount() - 1) == geom.GetGeometryRef(i + 1).GetPoint(0):
+                        lineNext = geom.GetGeometryRef(i + 1)
+                        lineNew = ogr.Geometry(ogr.wkbLineString)
+                        for j in range(0, line.GetPointCount()):
+                            lineNew.AddPoint(line.GetPoint(j)[0], line.GetPoint(j)[1], line.GetPoint(j)[2])
+                        for j in range(1, lineNext.GetPointCount()):
+                            lineNew.AddPoint(lineNext.GetPoint(j)[0], lineNext.GetPoint(j)[1], lineNext.GetPoint(j)[2])
+                        skip = True
+                        geomNew.AddGeometry(lineNew)
+                    else:
+                        lineNew = ogr.Geometry(ogr.wkbLineString)
+                        for j in range(0, line.GetPointCount()):
+                            lineNew.AddPoint(line.GetPoint(j)[0], line.GetPoint(j)[1], line.GetPoint(j)[2])
+                        skip = False
+                        geomNew.AddGeometry(lineNew)
+
+                # Wenn MultiLineString weniger als vier Eckpunkte hat: Eigentlich ein LineString
+                if geomNew.GetGeometryCount() == 1:
+                    geomLine = geomNew.GetGeometryRef(0)
+                    geomNewLine = ogr.Geometry(ogr.wkbLineString)
+                    for j in range(0, geomLine.GetPointCount()):
+                        geomNewLine.AddPoint(geomLine.GetPoint(0)[0], geomLine.GetPoint(0)[1], geomLine.GetPoint(0)[2])
+                    simpList.append(geomNewLine)
+
+                # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
+                elif geomNew.GetGeometryCount() < count:
                     simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol))
 
                 # Wenn fertig: Zurückgeben

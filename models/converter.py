@@ -1757,7 +1757,8 @@ class Converter(QgsTask):
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
-        walls = self.adjustWalls(walls)
+        walls = self.adjustWallOpenings(walls)
+        walls = self.adjustWallSize(walls, bases, roofs)
 
         # Geometrie
         links = []
@@ -2246,7 +2247,7 @@ class Converter(QgsTask):
         return roofs, walls
 
     # noinspection PyMethodMayBeStatic
-    def adjustWalls(self, walls):
+    def adjustWallOpenings(self, walls):
         """ Anpassen der Wände auf Grundlage der Dächer, Grundflächen und Öffnungen in Level of Detail (LoD) 3
 
         Args:
@@ -2437,14 +2438,24 @@ class Converter(QgsTask):
                             ptSt = ring.GetPoint(r)
                             nr = 0 if r == ring.GetPointCount() - 1 else r + 1
                             ptEnd = ring.GetPoint(nr)
-
                             if swap:
                                 newRingWall2.AddPoint(ptSt[0], ptSt[1], ptSt[2])
                             else:
                                 newRingWall1.AddPoint(ptSt[0], ptSt[1], ptSt[2])
-
                             for s in range(0, len(sPts[q])):
                                 ptMid = sPts[q][s]
+
+                                # Auf Punkt-Gleichheit prüfen
+                                tol = 0.001
+                                if (ptSt[0] - tol < ptMid[0] < ptSt[0] + tol) and (
+                                        ptSt[1] - tol < ptMid[1] < ptSt[1] + tol) and (
+                                        ptSt[2] - tol < ptMid[2] < ptSt[2] + tol):
+                                    if swap:
+                                        newRingWall1.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+                                    else:
+                                        newRingWall2.AddPoint(ptMid[0], ptMid[1], ptMid[2])
+                                    swap = not swap
+                                    break
 
                                 # Parallelität der Linien von Start- zu Mittelpunkt und Mittel- zu Endpunkt prüfen
                                 tol = 0.01
@@ -2477,37 +2488,39 @@ class Converter(QgsTask):
                         newRingWall2.CloseRings()
                         newGeomWall2.AddGeometry(newRingWall2)
 
-                        print("Vorher: " + str(geom))
-                        print("Nachher: " + str(newGeomWall1))
-                        print("Nachher: " + str(newGeomWall2))
-
+                        # Prüfen, welche Hälfte zu nutzen ist: Näher an Hauptwand
                         minDist1, minDist2 = sys.maxsize, sys.maxsize
                         ring = finalWall[0].GetGeometryRef(0)
                         for t in range(0, ring.GetPointCount()):
                             ptRef = ring.GetPoint(t)
                             for u in range(0, newRingWall1.GetPointCount()):
                                 ptNew = newRingWall1.GetPoint(u)
-                                dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (ptRef[2] - ptNew[2]) ** 2)
+                                dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (
+                                            ptRef[2] - ptNew[2]) ** 2)
                                 if dist < minDist1:
                                     minDist1 = dist
                             for u in range(0, newRingWall2.GetPointCount()):
-                                ptNew = newRingWall1.GetPoint(u)
-                                dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (ptRef[2] - ptNew[2]) ** 2)
+                                ptNew = newRingWall2.GetPoint(u)
+                                dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (
+                                            ptRef[2] - ptNew[2]) ** 2)
                                 if dist < minDist2:
                                     minDist2 = dist
 
                         finalWall[wallNr] = newGeomWall1 if minDist1 < minDist2 else newGeomWall2
 
-                # TODO: Diese Opening-Flächen kürzen
-                # Zugehörige Opening suchen
-                # Schnitt suchen (Intersect)
-                # Außenhälfte übernehmen (Angrenzend an Wand[0])
-
-                # TODO: Wände an Ground und Roof anschließen
-                # siehe LoD2
-                # Prüfung auf Schnitt mit allen Bases und Roofs
-                # Ebenenschnitt berechnen, um Höhe zu erhalten
-                # Um diese Höhe erhöhen, bzw. erniedrigen
-
             wall[0] = finalWall
+        return walls
+
+
+    def adjustWallSize(self, walls, bases, roofs):
+
+        for i in range(0, len(walls)):
+            wallGeom = walls[i][0][0]
+
+            # TODO: Wände an Ground und Roof anschließen
+            # siehe LoD2
+            # Prüfung auf Schnitt mit allen Bases und Roofs
+            # Ebenenschnitt berechnen, um Höhe zu erhalten
+            # Um diese Höhe erhöhen, bzw. erniedrigen
+
         return walls

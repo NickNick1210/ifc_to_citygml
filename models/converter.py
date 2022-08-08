@@ -1751,14 +1751,14 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
         """
         # Berechnung
-        bases = self.calcLoD3Bases(ifcBuilding)
-        roofs = self.calcLoD3Roofs(ifcBuilding)
+        bases, basesOrig = self.calcLoD3Bases(ifcBuilding)
+        roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
         walls = self.adjustWallOpenings(walls)
-        walls = self.adjustWallSize(walls, bases, roofs)
+        walls = self.adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig)
 
         # Geometrie
         links = []
@@ -1855,8 +1855,7 @@ class Converter(QgsTask):
         Returns:
             Die berechneten Grundflächen-Geometrien als Liste
         """
-        bases = []
-        baseNames = []
+        bases, baseNames, basesOrig = [], [], []
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -1936,8 +1935,9 @@ class Converter(QgsTask):
                     finalSlab.append(slabGeom[j])
 
             bases.append([finalSlab, baseNames[i], []])
+            basesOrig.append(slabGeom)
 
-        return bases
+        return bases, basesOrig
 
     # noinspection PyMethodMayBeStatic
     def calcLoD3Roofs(self, ifcBuilding):
@@ -1949,8 +1949,7 @@ class Converter(QgsTask):
         Returns:
             Die berechneten Dächer als Liste
         """
-        roofs = []
-        roofNames = []
+        roofs, roofNames, roofsOrig = [], [], []
 
         # IFC-Elemente des Daches
         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
@@ -2029,8 +2028,9 @@ class Converter(QgsTask):
                     finalRoof.append(roofGeom[j])
 
             roofs.append([finalRoof, roofNames[i], []])
+            roofsOrig.append(roofGeom)
 
-        return roofs
+        return roofs, roofsOrig
 
     # noinspection PyMethodMayBeStatic
     def calcLoD3Walls(self, ifcBuilding):
@@ -2511,7 +2511,7 @@ class Converter(QgsTask):
             wall[0] = finalWall
         return walls
 
-    def adjustWallSize(self, walls, bases, roofs):
+    def adjustWallSize(self, walls, bases, roofs, basesOrig, roofsOrig):
 
         # TODO: Wände an Ground und Roof anschließen
         # siehe LoD2
@@ -2533,27 +2533,84 @@ class Converter(QgsTask):
             wallGeomTemp, wallRingTemp = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
             for j in range(0, wallRing.GetPointCount()):
                 pt = wallRing.GetPoint(j)
+                ptGeom = ogr.Geometry(ogr.wkbPoint)
+                ptGeom.AddPoint(pt[0], pt[1], pt[2])
+                #ptGeom.AddPoint(pt[0], pt[1], pt[2]+100)
 
-                if pt[2] < minZ + 0.01:
-                    wallRingTemp.AddPoint(pt[0], pt[1], pt[2]-1)
+                baseFound = False
+                for k in range(0, len(basesOrig)):
+                    baseOrig = basesOrig[k]
+                    for m in range(0, len(baseOrig)):
+                        baseOrigGeom = baseOrig[m]
+                        baseOrigRing = baseOrigGeom.GetGeometryRef(0)
+                        for n in range(0, baseOrigRing.GetPointCount()):
+                            ptBase = baseOrigRing.GetPoint(n)
+                            if ptBase == pt:
+                                baseGeom = bases[k][0][0]
+                                baseRing = baseGeom.GetGeometryRef(0)
+                                baseHeight = baseRing.GetPoint(0)[2]
+                                baseFound = True
+                                break
+                        if baseFound:
+                            break
+                    if baseFound:
+                        break
+
+                roofFound = False
+                for k in range(0, len(roofsOrig)):
+                    roofOrig = roofsOrig[k]
+                    for m in range(0, len(roofOrig)):
+                        roofOrigGeom = roofOrig[m]
+                        roofOrigRing = roofOrigGeom.GetGeometryRef(0)
+
+                        for n in range(0, roofOrigRing.GetPointCount()):
+                            ptRoof = roofOrigRing.GetPoint(n)
+                            if ptRoof == pt:
+                                roofGeom = roofs[k][0][0]
+                                roofRing = roofGeom.GetGeometryRef(0)
+                                roofHeight = roofRing.GetPoint(0)[2]
+                                roofFound = True
+                                break
+
+                        if roofFound:
+                            break
+
+                        intersect = roofOrigGeom.Intersection(ptGeom)
+                        if intersect is not None and not intersect.IsEmpty():
+                            print("Intersect!")
+                            print(intersect)
+                            roofGeom = roofs[k][0][0]
+
+                            # TODO
+                            # Ebene: roofOrigGeom
+                            # Linie: pt mit pt+100
+                            # Schnitt
+                            # Höhe mit pt[2] abgleichen: Wenn nah, dann weiter
+
+                            # Ebene: roofGeom
+                            # Linie: pt mit pt+100
+                            # Schnitt
+                            # Höhe als neue Höhe nehmen (roofHeight)
+
+                            # Gleiches auch bei Base
+
+                            roofFound = True
+                            break
+
+                    if roofFound:
+                        break
+
+                if baseFound:
+                    wallRingTemp.AddPoint(pt[0], pt[1], baseHeight)
+                elif roofFound:
+                    wallRingTemp.AddPoint(pt[0], pt[1], roofHeight)
                 else:
-                    wallRingTemp.AddPoint(pt[0], pt[1], pt[2] + 1)
+                    wallRingTemp.AddPoint(pt[0], pt[1], pt[2])
 
             wallRingTemp.CloseRings()
             wallGeomTemp.AddGeometry(wallRingTemp)
             for j in range(1, wallGeom.GetGeometryCount()):
                 wallGeomTemp.AddGeometry(wallGeom.GetGeometryRef(j))
-
-            for j in range(0, len(bases)):
-                baseGeom = bases[j][0][0]
-                baseRing = baseGeom.GetGeometryRef(0)
-                baseHeight = baseRing.GetPoint(0)[2]
-
-                intersect = wallGeom.Intersection(baseGeom)
-                if not intersect.IsEmpty():
-                    print("Vorher: " + str(intersect))
-                    intersect = UtilitiesGeom.simplify(intersect, 0, 0)
-                    print("Nachher: " + str(intersect))
 
             walls[i][0][0] = wallGeomTemp
         return walls

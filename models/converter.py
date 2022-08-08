@@ -1755,7 +1755,7 @@ class Converter(QgsTask):
         roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        # openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
         walls = self.adjustWallOpenings(walls)
         walls = self.adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig)
@@ -2511,32 +2511,35 @@ class Converter(QgsTask):
             wall[0] = finalWall
         return walls
 
+    # noinspection PyMethodMayBeStatic
     def adjustWallSize(self, walls, bases, roofs, basesOrig, roofsOrig):
+        """ Anpassen der Wände in Bezug auf die veränderten Grundflächen und Dächer in Level of Detail (LoD) 3
 
-        # TODO: Wände an Ground und Roof anschließen
-        # siehe LoD2
-        # Prüfung auf Schnitt mit allen Bases und Roofs
-        # Ebenenschnitt berechnen, um Höhe zu erhalten
-        # Um diese Höhe erhöhen, bzw. erniedrigen
+        Args:
+            walls: Die anzupassenden Wände als Liste
+            bases: Die Grundflächen, an die die Wände angepasst werden sollen, als Liste
+            roofs: Die Dächer, an die die Wände angepasst werden sollen, als Liste
+            basesOrig: Die originalen Grundflächen als Liste
+            roofsOrig: Die originalen Dächer als Liste
 
+        Returns:
+            Die angepassten Wände als Liste
+        """
+
+        # Alle Wände durchgehen
         for i in range(0, len(walls)):
             wallGeom = walls[i][0][0]
             wallRing = wallGeom.GetGeometryRef(0)
-
-            # tiefste Höhe heraussuchen
-            minZ = sys.maxsize
-            for j in range(0, wallRing.GetPointCount()):
-                pt = wallRing.GetPoint(j)
-                if pt[2] < minZ:
-                    minZ = pt[2]
-
             wallGeomTemp, wallRingTemp = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
-            wallHoles, inHole = [], False
-            newWalls = []
+            wallHoles, inHole, newWalls = [], False, []
+
+            # Alle Eckpunkte der Wände durchgehen
             for j in range(0, wallRing.GetPointCount()):
                 pt = wallRing.GetPoint(j)
-                ptPolGeom = ogr.Geometry(ogr.wkbPolygon)
-                ptPolRing = ogr.Geometry(ogr.wkbLinearRing)
+
+                # HÖHE #
+                # Gebufferte Punktgeometrie
+                ptPolGeom, ptPolRing = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
                 ptPolRing.AddPoint(pt[0] - 0.001, pt[1] - 0.001, pt[2])
                 ptPolRing.AddPoint(pt[0] - 0.001, pt[1] + 0.001, pt[2])
                 ptPolRing.AddPoint(pt[0] + 0.001, pt[1] + 0.001, pt[2])
@@ -2544,93 +2547,49 @@ class Converter(QgsTask):
                 ptPolRing.CloseRings()
                 ptPolGeom.AddGeometry(ptPolRing)
 
-                baseFound = False
-                for k in range(0, len(basesOrig)):
-                    baseOrig = basesOrig[k]
-                    for m in range(0, len(baseOrig)):
-                        baseOrigGeom = baseOrig[m]
-                        baseOrigRing = baseOrigGeom.GetGeometryRef(0)
-                        for n in range(0, baseOrigRing.GetPointCount()):
-                            ptBase = baseOrigRing.GetPoint(n)
-                            if ptBase == pt:
-                                baseGeom = bases[k][0][0]
-                                baseRing = baseGeom.GetGeometryRef(0)
-                                baseHeight = baseRing.GetPoint(0)[2]
-                                baseFound = True
-                                break
-                        if baseFound:
-                            break
+                # Mit allen originalen Grundflächen und Dächern abgleichen
+                found = False
+                origs = basesOrig + roofsOrig
+                anzBases = len(basesOrig)
+                for k in range(0, len(origs)):
+                    for m in range(0, len(origs[k])):
+                        origGeom = origs[k][m]
+                        origRing = origGeom.GetGeometryRef(0)
+                        geom = roofs[k - anzBases][0][0] if k >= anzBases else bases[k][0][0]
+                        ring = geom.GetGeometryRef(0)
 
-                        intersect = baseOrigGeom.Intersection(ptPolGeom)
-                        if intersect is not None and not intersect.IsEmpty():
-                            baseGeom = bases[k][0][0]
-                            baseRing = baseGeom.GetGeometryRef(0)
-
-                            baseOrigPlane = UtilitiesGeom.getPlane(baseOrigRing.GetPoint(0), baseOrigRing.GetPoint(1),
-                                                                   baseOrigRing.GetPoint(2))
-                            ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100), Point3D(pt[0], pt[1], pt[2] + 100))
-                            sRes = baseOrigPlane.intersection(ptLine)
-
-                            if len(sRes) != 0 and isinstance(sRes[0], sympy.geometry.point.Point3D):
-                                sZ = float(sRes[0][2])
-                                if sZ - 0.01 < pt[2] < sZ + 0.01:
-                                    print(str(sZ) + " zu " + str(pt[2]))
-                                    basePlane = UtilitiesGeom.getPlane(baseRing.GetPoint(0), baseRing.GetPoint(1),
-                                                                       baseRing.GetPoint(2))
-                                    sPoint = basePlane.intersection(ptLine)[0]
-                                    baseHeight = float(sPoint[2])
-                                    print("baseHeight: " + str(baseHeight))
-                                    baseFound = True
-                                    break
-
-                    if baseFound:
-                        break
-
-                roofFound = False
-                for k in range(0, len(roofsOrig)):
-                    roofOrig = roofsOrig[k]
-                    for m in range(0, len(roofOrig)):
-                        roofOrigGeom = roofOrig[m]
-                        roofOrigRing = roofOrigGeom.GetGeometryRef(0)
-
-                        for n in range(0, roofOrigRing.GetPointCount()):
-                            ptRoof = roofOrigRing.GetPoint(n)
-                            if ptRoof == pt:
-                                roofGeom = roofs[k][0][0]
-                                roofRing = roofGeom.GetGeometryRef(0)
-                                roofHeight = roofRing.GetPoint(0)[2]
-                                roofFound = True
+                        # Prüfen, ob Wandpunkt gleich zu Punkt von Grundfläche/Dach
+                        for n in range(0, origRing.GetPointCount()):
+                            if origRing.GetPoint(n) == pt:
+                                # Bestimmen der neuen Höhe des Wandpunkts
+                                height = ring.GetPoint(0)[2]
+                                found = True
                                 break
 
-                        if roofFound:
-                            break
-
-                        intersect = roofOrigGeom.Intersection(ptPolGeom)
-                        if intersect is not None and not intersect.IsEmpty():
-                            roofGeom = roofs[k][0][0]
-                            roofRing = roofGeom.GetGeometryRef(0)
-
-                            roofOrigPlane = UtilitiesGeom.getPlane(roofOrigRing.GetPoint(0), roofOrigRing.GetPoint(1),
-                                                                   roofOrigRing.GetPoint(2))
-                            ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100), Point3D(pt[0], pt[1], pt[2] + 100))
-                            sRes = roofOrigPlane.intersection(ptLine)
-
-                            if len(sRes) != 0 and isinstance(sRes[0], sympy.geometry.point.Point3D):
-                                sZ = float(sRes[0][2])
-
-                                if sZ - 0.01 < pt[2] < sZ + 0.01:
-                                    print(str(sZ) + " zu " + str(pt[2]))
-                                    roofPlane = UtilitiesGeom.getPlane(roofRing.GetPoint(0), roofRing.GetPoint(1),
-                                                                       roofRing.GetPoint(2))
-                                    sPoint = roofPlane.intersection(ptLine)[0]
-                                    roofHeight = float(sPoint[2])
-                                    print("roofHeight: " + str(roofHeight))
-                                    roofFound = True
-                                    break
-
-                    if roofFound:
+                        # Prüfen, ob Wandpunkt einen 2D-Schnitt mit Grundfläche/Dach bildet
+                        if not found:
+                            intersect = origGeom.Intersection(ptPolGeom)
+                            if intersect is not None and not intersect.IsEmpty():
+                                # Prüfen, ob die Wandhöhe und Höhe der originalen Grundfläche/Dach in etwa gleich ist
+                                origPlane = UtilitiesGeom.getPlane(origRing.GetPoint(0), origRing.GetPoint(1),
+                                                                   origRing.GetPoint(2))
+                                ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100), Point3D(pt[0], pt[1], pt[2] + 100))
+                                sRes = origPlane.intersection(ptLine)
+                                if len(sRes) != 0 and isinstance(sRes[0], sympy.geometry.point.Point3D):
+                                    sZ = float(sRes[0][2])
+                                    if sZ - 0.01 < pt[2] < sZ + 0.01:
+                                        # Bestimmen der neuen Höhe des Wandpunkts
+                                        plane = UtilitiesGeom.getPlane(ring.GetPoint(0), ring.GetPoint(1),
+                                                                       ring.GetPoint(2))
+                                        sPoint = plane.intersection(ptLine)[0]
+                                        height = float(sPoint[2])
+                                        found = True
+                                        break
+                    if found:
                         break
 
+                # ÖFFNUNGEN und GEOMETRIE #
+                # Über alle Nebenwände und dessen Eckpunkte gehen
                 opBound, pts = False, []
                 for m in range(1, len(walls[i][0])):
                     wallOpGeom = walls[i][0][m]
@@ -2639,19 +2598,21 @@ class Converter(QgsTask):
                         wallOpPt = wallOpRing.GetPoint(n)
                         if wallOpPt == pt:
                             if inHole:
-                                if n == 0:
-                                    lastPt = wallOpRing.GetPoint(wallOpRing.GetPointCount() - 2)
-                                else:
-                                    lastPt = wallOpRing.GetPoint(n-1)
+                                newN = wallOpRing.GetPointCount() - 2 if n == 0 else n-1
+                                lastPt = wallOpRing.GetPoint(newN)
                             else:
-                                nextPt = wallOpRing.GetPoint(n+1)
+                                nextPt = wallOpRing.GetPoint(n + 1)
                             opBound = True
                             break
                     if opBound:
                         break
+
+                # Wenn Wandpunkt gleich zu einem Nebenwandpunkt
                 if opBound:
+                    # Bereits Teil der Öffnung: Punkt merken
                     if inHole:
-                        wallHoles[len(wallHoles)-1].append(pt)
+                        wallHoles[len(wallHoles) - 1].append(pt)
+                    # Anfang einer Öffnung: Neue Nebenwand beginnen, Punkt merken und setzen
                     else:
                         inHole = True
                         newWallGeom = ogr.Geometry(ogr.wkbPolygon)
@@ -2659,19 +2620,17 @@ class Converter(QgsTask):
                         newWallRing.AddPoint(nextPt[0], nextPt[1], nextPt[2])
                         newWallRing.AddPoint(pt[0], pt[1], pt[2])
                         wallHoles.append([pt])
-                        if baseFound:
-                            wallRingTemp.AddPoint(pt[0], pt[1], baseHeight)
-                            lastHeight = baseHeight
-                        elif roofFound:
-                            wallRingTemp.AddPoint(pt[0], pt[1], roofHeight)
-                            lastHeight = roofHeight
-                        else:
-                            wallRingTemp.AddPoint(pt[0], pt[1], pt[2])
-                            lastHeight = pt[2]
+                        if not found:
+                            height = pt[2]
+                        wallRingTemp.AddPoint(pt[0], pt[1], height)
+                        lastHeight = height
+
+                # Wenn Wandpunkt gleich zu keinem Nebenwandpunkt
                 else:
+                    # Nach Öffnungsende: Neue Nebenwand schließen, letzten Punkt merken und setzen
                     if inHole:
                         inHole = False
-                        ptLast = wallRing.GetPoint(j-1)
+                        ptLast = wallRing.GetPoint(j - 1)
                         newWallRing.AddPoint(ptLast[0], ptLast[1], ptLast[2])
                         newWallRing.AddPoint(lastPt[0], lastPt[1], lastPt[2])
                         newWallRing.CloseRings()
@@ -2679,28 +2638,30 @@ class Converter(QgsTask):
                         newWalls.append(newWallGeom)
                         wallRingTemp.AddPoint(ptLast[0], ptLast[1], lastHeight)
 
-                    if baseFound:
-                        wallRingTemp.AddPoint(pt[0], pt[1], baseHeight)
-                    elif roofFound:
-                        wallRingTemp.AddPoint(pt[0], pt[1], roofHeight)
-                    else:
-                        wallRingTemp.AddPoint(pt[0], pt[1], pt[2])
+                    # Punkt setzen
+                    if not found:
+                        height = pt[2]
+                    wallRingTemp.AddPoint(pt[0], pt[1], height)
 
+            # Geometrie abschließen
             wallRingTemp.CloseRings()
             wallGeomTemp.AddGeometry(wallRingTemp)
 
+            # Alte Löcher übernehmen
             for j in range(1, wallGeom.GetGeometryCount()):
                 wallGeomTemp.AddGeometry(wallGeom.GetGeometryRef(j))
 
-            print(wallHoles)
+            # Neue Löcher hinzufügen
             for j in range(0, len(wallHoles)):
                 wallHole = ogr.Geometry(ogr.wkbLinearRing)
                 for k in range(0, len(wallHoles[j])):
                     wallHole.AddPoint(wallHoles[j][k][0], wallHoles[j][k][1], wallHoles[j][k][2])
+                wallHole.CloseRings()
                 wallGeomTemp.AddGeometry(wallHole)
 
-            walls[i][0][0] = wallGeomTemp
+            walls[i][0][0] = UtilitiesGeom.simplify(wallGeomTemp, 0.01, 0.01)
 
+            # Neue Nebenwand hinzufügen
             for newWall in newWalls:
                 walls[i][0].append(newWall)
 

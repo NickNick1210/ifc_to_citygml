@@ -140,9 +140,7 @@ class UtilitiesGeom:
         Args:
             geom: Die zu vereinfachende Geometrie, einzeln oder als Liste
             distTol: Die erlaubte Toleranz bei der Vereinfachung der Punktnähe (in Einheit der Geometrie)
-                default: 0.1
             angTol: Die erlaubte Toleranz bei der Vereinfachung von Punkten auf vorhandenen Linien
-                default: False
             zd: Ob nur zweidimensional vereinfacht werden soll
                 default: False
 

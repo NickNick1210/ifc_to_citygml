@@ -2531,10 +2531,10 @@ class Converter(QgsTask):
                     minZ = pt[2]
 
             wallGeomTemp, wallRingTemp = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
+            wallHoles, inHole = [], False
+            newWalls = []
             for j in range(0, wallRing.GetPointCount()):
                 pt = wallRing.GetPoint(j)
-                ptGeom = ogr.Geometry(ogr.wkbPoint)
-                ptGeom.AddPoint(pt[0], pt[1], pt[2])
                 ptPolGeom = ogr.Geometry(ogr.wkbPolygon)
                 ptPolRing = ogr.Geometry(ogr.wkbLinearRing)
                 ptPolRing.AddPoint(pt[0] - 0.001, pt[1] - 0.001, pt[2])
@@ -2631,17 +2631,77 @@ class Converter(QgsTask):
                     if roofFound:
                         break
 
-                if baseFound:
-                    wallRingTemp.AddPoint(pt[0], pt[1], baseHeight)
-                elif roofFound:
-                    wallRingTemp.AddPoint(pt[0], pt[1], roofHeight)
+                opBound, pts = False, []
+                for m in range(1, len(walls[i][0])):
+                    wallOpGeom = walls[i][0][m]
+                    wallOpRing = wallOpGeom.GetGeometryRef(0)
+                    for n in range(0, wallOpRing.GetPointCount()):
+                        wallOpPt = wallOpRing.GetPoint(n)
+                        if wallOpPt == pt:
+                            if inHole:
+                                if n == 0:
+                                    lastPt = wallOpRing.GetPoint(wallOpRing.GetPointCount() - 2)
+                                else:
+                                    lastPt = wallOpRing.GetPoint(n-1)
+                            else:
+                                nextPt = wallOpRing.GetPoint(n+1)
+                            opBound = True
+                            break
+                    if opBound:
+                        break
+                if opBound:
+                    if inHole:
+                        wallHoles[len(wallHoles)-1].append(pt)
+                    else:
+                        inHole = True
+                        newWallGeom = ogr.Geometry(ogr.wkbPolygon)
+                        newWallRing = ogr.Geometry(ogr.wkbLinearRing)
+                        newWallRing.AddPoint(nextPt[0], nextPt[1], nextPt[2])
+                        newWallRing.AddPoint(pt[0], pt[1], pt[2])
+                        wallHoles.append([pt])
+                        if baseFound:
+                            wallRingTemp.AddPoint(pt[0], pt[1], baseHeight)
+                            lastHeight = baseHeight
+                        elif roofFound:
+                            wallRingTemp.AddPoint(pt[0], pt[1], roofHeight)
+                            lastHeight = roofHeight
+                        else:
+                            wallRingTemp.AddPoint(pt[0], pt[1], pt[2])
+                            lastHeight = pt[2]
                 else:
-                    wallRingTemp.AddPoint(pt[0], pt[1], pt[2])
+                    if inHole:
+                        inHole = False
+                        ptLast = wallRing.GetPoint(j-1)
+                        newWallRing.AddPoint(ptLast[0], ptLast[1], ptLast[2])
+                        newWallRing.AddPoint(lastPt[0], lastPt[1], lastPt[2])
+                        newWallRing.CloseRings()
+                        newWallGeom.AddGeometry(newWallRing)
+                        newWalls.append(newWallGeom)
+                        wallRingTemp.AddPoint(ptLast[0], ptLast[1], lastHeight)
+
+                    if baseFound:
+                        wallRingTemp.AddPoint(pt[0], pt[1], baseHeight)
+                    elif roofFound:
+                        wallRingTemp.AddPoint(pt[0], pt[1], roofHeight)
+                    else:
+                        wallRingTemp.AddPoint(pt[0], pt[1], pt[2])
 
             wallRingTemp.CloseRings()
             wallGeomTemp.AddGeometry(wallRingTemp)
+
             for j in range(1, wallGeom.GetGeometryCount()):
                 wallGeomTemp.AddGeometry(wallGeom.GetGeometryRef(j))
 
+            print(wallHoles)
+            for j in range(0, len(wallHoles)):
+                wallHole = ogr.Geometry(ogr.wkbLinearRing)
+                for k in range(0, len(wallHoles[j])):
+                    wallHole.AddPoint(wallHoles[j][k][0], wallHoles[j][k][1], wallHoles[j][k][2])
+                wallGeomTemp.AddGeometry(wallHole)
+
             walls[i][0][0] = wallGeomTemp
+
+            for newWall in newWalls:
+                walls[i][0].append(newWall)
+
         return walls

@@ -1755,7 +1755,7 @@ class Converter(QgsTask):
         roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
         walls = self.calcLoD3Walls(ifcBuilding)
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        # openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         roofs, walls = self.assignOpenings(openings, roofs, walls)
         walls = self.adjustWallOpenings(walls)
         walls = self.adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig)
@@ -2496,13 +2496,13 @@ class Converter(QgsTask):
                             for u in range(0, newRingWall1.GetPointCount()):
                                 ptNew = newRingWall1.GetPoint(u)
                                 dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (
-                                            ptRef[2] - ptNew[2]) ** 2)
+                                        ptRef[2] - ptNew[2]) ** 2)
                                 if dist < minDist1:
                                     minDist1 = dist
                             for u in range(0, newRingWall2.GetPointCount()):
                                 ptNew = newRingWall2.GetPoint(u)
                                 dist = math.sqrt((ptRef[0] - ptNew[0]) ** 2 + (ptRef[1] - ptNew[1]) ** 2 + (
-                                            ptRef[2] - ptNew[2]) ** 2)
+                                        ptRef[2] - ptNew[2]) ** 2)
                                 if dist < minDist2:
                                     minDist2 = dist
 
@@ -2535,7 +2535,14 @@ class Converter(QgsTask):
                 pt = wallRing.GetPoint(j)
                 ptGeom = ogr.Geometry(ogr.wkbPoint)
                 ptGeom.AddPoint(pt[0], pt[1], pt[2])
-                #ptGeom.AddPoint(pt[0], pt[1], pt[2]+100)
+                ptPolGeom = ogr.Geometry(ogr.wkbPolygon)
+                ptPolRing = ogr.Geometry(ogr.wkbLinearRing)
+                ptPolRing.AddPoint(pt[0] - 0.001, pt[1] - 0.001, pt[2])
+                ptPolRing.AddPoint(pt[0] - 0.001, pt[1] + 0.001, pt[2])
+                ptPolRing.AddPoint(pt[0] + 0.001, pt[1] + 0.001, pt[2])
+                ptPolRing.AddPoint(pt[0] + 0.001, pt[1] - 0.001, pt[2])
+                ptPolRing.CloseRings()
+                ptPolGeom.AddGeometry(ptPolRing)
 
                 baseFound = False
                 for k in range(0, len(basesOrig)):
@@ -2553,6 +2560,29 @@ class Converter(QgsTask):
                                 break
                         if baseFound:
                             break
+
+                        intersect = baseOrigGeom.Intersection(ptPolGeom)
+                        if intersect is not None and not intersect.IsEmpty():
+                            baseGeom = bases[k][0][0]
+                            baseRing = baseGeom.GetGeometryRef(0)
+
+                            baseOrigPlane = UtilitiesGeom.getPlane(baseOrigRing.GetPoint(0), baseOrigRing.GetPoint(1),
+                                                                   baseOrigRing.GetPoint(2))
+                            ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100), Point3D(pt[0], pt[1], pt[2] + 100))
+                            sRes = baseOrigPlane.intersection(ptLine)
+
+                            if len(sRes) != 0 and isinstance(sRes[0], sympy.geometry.point.Point3D):
+                                sZ = float(sRes[0][2])
+                                if sZ - 0.01 < pt[2] < sZ + 0.01:
+                                    print(str(sZ) + " zu " + str(pt[2]))
+                                    basePlane = UtilitiesGeom.getPlane(baseRing.GetPoint(0), baseRing.GetPoint(1),
+                                                                       baseRing.GetPoint(2))
+                                    sPoint = basePlane.intersection(ptLine)[0]
+                                    baseHeight = float(sPoint[2])
+                                    print("baseHeight: " + str(baseHeight))
+                                    baseFound = True
+                                    break
+
                     if baseFound:
                         break
 
@@ -2575,27 +2605,28 @@ class Converter(QgsTask):
                         if roofFound:
                             break
 
-                        intersect = roofOrigGeom.Intersection(ptGeom)
+                        intersect = roofOrigGeom.Intersection(ptPolGeom)
                         if intersect is not None and not intersect.IsEmpty():
-                            print("Intersect!")
-                            print(intersect)
                             roofGeom = roofs[k][0][0]
+                            roofRing = roofGeom.GetGeometryRef(0)
 
-                            # TODO
-                            # Ebene: roofOrigGeom
-                            # Linie: pt mit pt+100
-                            # Schnitt
-                            # Höhe mit pt[2] abgleichen: Wenn nah, dann weiter
+                            roofOrigPlane = UtilitiesGeom.getPlane(roofOrigRing.GetPoint(0), roofOrigRing.GetPoint(1),
+                                                                   roofOrigRing.GetPoint(2))
+                            ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100), Point3D(pt[0], pt[1], pt[2] + 100))
+                            sRes = roofOrigPlane.intersection(ptLine)
 
-                            # Ebene: roofGeom
-                            # Linie: pt mit pt+100
-                            # Schnitt
-                            # Höhe als neue Höhe nehmen (roofHeight)
+                            if len(sRes) != 0 and isinstance(sRes[0], sympy.geometry.point.Point3D):
+                                sZ = float(sRes[0][2])
 
-                            # Gleiches auch bei Base
-
-                            roofFound = True
-                            break
+                                if sZ - 0.01 < pt[2] < sZ + 0.01:
+                                    print(str(sZ) + " zu " + str(pt[2]))
+                                    roofPlane = UtilitiesGeom.getPlane(roofRing.GetPoint(0), roofRing.GetPoint(1),
+                                                                       roofRing.GetPoint(2))
+                                    sPoint = roofPlane.intersection(ptLine)[0]
+                                    roofHeight = float(sPoint[2])
+                                    print("roofHeight: " + str(roofHeight))
+                                    roofFound = True
+                                    break
 
                     if roofFound:
                         break

@@ -14,6 +14,7 @@
 import math
 import sys
 import uuid
+from copy import deepcopy
 from datetime import datetime
 import numpy as np
 
@@ -1946,14 +1947,23 @@ class Converter(QgsTask):
         if len(bases) > 0:
             bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
 
+        finalBases = [bases[0]]
         for i in range(1, len(bases)):
             base = bases[i][0][0]
             baseLast = bases[i-1][0][0]
-            print(base)
-            print(baseLast)
-            print(baseLast.Intersection(base))
+            diff = base.Difference(baseLast)
 
-        return bases, basesOrig
+            if diff is not None and not diff.IsEmpty():
+                wkt = diff.ExportToWkt()
+                heightBelow = baseLast.GetGeometryRef(0).GetPoint(0)[2]
+                height = base.GetGeometryRef(0).GetPoint(0)[2]
+                wkt = wkt.replace(" " + str(heightBelow) + ",", " " + str(height) + ",").replace(" " + str(heightBelow) + ")", " " + str(height) + ")")
+                diff = ogr.CreateGeometryFromWkt(wkt)
+                newBase = deepcopy(bases[1])
+                newBase[0][0] = diff
+                finalBases.append(newBase)
+
+        return finalBases, basesOrig
 
     # noinspection PyMethodMayBeStatic
     def calcLoD3Roofs(self, ifcBuilding):

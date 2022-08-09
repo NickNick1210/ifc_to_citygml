@@ -1751,23 +1751,27 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
         """
         # Berechnung
+        print("Start")
         bases, basesOrig = self.calcLoD3Bases(ifcBuilding)
-        roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
-        walls = self.calcLoD3Walls(ifcBuilding)
-        openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
-        roofs, walls = self.assignOpenings(openings, roofs, walls)
-        walls = self.adjustWallOpenings(walls)
-        walls = self.adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig)
+        print("nach Bases")
+        #roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
+        #print("nach Roofs")
+        #walls = self.calcLoD3Walls(ifcBuilding)
+        #print("nach Walls")
+        #openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        #roofs, walls = self.assignOpenings(openings, roofs, walls)
+        #walls = self.adjustWallOpenings(walls)
+        #walls = self.adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig)
 
         # Geometrie
         links = []
         for base in bases:
             links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
-        for roof in roofs:
-            links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
-        for wall in walls:
-            links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
+        #for roof in roofs:
+        #    links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
+        #for wall in walls:
+        #    links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
         return links
 
     def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
@@ -1870,6 +1874,8 @@ class Converter(QgsTask):
         for ifcSlab in ifcSlabs:
             baseNames.append(ifcSlab.Name)
 
+        #ifcSlabs = [ifcSlabs[1]]
+
         for i in range(0, len(ifcSlabs)):
             ifcSlab = ifcSlabs[i]
             settings = ifcopenshell.geom.settings()
@@ -1936,6 +1942,16 @@ class Converter(QgsTask):
 
             bases.append([finalSlab, baseNames[i], []])
             basesOrig.append(slabGeom)
+
+        if len(bases) > 0:
+            bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
+
+        for i in range(1, len(bases)):
+            base = bases[i][0][0]
+            baseLast = bases[i-1][0][0]
+            print(base)
+            print(baseLast)
+            print(baseLast.Intersection(base))
 
         return bases, basesOrig
 

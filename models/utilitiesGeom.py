@@ -317,8 +317,8 @@ class UtilitiesGeom:
                 ring2 = geom2.GetGeometryRef(0)
 
                 # Auf Parallität prüfen
-                geom1Simp = UtilitiesGeom.simplify(geom1, 0.001, 0.001)
-                geom2Simp = UtilitiesGeom.simplify(geom2, 0.001, 0.001)
+                geom1Simp = UtilitiesGeom.simplify(geom1, 0.001, 0.0001)
+                geom2Simp = UtilitiesGeom.simplify(geom2, 0.001, 0.0001)
                 ring1Simp, ring2Simp = geom1Simp.GetGeometryRef(0), geom2Simp.GetGeometryRef(0)
                 pt11, pt12, pt13 = ring1Simp.GetPoint(0), ring1Simp.GetPoint(1), ring1Simp.GetPoint(2)
                 pt21, pt22, pt23 = ring2Simp.GetPoint(0), ring2Simp.GetPoint(1), ring2Simp.GetPoint(2)
@@ -335,7 +335,7 @@ class UtilitiesGeom:
                     # Alle Eckpunkte miteinander vergleichen
                     samePts = []
                     firstK, lastK = None, None
-                    ks = []
+                    ks, ms = [], []
                     for k in range(0, ring1.GetPointCount() - 1):
                         for m in range(0, ring2.GetPointCount() - 1):
                             if ring1.GetPoint(k) == ring2.GetPoint(m):
@@ -343,6 +343,8 @@ class UtilitiesGeom:
                                     firstK = k
                                 lastK = k
                                 ks.append(k)
+                                if m not in ms:
+                                    ms.append(m)
                                 samePts.append(ring1.GetPoint(k))
 
                     # Wenn mehrere gleiche Punkte gefunden
@@ -352,22 +354,37 @@ class UtilitiesGeom:
                         geometry, ring = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
 
                         # Testen, ob alle übereinstimmenden Eckpunkte hintereinander liegen
-                        row = True
-                        if firstK == 0 and lastK == ring1.GetPointCount() - 2:
-                            for p in range(0, len(ks) - 1):
-                                if ks[p] + 1 != ks[p + 1]:
-                                    for q in range(p + 1, len(ks)):
-                                        if q + 1 != len(ks) and ks[q] + 1 != ks[q + 1]:
-                                            row = False
-                                            break
-                                    break
-                        else:
-                            if firstK + len(samePts) - 1 != lastK:
-                                row = False
+                        if len(samePts) > 2:
+                            row = True
+                            if firstK == 0 and lastK == ring1.GetPointCount() - 2:
+                                for p in range(0, len(ks) - 1):
+                                    if ks[p] + 1 != ks[p + 1]:
+                                        for q in range(p + 1, len(ks)):
+                                            if q + 1 != len(ks) and ks[q] + 1 != ks[q + 1]:
+                                                row = False
+                                                break
+                                        break
+                            else:
+                                if firstK + len(samePts) - 1 != lastK:
+                                    row = False
+
+                            if row:
+                                ms.sort()
+                                print("ms: " + str(ms))
+                                if ms[0] == 0 and ms[-1] == ring2.GetPointCount()-2:
+                                    jumps = 0
+                                    for p in range(1, len(ms)):
+                                        if ms[p-1] + 1 != ms[p]:
+                                            jumps += 1
+                                    if jumps > 1:
+                                        row = False
+                                else:
+                                    if ms[0] + len(ms) - 1 != ms[len(ms)-1]:
+                                        row = False
+                                print("row: " + str(row))
 
                         # Normalfall: Zwei Polygone grenzen mit einer Schnittgeraden aneinander
                         if len(samePts) < 3 or row:
-                            print("Normalfall: " + str(samePts))
                             for k in range(0, ring1.GetPointCount() - 1):
                                 point1 = ring1.GetPoint(k)
 
@@ -406,13 +423,25 @@ class UtilitiesGeom:
                             for n in range(1, geom2.GetGeometryCount()):
                                 geometry.AddGeometry(geom2.GetGeometryRef(n))
                             geomsOut.append(geometry)
+                            
+                            lastPt = None
+                            for o in range(0, ring.GetPointCount()):
+                                pt = ring.GetPoint(o)
+                                if lastPt is not None:
+                                    if abs(pt[2] - lastPt[2]) > 2.3 and abs(pt[0] - lastPt[0]) > 10:
+                                        print("HIER")
+                                        print(geometry)
+                                        print(geom1)
+                                        print(geom2)
+                                        # TODO: Mit diesen Flächen passiert was komisches
+                                lastPt = pt
+                            
                             done.append(i)
                             done.append(j)
                             break
 
                         # Spezialfall: Loch zwischen den beiden Polygonen
                         else:
-                            print("Spezialfall: " + str(samePts))
                             # Höhere Geometrie herausfinden, ggf. tauschen
                             maxHeightX, maxHeightY = -sys.maxsize, -sys.maxsize
                             maxHeightXK, maxHeightYK = None, None
@@ -567,7 +596,9 @@ class UtilitiesGeom:
                             break
 
                     else:
+                        # Prüfen, ob Fläche innerhalb eines Loches ist: ggf. aus Loch entfernen
                         found = False
+                        # Über alle Löcher gehen
                         for h in range(1, geom1.GetGeometryCount()):
                             innerRing1 = geom1.GetGeometryRef(h)
 
@@ -584,8 +615,8 @@ class UtilitiesGeom:
                                         ks.append(k)
                                         samePts.append(innerRing1.GetPoint(k))
 
+                            # Wenn min. zwei gleiche Eckpunkte gefunden: Neue Lochgeometrie erzeugen
                             if len(samePts) > 1:
-                                print("Hier!!!")
                                 newRing = ogr.Geometry(ogr.wkbLinearRing)
                                 for n in range(0, innerRing1.GetPointCount()):
                                     point1 = innerRing1.GetPoint(n)
@@ -609,19 +640,20 @@ class UtilitiesGeom:
                                                             break
                                                         else:
                                                             newRing.AddPoint(point3[0], point3[1], point3[2])
+
+                                # Geometrie abschließen und hinzufügen
                                 newRing.CloseRings()
                                 newGeom1 = ogr.Geometry(ogr.wkbPolygon)
                                 for n in range(0, geom1.GetGeometryCount()):
-                                    if n == h:
-                                        newGeom1.AddGeometry(newRing)
-                                    else:
-                                        newGeom1.AddGeometry(geom1.GetGeometryRef(n))
+                                    ring = newRing if n == h else geom1.GetGeometryRef(n)
+                                    newGeom1.AddGeometry(ring)
                                 geomsOut.append(newGeom1)
+
+                                # Weiteres Vorgehen abbrechen
                                 done.append(i)
                                 done.append(j)
                                 found = True
                                 break
-
                             if found:
                                 break
                         if found:
@@ -632,7 +664,7 @@ class UtilitiesGeom:
                 geomsOut.append(geomsIn[i])
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
-        if len(geomsOut) < len(geomsIn):
+        if len(geomsOut) < len(geomsIn) and count < 3:
             return UtilitiesGeom.union3D(geomsOut, count+1)
 
         # Wenn fertig: Zurückgeben

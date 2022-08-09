@@ -1755,10 +1755,10 @@ class Converter(QgsTask):
         print("Start")
         bases, basesOrig = self.calcLoD3Bases(ifcBuilding)
         print("nach Bases")
-        #roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
-        #print("nach Roofs")
-        #walls = self.calcLoD3Walls(ifcBuilding)
-        #print("nach Walls")
+        roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
+        print("nach Roofs")
+        walls = self.calcLoD3Walls(ifcBuilding)
+        print("nach Walls")
         #openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         #roofs, walls = self.assignOpenings(openings, roofs, walls)
@@ -1769,10 +1769,10 @@ class Converter(QgsTask):
         links = []
         for base in bases:
             links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
-        #for roof in roofs:
-        #    links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
-        #for wall in walls:
-        #    links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
+        for roof in roofs:
+            links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
+        for wall in walls:
+            links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
         return links
 
     def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
@@ -1864,8 +1864,10 @@ class Converter(QgsTask):
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        floor = False
         if len(ifcSlabs) == 0:
             ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            floor = True
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, it will also be missing in CityGML"))
@@ -1874,8 +1876,6 @@ class Converter(QgsTask):
         # Namen der Grundflächen heraussuchen
         for ifcSlab in ifcSlabs:
             baseNames.append(ifcSlab.Name)
-
-        #ifcSlabs = [ifcSlabs[1]]
 
         for i in range(0, len(ifcSlabs)):
             ifcSlab = ifcSlabs[i]
@@ -1944,24 +1944,29 @@ class Converter(QgsTask):
             bases.append([finalSlab, baseNames[i], []])
             basesOrig.append(slabGeom)
 
+        # Nach Höhe sortieren
         if len(bases) > 0:
             bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
 
-        finalBases = [bases[0]]
-        for i in range(1, len(bases)):
-            base = bases[i][0][0]
-            baseLast = bases[i-1][0][0]
-            diff = base.Difference(baseLast)
+        # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
+        if floor:
+            finalBases = [bases[0]]
+            for i in range(1, len(bases)):
+                base = bases[i][0][0]
+                baseLast = bases[i-1][0][0]
+                diff = base.Difference(baseLast)
 
-            if diff is not None and not diff.IsEmpty():
-                wkt = diff.ExportToWkt()
-                heightBelow = baseLast.GetGeometryRef(0).GetPoint(0)[2]
-                height = base.GetGeometryRef(0).GetPoint(0)[2]
-                wkt = wkt.replace(" " + str(heightBelow) + ",", " " + str(height) + ",").replace(" " + str(heightBelow) + ")", " " + str(height) + ")")
-                diff = ogr.CreateGeometryFromWkt(wkt)
-                newBase = deepcopy(bases[1])
-                newBase[0][0] = diff
-                finalBases.append(newBase)
+                if diff is not None and not diff.IsEmpty():
+                    wkt = diff.ExportToWkt()
+                    heightBelow = baseLast.GetGeometryRef(0).GetPoint(0)[2]
+                    height = base.GetGeometryRef(0).GetPoint(0)[2]
+                    wkt = wkt.replace(" " + str(heightBelow) + ",", " " + str(height) + ",").replace(" " + str(heightBelow) + ")", " " + str(height) + ")")
+                    diff = ogr.CreateGeometryFromWkt(wkt)
+                    newBase = deepcopy(bases[1])
+                    newBase[0][0] = diff
+                    finalBases.append(newBase)
+        else:
+            finalBases = bases
 
         return finalBases, basesOrig
 
@@ -2136,6 +2141,7 @@ class Converter(QgsTask):
             # Vereinigen, Vereinfachen und Hinzufügen
             wallGeom = UtilitiesGeom.union3D(geometries)
             # wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.001)
+            #wallGeom = geometries
             walls.append([wallGeom, wallNames[i], []])
         return walls
 

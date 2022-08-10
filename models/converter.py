@@ -1919,6 +1919,10 @@ class Converter(QgsTask):
             heights, areas = [], []
             for geom in slabGeom:
                 ring = geom.GetGeometryRef(0)
+                if ring is None:
+                    heights.append(sys.maxsize)
+                    areas.append(-sys.maxsize)
+                    continue
                 # Höhe herausfinden
                 minHeight, maxHeight = sys.maxsize, -sys.maxsize
                 for k in range(0, ring.GetPointCount()):
@@ -1941,15 +1945,23 @@ class Converter(QgsTask):
                 if areas[j] > 0.9 * max(areas) and heights[j] <= min(heights) + 0.01:
                     finalSlab.append(slabGeom[j])
 
+            if len(finalSlab) == 0:
+                print(areas)
+                print(max(areas))
+                print(heights)
+                print(max(heights))
+                print(len(slabGeom))
+
             bases.append([finalSlab, baseNames[i], []])
             basesOrig.append(slabGeom)
 
         # Nach Höhe sortieren
-        if len(bases) > 0:
-            bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
+        #if len(bases) > 0:
+        #    bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
 
         # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
-        if floor:
+        if 1 == 0:
+        #if floor:
             finalBases = [bases[0]]
             for i in range(1, len(bases)):
                 base = bases[i][0][0]
@@ -2105,6 +2117,7 @@ class Converter(QgsTask):
 
         # Geometrie
         for i in range(0, len(ifcWallsExt)):
+            print("Wall " + str(i) + " von " + str(len(ifcWallsExt)) + ": " + wallNames[i])
             ifcWall = ifcWallsExt[i]
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)

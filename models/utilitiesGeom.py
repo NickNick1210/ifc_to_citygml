@@ -424,7 +424,6 @@ class UtilitiesGeom:
 
                         # Spezialfall: Loch zwischen den beiden Polygonen
                         elif len(samePts) > 3:
-                            print("Loch!!!" + str(samePts))
                             # Höhere Geometrie herausfinden, ggf. tauschen
                             maxHeightX, maxHeightY = -sys.maxsize, -sys.maxsize
                             maxHeightXK, maxHeightYK = None, None
@@ -588,44 +587,105 @@ class UtilitiesGeom:
                             # Alle Eckpunkte miteinander vergleichen
                             samePts = []
                             ks = []
+                            allKs = [False] * (innerRing1.GetPointCount()-1)
                             for k in range(0, innerRing1.GetPointCount() - 1):
                                 for m in range(0, ring2.GetPointCount() - 1):
                                     if innerRing1.GetPoint(k) == ring2.GetPoint(m):
                                         ks.append(k)
                                         samePts.append(innerRing1.GetPoint(k))
+                                        allKs[k] = True
+                                        break
 
                             # Wenn min. zwei gleiche Eckpunkte gefunden: Neue Lochgeometrie erzeugen
                             if len(samePts) > 1:
-                                newRing = ogr.Geometry(ogr.wkbLinearRing)
-                                for n in range(0, innerRing1.GetPointCount()):
-                                    point1 = innerRing1.GetPoint(n)
-                                    newRing.AddPoint(point1[0], point1[1], point1[2])
-                                    if point1 in samePts:
-                                        for o in range(0, ring2.GetPointCount()):
-                                            point2 = ring2.GetPoint(o)
-                                            if point2 == point1:
-                                                stop = False
-                                                for p in range(o + 1, ring2.GetPointCount()):
-                                                    point3 = ring2.GetPoint(p)
-                                                    if point3 in samePts:
-                                                        stop = True
-                                                        break
-                                                    else:
+                                newRings = []
+                                while False in allKs:
+                                    newRing = ogr.Geometry(ogr.wkbLinearRing)
+                                    print(allKs)
+                                    for m in range(0, len(allKs)):
+                                        if not allKs[m]:
+                                            start = m
+                                            break
+                                    n = start
+                                    while n < innerRing1.GetPointCount()-1:
+                                        point1 = innerRing1.GetPoint(n)
+                                        newRing.AddPoint(point1[0], point1[1], point1[2])
+                                        allKs[n] = True
+                                        print("Add1: n" + str(n))
+                                        if point1 in samePts:
+                                            for o in range(0, ring2.GetPointCount()):
+                                                point2 = ring2.GetPoint(o)
+                                                if point2 == point1:
+                                                    stop = False
+                                                    for p in range(o + 1, ring2.GetPointCount()-1):
+                                                        point3 = ring2.GetPoint(p)
                                                         newRing.AddPoint(point3[0], point3[1], point3[2])
-                                                if not stop:
-                                                    for q in range(0, o):
-                                                        point3 = ring2.GetPoint(q)
+                                                        print("Add2: p" + str(p))
                                                         if point3 in samePts:
+                                                            stop = True
                                                             break
-                                                        else:
+                                                    if not stop:
+                                                        for q in range(0, o):
+                                                            point3 = ring2.GetPoint(q)
                                                             newRing.AddPoint(point3[0], point3[1], point3[2])
+                                                            print("Add3: q" + str(q))
+                                                            if point3 in samePts:
+                                                                break
+                                                    for r in range(0, innerRing1.GetPointCount()):
+                                                        point = innerRing1.GetPoint(r)
+                                                        if point == point3:
+                                                            n = r if r > n else innerRing1.GetPointCount()
+                                                            break
+                                                    break
+                                        n += 1
 
-                                # Geometrie abschließen und hinzufügen
-                                newRing.CloseRings()
+                                    for n in range(0, innerRing1.GetPointCount()):
+                                        point = innerRing1.GetPoint(n)
+                                        if point == point3:
+                                            start2 = n+1
+                                            break
+                                    for n in range(start2, start):
+                                        point1 = innerRing1.GetPoint(n)
+                                        newRing.AddPoint(point1[0], point1[1], point1[2])
+                                        allKs[n] = True
+                                        print("Add4: n" + str(n))
+                                        if point1 in samePts:
+                                            for o in range(0, ring2.GetPointCount()):
+                                                point2 = ring2.GetPoint(o)
+                                                if point2 == point1:
+                                                    stop = False
+                                                    for p in range(o + 1, ring2.GetPointCount()):
+                                                        point3 = ring2.GetPoint(p)
+                                                        newRing.AddPoint(point3[0], point3[1], point3[2])
+                                                        print("Add5: p" + str(p))
+                                                        if point3 in samePts:
+                                                            stop = True
+                                                            break
+                                                    if not stop:
+                                                        for q in range(0, o):
+                                                            point3 = ring2.GetPoint(q)
+                                                            newRing.AddPoint(point3[0], point3[1], point3[2])
+                                                            print("Add6: q" + str(q))
+                                                            if point3 in samePts:
+                                                                break
+                                    print(allKs)
+                                    if False in allKs:
+                                        print("Hier fehlt noch ein Loch!!!")
+                                    else:
+                                        print("Es fehlt kein Loch mehr!")
+                                        print(innerRing1)
+                                        print(ring2)
+                                        print(newRing)
+
+                                    # Geometrie abschließen und hinzufügen
+                                    newRing.CloseRings()
+                                    newRings.append(newRing)
                                 newGeom1 = ogr.Geometry(ogr.wkbPolygon)
                                 for n in range(0, geom1.GetGeometryCount()):
-                                    ring = newRing if n == h else geom1.GetGeometryRef(n)
-                                    newGeom1.AddGeometry(ring)
+                                    if n != h:
+                                        newGeom1.AddGeometry(geom1.GetGeometryRef(n))
+                                for newRing in newRings:
+                                    newGeom1.AddGeometry(newRing)
                                 geomsOut.append(newGeom1)
 
                                 # Weiteres Vorgehen abbrechen

@@ -1753,9 +1753,9 @@ class Converter(QgsTask):
         """
         # Berechnung
         print("Start")
-        bases, basesOrig = self.calcLoD3Bases(ifcBuilding)
+        #bases, basesOrig = self.calcLoD3Bases(ifcBuilding)
         print("nach Bases")
-        roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
+        #roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
         print("nach Roofs")
         walls = self.calcLoD3Walls(ifcBuilding)
         print("nach Walls")
@@ -1767,10 +1767,10 @@ class Converter(QgsTask):
 
         # Geometrie
         links = []
-        for base in bases:
-            links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
-        for roof in roofs:
-            links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
+        #for base in bases:
+        #    links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
+        #for roof in roofs:
+        #    links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
         for wall in walls:
             links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
         return links

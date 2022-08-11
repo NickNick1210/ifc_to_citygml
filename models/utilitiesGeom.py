@@ -505,64 +505,15 @@ class UtilitiesGeom:
                                     ringHole.CloseRings()
                                     ringsHole.append(ringHole)
 
-                            # Eigentliche Geometrie erstellen
-                            fin, startK = False, maxHeightK
-                            while True:
-                                if not fin:
-                                    for k in range(startK, ring1.GetPointCount() - 1):
-                                        point1 = ring1.GetPoint(k)
-                                        ring.AddPoint(point1[0], point1[1], point1[2])
-
-                                        # Wenn gleicher Eckpunkt: Anbinden der zweiten Geometrie
-                                        if point1 in samePts and k != maxHeightK:
-                                            for m in range(0, ring2.GetPointCount() - 1):
-                                                point2 = ring2.GetPoint(m)
-                                                if point2 == point1:
-                                                    stop = False
-                                                    rangeS, rangeE = m + 1, ring2.GetPointCount()-1
-                                                    while True:
-                                                        for n in range(rangeS, rangeE):
-                                                            point3 = ring2.GetPoint(n)
-                                                            if point3 == ring1.GetPoint(maxHeightK):
-                                                                stop = True
-                                                                break
-                                                            ring.AddPoint(point3[0], point3[1], point3[2])
-                                                            if point3 in samePts:
-                                                                for p in range(0, ring1.GetPointCount() - 1):
-                                                                    point4 = ring1.GetPoint(p)
-                                                                    if point3 == point4:
-                                                                        if p <= maxHeightK:
-                                                                            for q in range(p + 1, maxHeightK):
-                                                                                point5 = ring1.GetPoint(q)
-                                                                                ring.AddPoint(point5[0], point5[1],
-                                                                                              point5[2])
-                                                                        else:
-                                                                            for q in range(p + 1,
-                                                                                           ring1.GetPointCount() - 1):
-                                                                                point5 = ring1.GetPoint(q)
-                                                                                ring.AddPoint(point5[0], point5[1],
-                                                                                              point5[2])
-                                                                            for q in range(0, maxHeightK):
-                                                                                point5 = ring1.GetPoint(q)
-                                                                                ring.AddPoint(point5[0], point5[1],
-                                                                                              point5[2])
-                                                                        break
-                                                                stop = True
-                                                                break
-                                                        if stop:
-                                                            break
-                                                        else:
-                                                            stop = True
-                                                            rangeS, rangeE = 0, m
-                                            fin = True
-                                            break
-                                    startK = 0
-                                else:
-                                    break
-
-                            # Geometrie abschließen und Löcher der ursprünglichen Geometrien hinzufügen
-                            ring.CloseRings()
+                            maxLength, maxO = -sys.maxsize, None
+                            for o in range(0, len(ringsHole)):
+                                ring = ringsHole[o]
+                                if ring.Length() > maxLength:
+                                    maxLength = ring.Length()
+                                    maxO = o
+                            ring = ringsHole[maxO]
                             geometry.AddGeometry(ring)
+
                             for m in range(1, geom1.GetGeometryCount()):
                                 geometry.AddGeometry(geom1.GetGeometryRef(m))
                             for n in range(1, geom2.GetGeometryCount()):
@@ -570,7 +521,7 @@ class UtilitiesGeom:
 
                             # Neue Löcher hinzufügen
                             for ringHole in ringsHole:
-                                if not ring.Length() - 0.00001 < ringHole.Length() < ring.Length() + 0.00001:
+                                if not ring == ringHole:
                                     geometry.AddGeometry(ringHole)
                             geomsOut.append(geometry)
                             done.append(i)
@@ -703,7 +654,7 @@ class UtilitiesGeom:
                 geomsOut.append(geomsIn[i])
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
-        if len(geomsOut) < len(geomsIn) and count < 7:
+        if len(geomsOut) < len(geomsIn) and count < 6:
             return UtilitiesGeom.union3D(geomsOut, count + 1)
 
         # Wenn fertig: Zurückgeben

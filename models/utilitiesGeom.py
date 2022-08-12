@@ -552,14 +552,31 @@ class UtilitiesGeom:
                             # Wenn min. zwei gleiche Eckpunkte gefunden: Neue Lochgeometrie erzeugen
                             if len(samePts) > 1:
                                 newRings = []
-                                while False in allKs:
+                                while False in allKs or False in allMs:
                                     newRing = ogr.Geometry(ogr.wkbLinearRing)
-                                    print("ks: " + str(allKs))
-                                    print("ms: " + str(allMs))
-                                    for m in range(0, len(allKs)):
-                                        if not allKs[m]:
-                                            start = m
-                                            break
+                                    #print("ks: " + str(allKs))
+                                    #print("ms: " + str(allMs))
+                                    if False in allKs:
+                                        start = allKs.index(False)
+                                    elif False in allMs:
+                                        mFalse = allMs.index(False)
+                                        start = None
+                                        s = mFalse-1 if mFalse >= 1 else ring2.GetPointCount()-1
+                                        e = -1 if mFalse >= 1 else mFalse
+                                        for k in range(s, e, -1):
+                                            mPoint = ring2.GetPoint(k)
+                                            if mPoint in samePts:
+                                                for m in range(0, innerRing1.GetPointCount()):
+                                                    kPoint = innerRing1.GetPoint(m)
+                                                    if kPoint == mPoint:
+                                                        start = m
+                                                        break
+                                            if start is not None:
+                                                break
+                                            if k <= 0:
+                                                s = ring2.GetPointCount()-1
+                                                e = mFalse
+
                                     n = start
                                     end = innerRing1.GetPointCount()-1
                                     find = True
@@ -567,7 +584,7 @@ class UtilitiesGeom:
                                         point1 = innerRing1.GetPoint(n)
                                         newRing.AddPoint(point1[0], point1[1], point1[2])
                                         allKs[n] = True
-                                        print("Add1: n" + str(n))
+                                        #print("Add1: n" + str(n))
                                         if point1 in samePts and find:
                                             for o in range(0, ring2.GetPointCount()):
                                                 point2 = ring2.GetPoint(o)
@@ -577,7 +594,7 @@ class UtilitiesGeom:
                                                         point3 = ring2.GetPoint(p)
                                                         newRing.AddPoint(point3[0], point3[1], point3[2])
                                                         allMs[p] = True
-                                                        print("Add2: p" + str(p))
+                                                        #print("Add2: p" + str(p))
                                                         if point3 in samePts:
                                                             stop = True
                                                             break
@@ -586,7 +603,7 @@ class UtilitiesGeom:
                                                             point3 = ring2.GetPoint(q)
                                                             newRing.AddPoint(point3[0], point3[1], point3[2])
                                                             allMs[q] = True
-                                                            print("Add3: q" + str(q))
+                                                            #print("Add3: q" + str(q))
                                                             if point3 in samePts:
                                                                 break
                                                     for r in range(0, innerRing1.GetPointCount()):
@@ -603,23 +620,15 @@ class UtilitiesGeom:
                                             n = 0
                                             end = start
 
-                                    print("ks: " + str(allKs))
-                                    print("ms: " + str(allMs))
-                                    if False in allKs:
+                                    #print("ks: " + str(allKs))
+                                    #print("ms: " + str(allMs))
+                                    if False in allKs or False in allMs:
                                         print("Hier fehlt noch ein Loch!!!")
                                     else:
                                         print("Es fehlt kein Loch mehr!")
                                         print(innerRing1)
                                         print(ring2)
                                         print(newRing)
-                                    if False in allMs:
-                                        print("############## M !!!!!!! ################")
-
-                                    # TODO:
-                                    # Alle Ms müssen benutzt werden: allMs nur aus True bestehen
-                                    # Wenn noch False in allMs: wiederholen, wie bei allKs
-                                    # Wenn allKs alles True: Erstes False in allMs nehmen und hochiterieren, bis gleicher Punkt zu ks gefunden
-                                    # Diesen k-Punkt als Ausgangspunkt nehmen
 
                                     # Geometrie abschließen und hinzufügen
                                     newRing.CloseRings()

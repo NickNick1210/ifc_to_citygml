@@ -1767,7 +1767,8 @@ class Converter(QgsTask):
         print("nach Openings-Zuordnung")
         walls = self.adjustWallOpenings(walls)
         print("nach Wand-Openings-Anpassung")
-        #walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
+        # walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
+        # TODO: AdjustWallSize austesten
         print("nach Wand-Höhen-Anpassung")
 
         # Geometrie
@@ -1961,14 +1962,15 @@ class Converter(QgsTask):
             finalBases = [bases[0]]
             for i in range(1, len(bases)):
                 base = bases[i][0][0]
-                baseLast = bases[i-1][0][0]
+                baseLast = bases[i - 1][0][0]
                 diff = base.Difference(baseLast)
 
                 if diff is not None and not diff.IsEmpty():
                     wkt = diff.ExportToWkt()
                     heightBelow = baseLast.GetGeometryRef(0).GetPoint(0)[2]
                     height = base.GetGeometryRef(0).GetPoint(0)[2]
-                    wkt = wkt.replace(" " + str(heightBelow) + ",", " " + str(height) + ",").replace(" " + str(heightBelow) + ")", " " + str(height) + ")")
+                    wkt = wkt.replace(" " + str(heightBelow) + ",", " " + str(height) + ",").replace(
+                        " " + str(heightBelow) + ")", " " + str(height) + ")")
                     diff = ogr.CreateGeometryFromWkt(wkt)
                     newBase = deepcopy(bases[1])
                     newBase[0][0] = diff
@@ -2192,7 +2194,12 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        for i in range(0, len(ifcOpeningsExt)):
+        # TODO: Nach und nach alle Fenster durchprobieren
+        #for i in range(0, len(ifcOpeningsExt)):
+        tempLimit = 5
+        if len(ifcOpeningsExt) < tempLimit:
+            tempLimit = len(ifcOpeningsExt)
+        for i in range(0, tempLimit):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
             else:
@@ -2207,6 +2214,9 @@ class Converter(QgsTask):
                            range(0, len(verts), 3)]
             grVertsList = []
             minHeight, maxHeight = sys.maxsize, -sys.maxsize
+
+            # Nur wichtige Vertizes hinzufügen
+            # TODO: ggf. doch alle benutzen
             for grVertCurr in grVertsCurr:
                 point = self.trans.georeferencePoint(grVertCurr)
                 if point[2] <= minHeight:
@@ -2215,9 +2225,8 @@ class Converter(QgsTask):
                 if point[2] >= maxHeight:
                     maxHeight = point[2]
                     grVertsList.append(point)
-
-            # Alle Flächen in der gleichen Ebene vereinigen
             openings.append([grVertsList, openingNames[i], type])
+            print(grVertsList)
 
         return openings
 
@@ -2230,12 +2239,10 @@ class Converter(QgsTask):
             walls: Die Wände, an die die Öffnungen angefügt werden sollen, als Liste
 
         Returns:
-            Die angepassten Dächer als Liste
             Die angepassten Wände als Liste
         """
         for opening in openings:
             ptOp = opening[0][0]
-            print(ptOp)
 
             # Wand bzw. Dach mit geringstem Abstand zur Öffnung berechnen
             minDist, minDistElem = sys.maxsize, None
@@ -2249,7 +2256,6 @@ class Converter(QgsTask):
                             if dist < minDist:
                                 minDist, minDistElem = dist, wall
 
-            print("minDist: " + str(minDist))
             # Öffnung hinzufügen
             minDistElem[2].append(opening)
         return walls
@@ -2325,19 +2331,18 @@ class Converter(QgsTask):
                             if minDistBound > maxDist:
                                 maxDist = minDistBound
                         if near and maxDist < 0.5:
-
                             # Hinzufügen
                             openBounds[i].append([len(finalWall), wallGeom])
                             finalWall.append(wallGeom)
-                            print("Angenommen: " + str(wallGeom))
 
                 # Öffnungen durch eine gesamte Fläche darstellen
                 # über alle Öffnungen der Wand iterieren
                 for j in range(0, len(wall[2])):
                     opening = wall[2][j]
                     verts = opening[0]
-                    sPts = []
-                    lastHeight = None
+                    sPts, lastHeight = [], None
+
+                    # Schnittpunkte zwischen Öffnung und Wand herausfinden
                     for openBound in openBounds[j]:
                         sPtsBound = []
                         geom = openBound[1]
@@ -2348,6 +2353,14 @@ class Converter(QgsTask):
                             s = plane.intersection(point)
                             if len(s) == 1:
                                 sPtsBound.append(vert)
+
+                        if len(sPtsBound) == 0:
+                            # TODO: Wenn kein Intersect stattfindet
+                            # Wand-Loch als Opening-Geometrie nehmen
+                            # Wand-Begrenzungen ganz entfernen
+                            pass
+
+                        # Durchschnittskoordinaten
                         allX, allY = 0, 0
                         minHeight, maxHeight = sys.maxsize, -sys.maxsize
                         for sPtBound in sPtsBound:
@@ -2360,7 +2373,8 @@ class Converter(QgsTask):
                         if minHeight != maxHeight:
                             meanX = allX / len(sPtsBound)
                             meanY = allY / len(sPtsBound)
-                            print("Eckpunkt: " + str([meanX, meanY, minHeight]) + " / " + str([meanX, meanY, maxHeight]))
+
+                            # Schnittpunkte geordnet sammeln
                             if lastHeight is None or lastHeight == minHeight:
                                 sPts.append([meanX, meanY, minHeight])
                                 sPts.append([meanX, meanY, maxHeight])
@@ -2370,20 +2384,19 @@ class Converter(QgsTask):
                                 sPts.append([meanX, meanY, minHeight])
                                 lastHeight = minHeight
 
-                    # Schnittpunkte auswerten und in neue Geometrie als Eckpunkte setzen
+                    # Neue Geometrie aus den Schnittpunkten
                     newGeomOpen = ogr.Geometry(ogr.wkbPolygon)
                     newGeomRing = ogr.Geometry(ogr.wkbLinearRing)
                     for o in range(0, len(sPts)):
                         newGeomRing.AddPoint(sPts[o][0], sPts[o][1], sPts[o][2])
-
-                    # Geometrie abschließen und setzen
                     newGeomRing.CloseRings()
                     newGeomOpen.AddGeometry(newGeomRing)
                     opening[0] = [newGeomOpen]
 
+                    # Schnittpunkte, nach Wandstück geordnet
                     newSPts, q = [], 1
                     while q < len(sPts):
-                        newSPts.append([sPts[q-1], sPts[q]])
+                        newSPts.append([sPts[q - 1], sPts[q]])
                         q += 1
                     sPts = newSPts
 
@@ -2422,22 +2435,22 @@ class Converter(QgsTask):
                                 # Parallelität der Linien von Start- zu Mittelpunkt und Mittel- zu Endpunkt prüfen
                                 tol = 0.01
                                 # Y-Steigung in Bezug auf X-Verlauf
-                                gradYSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[1] - ptSt[1]) / abs(
+                                gradYSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[1] - ptSt[1]) / abs(
                                     ptMid[0] - ptSt[0])
-                                gradYEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[1] - ptMid[1]) / abs(
+                                gradYEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[1] - ptMid[1]) / abs(
                                     ptEnd[0] - ptMid[0])
                                 if gradYSt - tol < gradYEnd < gradYSt + tol:
                                     # Z-Steigung in Bezug auf X-Verlauf
-                                    gradZSt = -1 if ptMid[0] - ptSt[0] == 0 else (ptMid[2] - ptSt[2]) / abs(
+                                    gradZSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[2] - ptSt[2]) / abs(
                                         ptMid[0] - ptSt[0])
-                                    gradZEnd = -1 if ptEnd[0] - ptMid[0] == 0 else (ptEnd[2] - ptMid[2]) / abs(
+                                    gradZEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[2] - ptMid[2]) / abs(
                                         ptEnd[0] - ptMid[0])
                                     if gradZSt - tol < gradZEnd < gradZSt + tol:
                                         # Z-Steigung in Bezug auf Y-Verlauf
-                                        gradYZSt = -1 if ptMid[1] - ptSt[1] == 0 else (ptMid[2] - ptSt[2]) / abs(
-                                            ptMid[1] - ptSt[1])
-                                        gradYZEnd = -1 if ptEnd[1] - ptMid[1] == 0 else (ptEnd[2] - ptMid[2]) / abs(
-                                            ptEnd[1] - ptMid[1])
+                                        gradYZSt = -1 if abs(ptMid[1] - ptSt[1]) < 0.0001 else (ptMid[2] - ptSt[
+                                            2]) / abs(ptMid[1] - ptSt[1])
+                                        gradYZEnd = -1 if abs(ptEnd[1] - ptMid[1]) < 0.0001 else (ptEnd[2] - ptMid[
+                                            2]) / abs(ptEnd[1] - ptMid[1])
                                         if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
                                             newRingWall1.AddPoint(ptMid[0], ptMid[1], ptMid[2])
                                             newRingWall2.AddPoint(ptMid[0], ptMid[1], ptMid[2])
@@ -2561,7 +2574,7 @@ class Converter(QgsTask):
                         wallOpPt = wallOpRing.GetPoint(n)
                         if wallOpPt == pt:
                             if inHole:
-                                newN = wallOpRing.GetPointCount() - 2 if n == 0 else n-1
+                                newN = wallOpRing.GetPointCount() - 2 if n == 0 else n - 1
                                 lastPt = wallOpRing.GetPoint(newN)
                             else:
                                 nextPt = wallOpRing.GetPoint(n + 1)

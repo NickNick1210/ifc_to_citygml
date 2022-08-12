@@ -1753,24 +1753,29 @@ class Converter(QgsTask):
         """
         # Berechnung
         print("Start")
-        #bases, basesOrig = self.calcLoD3Bases(ifcBuilding)
+        bases, basesOrig, floors = self.calcLoD3Bases(ifcBuilding)
         print("nach Bases")
-        #roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
+        roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
         print("nach Roofs")
         walls = self.calcLoD3Walls(ifcBuilding)
         print("nach Walls")
-        #openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        print("nach Doors")
         #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
-        #roofs, walls = self.assignOpenings(openings, roofs, walls)
+        print("nach Windows")
+        roofs, walls = self.assignOpenings(openings, roofs, walls)
+        print("nach Openings-Zuordnung")
         #walls = self.adjustWallOpenings(walls)
-        #walls = self.adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig)
+        print("nach Wand-Openings-Anpassung")
+        #walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
+        print("nach Wand-Höhen-Anpassung")
 
         # Geometrie
         links = []
-        #for base in bases:
-        #    links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
-        #for roof in roofs:
-        #    links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
+        for base in bases:
+            links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
+        for roof in roofs:
+            links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
         for wall in walls:
             links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
         return links
@@ -1945,23 +1950,14 @@ class Converter(QgsTask):
                 if areas[j] > 0.9 * max(areas) and heights[j] <= min(heights) + 0.01:
                     finalSlab.append(slabGeom[j])
 
-            if len(finalSlab) == 0:
-                print(areas)
-                print(max(areas))
-                print(heights)
-                print(max(heights))
-                print(len(slabGeom))
-
             bases.append([finalSlab, baseNames[i], []])
             basesOrig.append(slabGeom)
 
-        # Nach Höhe sortieren
-        #if len(bases) > 0:
-        #    bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
+        floors = bases
 
         # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
-        if 1 == 0:
-        #if floor:
+        if floor:
+            bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
             finalBases = [bases[0]]
             for i in range(1, len(bases)):
                 base = bases[i][0][0]
@@ -1980,7 +1976,7 @@ class Converter(QgsTask):
         else:
             finalBases = bases
 
-        return finalBases, basesOrig
+        return finalBases, basesOrig, floors
 
     # noinspection PyMethodMayBeStatic
     def calcLoD3Roofs(self, ifcBuilding):
@@ -2153,8 +2149,7 @@ class Converter(QgsTask):
 
             # Vereinigen, Vereinfachen und Hinzufügen
             wallGeom = UtilitiesGeom.union3D(geometries)
-            # wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.001)
-            #wallGeom = geometries
+            wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.001)
             walls.append([wallGeom, wallNames[i], []])
         return walls
 
@@ -2198,6 +2193,10 @@ class Converter(QgsTask):
 
         # Geometrie
         for i in range(0, len(ifcOpeningsExt)):
+            if type == "ifcDoor":
+                print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
+            else:
+                print("Window " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
             ifcOpening = ifcOpeningsExt[i]
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -2307,17 +2306,29 @@ class Converter(QgsTask):
             for wallGeom in wall[0]:
                 maxDist = -sys.maxsize
                 ring = wallGeom.GetGeometryRef(0)
+                heightDiff = False
                 for k in range(0, ring.GetPointCount()):
                     pt1 = ring.GetPoint(k)
                     for m in range(k + 1, ring.GetPointCount()):
                         pt2 = ring.GetPoint(m)
+                        if pt1[2] != pt2[2]:
+                            heightDiff = True
                         dist = math.sqrt((pt2[0] - pt1[0]) ** 2 + (pt2[1] - pt1[1]) ** 2 + (pt2[2] - pt1[2]) ** 2)
                         if dist > maxDist:
                             maxDist = dist
-                dists.append(maxDist)
+                if heightDiff:
+                    dists.append(maxDist)
+                else:
+                    dists.append(0)
 
             # Größte Fläche als Außenfläche
-            finalWall = [wall[0][dists.index(max(dists))]]
+            if max(dists) != 0:
+                ix = dists.index(max(dists))
+            elif dists.count(max(dists)) == 0:
+                ix = dists.index(max(dists))
+            else:
+                ix = len(dists) - dists[::-1].index(max(dists)) - 1
+            finalWall = [wall[0][ix]]
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
             if len(wall[2]) != 0:
@@ -2338,8 +2349,9 @@ class Converter(QgsTask):
                             geomOpening = opening[0][k]
                             ringOpening = geomOpening.GetGeometryRef(0)
 
-                            minDist = sys.maxsize
+                            minDist, maxDist = sys.maxsize, -sys.maxsize
                             for o in range(0, wallRing.GetPointCount()):
+                                minDistWall = sys.maxsize
                                 ptO = wallRing.GetPoint(o)
                                 for p in range(0, ringOpening.GetPointCount()):
                                     ptP = ringOpening.GetPoint(p)
@@ -2347,6 +2359,11 @@ class Converter(QgsTask):
                                         (ptP[0] - ptO[0]) ** 2 + (ptP[1] - ptO[1]) ** 2 + (ptP[2] - ptO[2]) ** 2)
                                     if dist < minDist:
                                         minDist = dist
+                                    if dist < minDistWall:
+                                        minDistWall = dist
+                                if minDistWall > maxDist:
+                                    maxDist = minDistWall
+
                             if minDist <= 0.2:
 
                                 # Höhen und Breiten der Öffnungen berechnen
@@ -2432,9 +2449,12 @@ class Converter(QgsTask):
                     for n in range(0, len(sLines)):
                         o = 0 if n == len(sLines) - 1 else n + 1
                         sPt = sLines[n].intersection(sLines[o])
-                        if len(sPt) != 0 and minZG - 0.1 < float(sPt[0][2]) < maxZG + 0.1:
-                            sPts[n].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
-                            sPts[o].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
+                        try:
+                            if len(sPt) != 0 and minZG - 0.1 < float(sPt[0][2]) < maxZG + 0.1:
+                                sPts[n].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
+                                sPts[o].append([float(sPt[0][0]), float(sPt[0][1]), float(sPt[0][2])])
+                        except:
+                            continue
 
                     # Schnittpunkte auswerten und in neue Geometrie als Eckpunkte setzen
                     newGeomOpen = ogr.Geometry(ogr.wkbPolygon)
@@ -2573,6 +2593,7 @@ class Converter(QgsTask):
 
         # Alle Wände durchgehen
         for i in range(0, len(walls)):
+            print("Wall " + str(i) + " von " + str(len(walls)) + ": " + str(walls[i][1]))
             wallGeom = walls[i][0][0]
             wallRing = wallGeom.GetGeometryRef(0)
             wallGeomTemp, wallRingTemp = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)

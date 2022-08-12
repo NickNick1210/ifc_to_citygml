@@ -362,7 +362,7 @@ class UtilitiesGeom:
                             for p in range(1, len(ks)):
                                 if ks[p] - 1 != ks[p - 1]:
                                     jumpK += 1
-                                elif ms[p] + 1 != ms[p - 1] and (ms[p] != 0 or ms[p - 1] != ring2.GetPointCount() - 2):
+                                elif ms[p] + 1 != ms[p - 1] and (ms[p - 1] != 0 or ms[p] != ring2.GetPointCount() - 2):
                                     row = False
                                     break
                         else:
@@ -512,8 +512,17 @@ class UtilitiesGeom:
                                 if ring.Length() > maxLength:
                                     maxLength = ring.Length()
                                     maxO = o
-                            ring = ringsHole[maxO]
-                            geometry.AddGeometry(ring)
+                            try:
+                                ring = ringsHole[maxO]
+                                geometry.AddGeometry(ring)
+                            except:
+                                print(maxO)
+                                print(maxLength)
+                                print(len(ringsHole))
+                                print(samePts)
+                                print(sameKMs)
+                                print(geom1)
+                                print(geom2)
 
                             # Alte Löcher hinzufügen
                             for m in range(1, geom1.GetGeometryCount()):
@@ -654,7 +663,7 @@ class UtilitiesGeom:
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
         if len(geomsOut) < len(geomsIn):
-            return UtilitiesGeom.union3D(geomsOut, count + 1)
+            return UtilitiesGeom.union3D(geomsOut)
 
         # Wenn fertig: Zurückgeben
         else:

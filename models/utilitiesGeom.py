@@ -285,7 +285,7 @@ class UtilitiesGeom:
             return simpList
 
     @staticmethod
-    def union3D(geomsIn, count=1):
+    def union3D(geomsIn):
         """ Vereinigen von OGR-Polygonen, sofern möglich
 
         Args:
@@ -505,6 +505,7 @@ class UtilitiesGeom:
                                     ringHole.CloseRings()
                                     ringsHole.append(ringHole)
 
+                            # Größtes "Loch" heraussuchen und als eigentliche Geometrie nehmen
                             maxLength, maxO = -sys.maxsize, None
                             for o in range(0, len(ringsHole)):
                                 ring = ringsHole[o]
@@ -514,6 +515,7 @@ class UtilitiesGeom:
                             ring = ringsHole[maxO]
                             geometry.AddGeometry(ring)
 
+                            # Alte Löcher hinzufügen
                             for m in range(1, geom1.GetGeometryCount()):
                                 geometry.AddGeometry(geom1.GetGeometryRef(m))
                             for n in range(1, geom2.GetGeometryCount()):
@@ -535,27 +537,26 @@ class UtilitiesGeom:
                         for h in range(1, geom1.GetGeometryCount()):
                             innerRing1 = geom1.GetGeometryRef(h)
 
-                            # Alle Eckpunkte miteinander vergleichen
-                            samePts = []
-                            ks = []
-                            allKs = [False] * (innerRing1.GetPointCount()-1)
-                            allMs = [False] * (ring2.GetPointCount()-1)
+                            # Alle Eckpunkte miteinander vergleichen und Gleichheit notieren
+                            samePts, ks = [], []
+                            allKs, allMs = [False] * (innerRing1.GetPointCount()-1), [False] * (ring2.GetPointCount()-1)
                             for k in range(0, innerRing1.GetPointCount() - 1):
                                 for m in range(0, ring2.GetPointCount() - 1):
                                     if innerRing1.GetPoint(k) == ring2.GetPoint(m):
                                         ks.append(k)
                                         samePts.append(innerRing1.GetPoint(k))
-                                        allKs[k] = True
-                                        allMs[m] = True
+                                        allKs[k], allMs[m] = True, True
                                         break
 
                             # Wenn min. zwei gleiche Eckpunkte gefunden: Neue Lochgeometrie erzeugen
                             if len(samePts) > 1:
                                 newRings = []
+
+                                # Mehrere neue Löcher möglich: Iterieren, bis alle Punkte genutzt wurden
                                 while False in allKs or False in allMs:
                                     newRing = ogr.Geometry(ogr.wkbLinearRing)
-                                    #print("ks: " + str(allKs))
-                                    #print("ms: " + str(allMs))
+
+                                    # Startpunkt heraussuchen: Darf kein gleicher Punkt sein
                                     if False in allKs:
                                         start = allKs.index(False)
                                     elif False in allMs:
@@ -574,27 +575,30 @@ class UtilitiesGeom:
                                             if start is not None:
                                                 break
                                             if k <= 0:
-                                                s = ring2.GetPointCount()-1
-                                                e = mFalse
+                                                s, e = ring2.GetPointCount()-1, mFalse
 
-                                    n = start
-                                    end = innerRing1.GetPointCount()-1
+                                    # Geometrie erstellen
+                                    n, end = start, innerRing1.GetPointCount()-1
                                     find = True
+
+                                    # Über inneren Ring gehen
                                     while n < end:
                                         point1 = innerRing1.GetPoint(n)
                                         newRing.AddPoint(point1[0], point1[1], point1[2])
                                         allKs[n] = True
-                                        #print("Add1: n" + str(n))
+
+                                        # Bis gleicher Punkt zu anderer Wand gefunden
                                         if point1 in samePts and find:
                                             for o in range(0, ring2.GetPointCount()):
                                                 point2 = ring2.GetPoint(o)
                                                 if point2 == point1:
                                                     stop = False
+
+                                                    # Über andere Wand gehen, bis gleicher Punkt zu Wand gefunden
                                                     for p in range(o + 1, ring2.GetPointCount()-1):
                                                         point3 = ring2.GetPoint(p)
                                                         newRing.AddPoint(point3[0], point3[1], point3[2])
                                                         allMs[p] = True
-                                                        #print("Add2: p" + str(p))
                                                         if point3 in samePts:
                                                             stop = True
                                                             break
@@ -603,9 +607,10 @@ class UtilitiesGeom:
                                                             point3 = ring2.GetPoint(q)
                                                             newRing.AddPoint(point3[0], point3[1], point3[2])
                                                             allMs[q] = True
-                                                            #print("Add3: q" + str(q))
                                                             if point3 in samePts:
                                                                 break
+
+                                                    # Loch zu Ende schließen
                                                     for r in range(0, innerRing1.GetPointCount()):
                                                         point = innerRing1.GetPoint(r)
                                                         if point == point3:
@@ -620,19 +625,11 @@ class UtilitiesGeom:
                                             n = 0
                                             end = start
 
-                                    #print("ks: " + str(allKs))
-                                    #print("ms: " + str(allMs))
-                                    if False in allKs or False in allMs:
-                                        print("Hier fehlt noch ein Loch!!!")
-                                    else:
-                                        print("Es fehlt kein Loch mehr!")
-                                        print(innerRing1)
-                                        print(ring2)
-                                        print(newRing)
-
                                     # Geometrie abschließen und hinzufügen
                                     newRing.CloseRings()
                                     newRings.append(newRing)
+
+                                # Neue Geometrie aus alter entnehmen und um neue Löcher ergänzen
                                 newGeom1 = ogr.Geometry(ogr.wkbPolygon)
                                 for n in range(0, geom1.GetGeometryCount()):
                                     if n != h:
@@ -656,7 +653,7 @@ class UtilitiesGeom:
                 geomsOut.append(geomsIn[i])
 
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
-        if len(geomsOut) < len(geomsIn) and count < 9:
+        if len(geomsOut) < len(geomsIn):
             return UtilitiesGeom.union3D(geomsOut, count + 1)
 
         # Wenn fertig: Zurückgeben

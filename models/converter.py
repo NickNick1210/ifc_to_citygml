@@ -1761,12 +1761,14 @@ class Converter(QgsTask):
         print("nach Walls")
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         print("nach Doors")
+        # TODO: Fenster testen
         # openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         print("nach Windows")
         walls = self.assignOpenings(openings, walls)
         print("nach Openings-Zuordnung")
         walls = self.adjustWallOpenings(walls)
         print("nach Wand-Openings-Anpassung")
+        # TODO: AdjustWallSize testen
         # walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
         print("nach Wand-Höhen-Anpassung")
 
@@ -2175,17 +2177,16 @@ class Converter(QgsTask):
         ifcRelSpaceBoundaries = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
         psetCommon = "Pset_DoorCommon" if type == "ifcDoor" else "Pset_WindowCommon"
         for ifcOpening in ifcOpenings:
-            extCount, intCount = 0, 0
-            for ifcRelSpaceBoundary in ifcRelSpaceBoundaries:
-                relElem = ifcRelSpaceBoundary.RelatedBuildingElement
-                if relElem == ifcOpening:
-                    if ifcRelSpaceBoundary.InternalOrExternalBoundary == "EXTERNAL":
-                        extCount += 1
-                    elif ifcRelSpaceBoundary.InternalOrExternalBoundary == "INTERNAL":
-                        intCount += 1
-            if extCount > 0:
-                ifcOpeningsExt.append(ifcOpening)
-            elif intCount == 0 and UtilitiesIfc.findPset(ifcOpening, psetCommon, "IsExternal"):
+            ext = UtilitiesIfc.findPset(ifcOpening, psetCommon, "IsExternal")
+            if ext is None:
+                ext = False
+                for ifcRelSpaceBoundary in ifcRelSpaceBoundaries:
+                    relElem = ifcRelSpaceBoundary.RelatedBuildingElement
+                    if relElem == ifcOpening and ifcRelSpaceBoundary.InternalOrExternalBoundary == "EXTERNAL":
+                        ext = True
+                if ext:
+                    ifcOpeningsExt.append(ifcOpening)
+            elif ext:
                 ifcOpeningsExt.append(ifcOpening)
 
         # Namen der Öffnungen heraussuchen
@@ -2193,7 +2194,7 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        for i in range(30, 31):
+        for i in range(0, 1):
             # for i in range(0, len(ifcOpeningsExt)):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
@@ -2286,11 +2287,29 @@ class Converter(QgsTask):
                     dists.append(0)
 
             # Größte Fläche als Außenfläche
-            lastMaxDist = None
+            lastMaxDist, bigDists = None, []
             for k in range(0, len(dists)):
                 if dists[k] > 0.95 * max(dists):
                     lastMaxDist = k
+                if dists[k] > 0.5 * max(dists):
+                    bigDists.append(k)
             finalWall = [wall[0][lastMaxDist]]
+
+            # Ggf. weitere Flächen, sofern diese in einer Ebene nur Hauptfläche sind
+            if len(bigDists) > 2:
+                maxGeom = wall[0][lastMaxDist].GetGeometryRef(0)
+                planeMax = UtilitiesGeom.getPlane(maxGeom.GetPoint(0), maxGeom.GetPoint(1), maxGeom.GetPoint(2))
+                pointMax = Point3D(maxGeom.GetPoint(0)[0], maxGeom.GetPoint(0)[1], maxGeom.GetPoint(0)[2])
+                for bigDist in bigDists:
+                    if bigDist != lastMaxDist:
+                        newGeom = wall[0][bigDist].GetGeometryRef(0)
+                        planeNew = UtilitiesGeom.getPlane(newGeom.GetPoint(0), newGeom.GetPoint(1), newGeom.GetPoint(2))
+                        angle = float(planeMax.angle_between(planeNew))
+                        if 0 <= angle < 0.01 or math.pi - 0.01 < angle < math.pi + 0.01 \
+                                or 2 * math.pi - 0.01 < angle < 2 * math.pi + 0.01:
+                            planeDist = float(planeNew.distance(pointMax))
+                            if planeDist < 0.01:
+                                finalWall.append(wall[0][bigDist])
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
             if len(wall[2]) != 0:
@@ -2304,7 +2323,6 @@ class Converter(QgsTask):
 
                     # Auf Nähe mit den Öffnungen (Türen und Fenster) prüfen
                     for i in range(0, len(wall[2])):
-                        print("i" + str(i))
                         if same:
                             break
                         opening = wall[2][i]
@@ -2335,7 +2353,6 @@ class Converter(QgsTask):
                     opening = wall[2][j]
                     verts = opening[0]
                     sPts, lastHeight = [], None
-                    print("j" + str(j) + ": " + str(opening[1]))
                     print(openBounds[j])
 
                     # Schnittpunkte zwischen Öffnung und Wand herausfinden

@@ -1761,14 +1761,13 @@ class Converter(QgsTask):
         print("nach Walls")
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         print("nach Doors")
-        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        # openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         print("nach Windows")
         walls = self.assignOpenings(openings, walls)
         print("nach Openings-Zuordnung")
         walls = self.adjustWallOpenings(walls)
         print("nach Wand-Openings-Anpassung")
-        #walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
-        # TODO: AdjustWallSize austesten
+        # walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
         print("nach Wand-Höhen-Anpassung")
 
         # Geometrie
@@ -2194,12 +2193,8 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        # TODO: Nach und nach alle Fenster durchprobieren
-        #for i in range(0, len(ifcOpeningsExt)):
-        tempLimit = 100
-        if len(ifcOpeningsExt) < tempLimit:
-            tempLimit = len(ifcOpeningsExt)
-        for i in range(0, tempLimit):
+        for i in range(30, 31):
+            # for i in range(0, len(ifcOpeningsExt)):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
             else:
@@ -2291,11 +2286,11 @@ class Converter(QgsTask):
                     dists.append(0)
 
             # Größte Fläche als Außenfläche
-            if dists.count(max(dists)) == 1:
-                ix = dists.index(max(dists))
-            else:
-                ix = len(dists) - dists[::-1].index(max(dists)) - 1
-            finalWall = [wall[0][ix]]
+            lastMaxDist = None
+            for k in range(0, len(dists)):
+                if dists[k] > 0.95 * max(dists):
+                    lastMaxDist = k
+            finalWall = [wall[0][lastMaxDist]]
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
             if len(wall[2]) != 0:
@@ -2309,6 +2304,7 @@ class Converter(QgsTask):
 
                     # Auf Nähe mit den Öffnungen (Türen und Fenster) prüfen
                     for i in range(0, len(wall[2])):
+                        print("i" + str(i))
                         if same:
                             break
                         opening = wall[2][i]
@@ -2330,6 +2326,7 @@ class Converter(QgsTask):
                         if near and maxDist < 0.5:
                             # Hinzufügen
                             openBounds[i].append([len(finalWall), wallGeom])
+                            print("OpenBound added: " + str(len(finalWall)) + " (" + str(wallGeom) + ")")
                             finalWall.append(wallGeom)
 
                 # Öffnungen durch eine gesamte Fläche darstellen
@@ -2338,6 +2335,8 @@ class Converter(QgsTask):
                     opening = wall[2][j]
                     verts = opening[0]
                     sPts, lastHeight = [], None
+                    print("j" + str(j) + ": " + str(opening[1]))
+                    print(openBounds[j])
 
                     # Schnittpunkte zwischen Öffnung und Wand herausfinden
                     startHor = False
@@ -2400,12 +2399,37 @@ class Converter(QgsTask):
                         # Neue Geometrie aus dem Loch erstellen
                         newGeomOpen = ogr.Geometry(ogr.wkbPolygon)
                         newGeomRing = ogr.Geometry(ogr.wkbLinearRing)
-                        for o in range(minHole.GetPointCount()-1, 0, -1):
-                            holePt = minHole.GetPoint(o)
-                            newGeomRing.AddPoint(holePt[0], holePt[1], holePt[2])
+                        if minHole is not None:
+                            for o in range(minHole.GetPointCount() - 1, 0, -1):
+                                holePt = minHole.GetPoint(o)
+                                newGeomRing.AddPoint(holePt[0], holePt[1], holePt[2])
+
+                        # Wenn kein Loch vorhanden: Hauptgeometrie nutzen
+                        else:
+                            openPts = []
+                            wallMainGeom = wallGeom.GetGeometryRef(0)
+                            for k in range(0, wallMainGeom.GetPointCount()):
+                                wallPt = wallMainGeom.GetPoint(k)
+                                print("Prüfpunkt: " + str(wallPt))
+                                print(openBounds[j])
+                                for openBound in openBounds[j]:
+                                    print(openBound)
+                                    for o in range(0, openBound[1].GetPointCount()):
+                                        boundPt = openBound[1].GetPoint(o)
+                                        print("Vergleichspunkt: " + str(boundPt))
+                                        if wallPt[0] - 0.001 < boundPt[0] < wallPt[0] + 0.001 and wallPt[1] - 0.001 < \
+                                                boundPt[1] < wallPt[1] + 0.001 and wallPt[2] - 0.001 < boundPt[2] < \
+                                                wallPt[2]:
+                                            openPts.append(wallPt)
+                            for openPt in openPts:
+                                newGeomRing.AddPoint(openPt[0], openPt[1], openPt[2])
+                                print("Neuer Punkt: " + str(openPt))
+
+                        # Geometrie abschließen
                         newGeomRing.CloseRings()
                         newGeomOpen.AddGeometry(newGeomRing)
                         opening[0] = [newGeomOpen]
+                        print(newGeomOpen)
 
                         # Begrenzungen entfernen
                         for openBound in openBounds[j]:
@@ -2473,9 +2497,11 @@ class Converter(QgsTask):
                                         ptEnd[0] - ptMid[0])
                                     if gradYSt - tol < gradYEnd < gradYSt + tol:
                                         # Z-Steigung in Bezug auf X-Verlauf
-                                        gradZSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[2] - ptSt[2]) / abs(
+                                        gradZSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[2] - ptSt[
+                                            2]) / abs(
                                             ptMid[0] - ptSt[0])
-                                        gradZEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[2] - ptMid[2]) / abs(
+                                        gradZEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[2] - ptMid[
+                                            2]) / abs(
                                             ptEnd[0] - ptMid[0])
                                         if gradZSt - tol < gradZEnd < gradZSt + tol:
                                             # Z-Steigung in Bezug auf Y-Verlauf

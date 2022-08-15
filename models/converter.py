@@ -1759,10 +1759,11 @@ class Converter(QgsTask):
         print("nach Roofs")
         walls = self.calcLoD3Walls(ifcBuilding)
         print("nach Walls")
-        openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        #openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         print("nach Doors")
         # TODO: Fenster testen
-        # openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        # TODO: Mittlere Kellerfenster zu tief in Wand
+        openings = self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         print("nach Windows")
         walls = self.assignOpenings(openings, walls)
         print("nach Openings-Zuordnung")
@@ -2194,8 +2195,8 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        for i in range(0, 1):
-            # for i in range(0, len(ifcOpeningsExt)):
+        for i in range(0, 5):
+        #for i in range(0, len(ifcOpeningsExt)):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
             else:
@@ -2310,6 +2311,7 @@ class Converter(QgsTask):
                             planeDist = float(planeNew.distance(pointMax))
                             if planeDist < 0.01:
                                 finalWall.append(wall[0][bigDist])
+                                print("Weitere Wand hinzugefügt in " + str(wall[1]))
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
             if len(wall[2]) != 0:
@@ -2344,7 +2346,6 @@ class Converter(QgsTask):
                         if near and maxDist < 0.5:
                             # Hinzufügen
                             openBounds[i].append([len(finalWall), wallGeom])
-                            print("OpenBound added: " + str(len(finalWall)) + " (" + str(wallGeom) + ")")
                             finalWall.append(wallGeom)
 
                 # Öffnungen durch eine gesamte Fläche darstellen
@@ -2353,7 +2354,6 @@ class Converter(QgsTask):
                     opening = wall[2][j]
                     verts = opening[0]
                     sPts, lastHeight = [], None
-                    print(openBounds[j])
 
                     # Schnittpunkte zwischen Öffnung und Wand herausfinden
                     startHor = False

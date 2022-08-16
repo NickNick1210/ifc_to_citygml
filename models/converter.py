@@ -1759,9 +1759,9 @@ class Converter(QgsTask):
         print("nach Roofs")
         walls = self.calcLoD3Walls(ifcBuilding)
         print("nach Walls")
+        # TODO: Türen wieder einkommentieren
         # openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         print("nach Doors")
-        # TODO: Fenster testen
         openings = self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         print("nach Windows")
         walls = self.assignOpenings(openings, walls)
@@ -2198,8 +2198,7 @@ class Converter(QgsTask):
         Returns:
             Die berechneten Öffnungs-Vertizes als Liste
         """
-        openings = []
-        openingNames = []
+        openings, openingNames = [], []
 
         # IFC-Elemente der Öffnungen
         ifcOpenings = UtilitiesIfc.findElement(self.ifc, ifcBuilding, type, result=[])
@@ -2226,7 +2225,9 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        for i in range(2, 3):
+        # TODO: Fenster nach und nach testen
+        # TODO: EG-Fenster ohne Geometrie
+        for i in range(30, 31):
             # for i in range(0, len(ifcOpeningsExt)):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))

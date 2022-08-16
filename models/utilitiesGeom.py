@@ -335,7 +335,7 @@ class UtilitiesGeom:
                 norm1, norm2 = np.cross(r11, r12), np.cross(r21, r22)
                 unit1, unit2 = norm1 / np.linalg.norm(norm1), norm2 / np.linalg.norm(norm2)
                 unit2Neg = np.negative(unit2)
-                tol = 0.0001
+                tol = 0.001
                 if UtilitiesGeom.isEqual(unit1, unit2, tol) or UtilitiesGeom.isEqual(unit1, unit2Neg, tol):
 
                     # Alle Eckpunkte miteinander vergleichen
@@ -343,7 +343,10 @@ class UtilitiesGeom:
                     ks, ms = [], []
                     for k in range(0, ring1.GetPointCount() - 1):
                         for m in range(0, ring2.GetPointCount() - 1):
-                            if ring1.GetPoint(k) == ring2.GetPoint(m):
+                            if ring1.GetPoint(k)[0] - 0.0001 < ring2.GetPoint(m)[0] < ring1.GetPoint(k)[0] + 0.0001 and \
+                                    ring1.GetPoint(k)[1] - 0.0001 < ring2.GetPoint(m)[1] < ring1.GetPoint(k)[
+                                1] + 0.0001 and ring1.GetPoint(k)[2] - 0.0001 < ring2.GetPoint(m)[2] < \
+                                    ring1.GetPoint(k)[2] + 0.0001:
                                 ks.append(k)
                                 if m not in ms:
                                     ms.append(m)
@@ -512,17 +515,9 @@ class UtilitiesGeom:
                                 if ring.Length() > maxLength:
                                     maxLength = ring.Length()
                                     maxO = o
-                            try:
-                                ring = ringsHole[maxO]
-                                geometry.AddGeometry(ring)
-                            except:
-                                print(maxO)
-                                print(maxLength)
-                                print(len(ringsHole))
-                                print(samePts)
-                                print(sameKMs)
-                                print(geom1)
-                                print(geom2)
+
+                            ring = ringsHole[maxO]
+                            geometry.AddGeometry(ring)
 
                             # Alte Löcher hinzufügen
                             for m in range(1, geom1.GetGeometryCount()):
@@ -548,7 +543,8 @@ class UtilitiesGeom:
 
                             # Alle Eckpunkte miteinander vergleichen und Gleichheit notieren
                             samePts, ks = [], []
-                            allKs, allMs = [False] * (innerRing1.GetPointCount()-1), [False] * (ring2.GetPointCount()-1)
+                            allKs, allMs = [False] * (innerRing1.GetPointCount() - 1), [False] * (
+                                        ring2.GetPointCount() - 1)
                             for k in range(0, innerRing1.GetPointCount() - 1):
                                 for m in range(0, ring2.GetPointCount() - 1):
                                     if innerRing1.GetPoint(k) == ring2.GetPoint(m):
@@ -571,7 +567,7 @@ class UtilitiesGeom:
                                     elif False in allMs:
                                         mFalse = allMs.index(False)
                                         start = None
-                                        s = mFalse-1 if mFalse >= 1 else ring2.GetPointCount()-1
+                                        s = mFalse - 1 if mFalse >= 1 else ring2.GetPointCount() - 1
                                         e = -1 if mFalse >= 1 else mFalse
                                         for k in range(s, e, -1):
                                             mPoint = ring2.GetPoint(k)
@@ -584,10 +580,10 @@ class UtilitiesGeom:
                                             if start is not None:
                                                 break
                                             if k <= 0:
-                                                s, e = ring2.GetPointCount()-1, mFalse
+                                                s, e = ring2.GetPointCount() - 1, mFalse
 
                                     # Geometrie erstellen
-                                    n, end = start, innerRing1.GetPointCount()-1
+                                    n, end = start, innerRing1.GetPointCount() - 1
                                     find = True
 
                                     # Über inneren Ring gehen
@@ -604,7 +600,7 @@ class UtilitiesGeom:
                                                     stop = False
 
                                                     # Über andere Wand gehen, bis gleicher Punkt zu Wand gefunden
-                                                    for p in range(o + 1, ring2.GetPointCount()-1):
+                                                    for p in range(o + 1, ring2.GetPointCount() - 1):
                                                         point3 = ring2.GetPoint(p)
                                                         newRing.AddPoint(point3[0], point3[1], point3[2])
                                                         allMs[p] = True

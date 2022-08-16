@@ -1762,7 +1762,6 @@ class Converter(QgsTask):
         # openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         print("nach Doors")
         # TODO: Fenster testen
-        # TODO: Mittlere Kellerfenster zu tief in Wand
         openings = self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         print("nach Windows")
         walls = self.assignOpenings(openings, walls)
@@ -2227,7 +2226,7 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        for i in range(0, 1):
+        for i in range(2, 3):
             # for i in range(0, len(ifcOpeningsExt)):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
@@ -2343,7 +2342,6 @@ class Converter(QgsTask):
                             planeDist = float(planeNew.distance(pointMax))
                             if planeDist < 0.01:
                                 finalWall.append(wall[0][bigDist])
-                                print("Weitere Wand hinzugefügt in " + str(wall[1]))
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
             if len(wall[2]) != 0:
@@ -2459,26 +2457,20 @@ class Converter(QgsTask):
                             wallMainGeom = wallGeom.GetGeometryRef(0)
                             for k in range(0, wallMainGeom.GetPointCount()):
                                 wallPt = wallMainGeom.GetPoint(k)
-                                print("Prüfpunkt: " + str(wallPt))
-                                print(openBounds[j])
                                 for openBound in openBounds[j]:
-                                    print(openBound)
                                     for o in range(0, openBound[1].GetPointCount()):
                                         boundPt = openBound[1].GetPoint(o)
-                                        print("Vergleichspunkt: " + str(boundPt))
                                         if wallPt[0] - 0.001 < boundPt[0] < wallPt[0] + 0.001 and wallPt[1] - 0.001 < \
                                                 boundPt[1] < wallPt[1] + 0.001 and wallPt[2] - 0.001 < boundPt[2] < \
                                                 wallPt[2]:
                                             openPts.append(wallPt)
                             for openPt in openPts:
                                 newGeomRing.AddPoint(openPt[0], openPt[1], openPt[2])
-                                print("Neuer Punkt: " + str(openPt))
 
                         # Geometrie abschließen
                         newGeomRing.CloseRings()
                         newGeomOpen.AddGeometry(newGeomRing)
                         opening[0] = [newGeomOpen]
-                        print(newGeomOpen)
 
                         # Begrenzungen entfernen
                         for openBound in openBounds[j]:

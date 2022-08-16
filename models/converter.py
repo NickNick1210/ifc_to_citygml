@@ -1759,7 +1759,7 @@ class Converter(QgsTask):
         print("nach Roofs")
         walls = self.calcLoD3Walls(ifcBuilding)
         print("nach Walls")
-        #openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        # openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         print("nach Doors")
         # TODO: Fenster testen
         # TODO: Mittlere Kellerfenster zu tief in Wand
@@ -1961,22 +1961,54 @@ class Converter(QgsTask):
         # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
         if floor:
             bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
-            finalBases = [bases[0]]
-            for i in range(1, len(bases)):
-                base = bases[i][0][0]
-                baseLast = bases[i - 1][0][0]
-                diff = base.Difference(baseLast)
+            minHeight = bases[0][0][0].GetGeometryRef(0).GetPoint(0)[2]
+            finalBases, removedBases = deepcopy(bases), []
+            for i in range(0, len(bases)):
 
-                if diff is not None and not diff.IsEmpty():
-                    wkt = diff.ExportToWkt()
-                    heightBelow = baseLast.GetGeometryRef(0).GetPoint(0)[2]
-                    height = base.GetGeometryRef(0).GetPoint(0)[2]
-                    wkt = wkt.replace(" " + str(heightBelow) + ",", " " + str(height) + ",").replace(
-                        " " + str(heightBelow) + ")", " " + str(height) + ")")
-                    diff = ogr.CreateGeometryFromWkt(wkt)
-                    newBase = deepcopy(bases[1])
-                    newBase[0][0] = diff
-                    finalBases.append(newBase)
+                # Unterste Flächen ohne Prüfungs durchlassen
+                currHeight = bases[i][0][0].GetGeometryRef(0).GetPoint(0)[2]
+                gotDiff, diffGeom = False, None
+                if not (minHeight - 0.01 < currHeight < minHeight + 0.01):
+
+                    # Differenz zwischen Fläche und den vorherigen Flächen berechnen
+                    base = bases[i][0][0]
+                    for k in range(0, i):
+                        if k not in removedBases:
+                            baseLast = bases[k][0][0]
+                            diff = base.Difference(baseLast)
+                            bArea = base.Area()
+                            diffArea = diff.Area()
+
+                            # Differenzfläche muss bestimmte Größe haben,
+                            # um relevant, aber nicht zu gleich zur Ausgangsfläche zu sein
+                            if diff is not None and diffArea < bArea * 0.99:
+                                gotDiff = True
+                                if not diff.IsEmpty() and (bArea * 0.03 < diffArea or diffArea > 2) and diffArea > 0.1:
+
+                                    # Diff-Geometrie unter Korrektur der Höhe übernehmen
+                                    diffGeom = ogr.Geometry(ogr.wkbPolygon)
+                                    diffRing = ogr.Geometry(ogr.wkbLinearRing)
+                                    height = base.GetGeometryRef(0).GetPoint(0)[2]
+                                    for n in range(0, diff.GetGeometryCount()):
+                                        dRingOld = diff.GetGeometryRef(0)
+                                        for m in range(0, dRingOld.GetPointCount()):
+                                            diffRing.AddPoint(dRingOld.GetPoint(m)[0], dRingOld.GetPoint(m)[1], height)
+                                        diffRing.CloseRings()
+                                        if diffRing is not None and not diffRing.IsEmpty():
+                                            diffGeom.AddGeometry(diffRing)
+
+                # Letzte Differenz übernehmen.
+                if diffGeom is not None:
+                    finalBases[i][0][0] = diffGeom
+
+                # Falls nur Differenzen stattgefunden haben, die der Ausgangsfläche entsprechen: Entfernen
+                elif gotDiff:
+                    removedBases.append(i)
+            removedBases.sort(reverse=True)
+            for removedBase in removedBases:
+                finalBases.pop(removedBase)
+
+        # Falls nur .BASE
         else:
             finalBases = bases
 
@@ -2195,8 +2227,8 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        for i in range(0, 5):
-        #for i in range(0, len(ifcOpeningsExt)):
+        for i in range(0, 1):
+            # for i in range(0, len(ifcOpeningsExt)):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
             else:

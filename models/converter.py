@@ -104,7 +104,7 @@ class Converter(QgsTask):
         elif self.lod == 3:
             root = self.convertLoD3(root, self.eade)
         elif self.lod == 4:
-            # TODO LoD4
+            # TODO: LoD4
             pass
 
         # Schreiben der CityGML in eine Datei
@@ -1759,17 +1759,17 @@ class Converter(QgsTask):
         print("nach Roofs")
         walls = self.calcLoD3Walls(ifcBuilding)
         print("nach Walls")
-        # TODO: Türen wieder einkommentieren
-        # openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
         print("nach Doors")
-        openings = self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        # TODO: Wieder einkommentieren
+        #openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
         print("nach Windows")
         walls = self.assignOpenings(openings, walls)
         print("nach Openings-Zuordnung")
         walls = self.adjustWallOpenings(walls)
         print("nach Wand-Openings-Anpassung")
         # TODO: AdjustWallSize testen
-        # walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
+        walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig)
         print("nach Wand-Höhen-Anpassung")
 
         # Geometrie
@@ -2225,10 +2225,9 @@ class Converter(QgsTask):
             openingNames.append(ifcOpening.Name)
 
         # Geometrie
-        # TODO: Fenster nach und nach testen
-        # TODO: EG-Fenster ohne Geometrie
-        for i in range(30, 31):
-            # for i in range(0, len(ifcOpeningsExt)):
+        # TODO: Wieder einkommentieren
+        for i in range(0, 5):
+        #for i in range(0, len(ifcOpeningsExt)):
             if type == "ifcDoor":
                 print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
             else:
@@ -2456,15 +2455,25 @@ class Converter(QgsTask):
                         else:
                             openPts = []
                             wallMainGeom = wallGeom.GetGeometryRef(0)
+                            tol = 0.001
                             for k in range(0, wallMainGeom.GetPointCount()):
                                 wallPt = wallMainGeom.GetPoint(k)
+                                found = False
                                 for openBound in openBounds[j]:
-                                    for o in range(0, openBound[1].GetPointCount()):
-                                        boundPt = openBound[1].GetPoint(o)
-                                        if wallPt[0] - 0.001 < boundPt[0] < wallPt[0] + 0.001 and wallPt[1] - 0.001 < \
-                                                boundPt[1] < wallPt[1] + 0.001 and wallPt[2] - 0.001 < boundPt[2] < \
-                                                wallPt[2]:
-                                            openPts.append(wallPt)
+                                    openBoundRing = openBound[1].GetGeometryRef(0)
+                                    for o in range(0, openBoundRing.GetPointCount()):
+                                        boundPt = openBoundRing.GetPoint(o)
+                                        dist = math.sqrt((boundPt[0] - wallPt[0]) ** 2 + (boundPt[1] - wallPt[1]) ** 2 + (
+                                                boundPt[2] - wallPt[2]) ** 2)
+                                        if wallPt[0] - tol < boundPt[0] < wallPt[0] + tol and wallPt[1] - tol < \
+                                                boundPt[1] < wallPt[1] + tol and wallPt[2] - tol < boundPt[2] < \
+                                                wallPt[2] + tol:
+                                            if wallPt not in openPts:
+                                                openPts.append(wallPt)
+                                                found = True
+                                                break
+                                    if found:
+                                        break
                             for openPt in openPts:
                                 newGeomRing.AddPoint(openPt[0], openPt[1], openPt[2])
 
@@ -2606,8 +2615,9 @@ class Converter(QgsTask):
         """
 
         # Alle Wände durchgehen
-        for i in range(0, len(walls)):
-            print("Wall " + str(i) + " von " + str(len(walls)) + ": " + str(walls[i][1]))
+        # TODO: Wieder einkommentieren
+        for i in range(45, 58):
+        #for i in range(0, len(walls)):
             wallGeom = walls[i][0][0]
             wallRing = wallGeom.GetGeometryRef(0)
             wallGeomTemp, wallRingTemp = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
@@ -2619,11 +2629,12 @@ class Converter(QgsTask):
 
                 # HÖHE #
                 # Gebufferte Punktgeometrie
+                tol = 0.001
                 ptPolGeom, ptPolRing = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
-                ptPolRing.AddPoint(pt[0] - 0.001, pt[1] - 0.001, pt[2])
-                ptPolRing.AddPoint(pt[0] - 0.001, pt[1] + 0.001, pt[2])
-                ptPolRing.AddPoint(pt[0] + 0.001, pt[1] + 0.001, pt[2])
-                ptPolRing.AddPoint(pt[0] + 0.001, pt[1] - 0.001, pt[2])
+                ptPolRing.AddPoint(pt[0] - tol, pt[1] - tol, pt[2])
+                ptPolRing.AddPoint(pt[0] - tol, pt[1] + tol, pt[2])
+                ptPolRing.AddPoint(pt[0] + tol, pt[1] + tol, pt[2])
+                ptPolRing.AddPoint(pt[0] + tol, pt[1] - tol, pt[2])
                 ptPolRing.CloseRings()
                 ptPolGeom.AddGeometry(ptPolRing)
 
@@ -2668,60 +2679,63 @@ class Converter(QgsTask):
                     if found:
                         break
 
-                # ÖFFNUNGEN und GEOMETRIE #
-                # Über alle Nebenwände und dessen Eckpunkte gehen
-                opBound, pts = False, []
-                for m in range(1, len(walls[i][0])):
-                    wallOpGeom = walls[i][0][m]
-                    wallOpRing = wallOpGeom.GetGeometryRef(0)
-                    for n in range(0, wallOpRing.GetPointCount()):
-                        wallOpPt = wallOpRing.GetPoint(n)
-                        if wallOpPt == pt:
-                            if inHole:
-                                newN = wallOpRing.GetPointCount() - 2 if n == 0 else n - 1
-                                lastPt = wallOpRing.GetPoint(newN)
-                            else:
-                                nextPt = wallOpRing.GetPoint(n + 1)
-                            opBound = True
+                if found:
+                    # ÖFFNUNGEN und GEOMETRIE #
+                    # Über alle Nebenwände und dessen Eckpunkte gehen
+                    opBound, pts = False, []
+                    for m in range(1, len(walls[i][0])):
+                        wallOpGeom = walls[i][0][m]
+                        wallOpRing = wallOpGeom.GetGeometryRef(0)
+                        for n in range(0, wallOpRing.GetPointCount()):
+                            wallOpPt = wallOpRing.GetPoint(n)
+                            if wallOpPt == pt:
+                                if inHole:
+                                    lastN = wallOpRing.GetPointCount() - 2 if n == 0 else n - 1
+                                    lastPt = wallOpRing.GetPoint(lastN)
+                                else:
+                                    nextPt = wallOpRing.GetPoint(n + 1)
+                                opBound = True
+                                break
+                        if opBound:
                             break
-                    if opBound:
-                        break
 
-                # Wenn Wandpunkt gleich zu einem Nebenwandpunkt
-                if opBound:
-                    # Bereits Teil der Öffnung: Punkt merken
-                    if inHole:
-                        wallHoles[len(wallHoles) - 1].append(pt)
-                    # Anfang einer Öffnung: Neue Nebenwand beginnen, Punkt merken und setzen
+                    # Wenn Wandpunkt gleich zu einem Nebenwandpunkt
+                    if opBound:
+                        # Bereits Teil der Öffnung: Punkt merken
+                        if inHole:
+                            wallHoles[len(wallHoles) - 1].append(pt)
+                        # Anfang einer Öffnung: Neue Nebenwand beginnen, Punkt merken und setzen
+                        else:
+                            inHole = True
+                            newWallGeom = ogr.Geometry(ogr.wkbPolygon)
+                            newWallRing = ogr.Geometry(ogr.wkbLinearRing)
+                            newWallRing.AddPoint(nextPt[0], nextPt[1], nextPt[2])
+                            newWallRing.AddPoint(pt[0], pt[1], pt[2])
+                            wallHoles.append([pt])
+                            if not found:
+                                height = pt[2]
+                            wallRingTemp.AddPoint(pt[0], pt[1], height)
+                            lastHeight = height
+
+                    # Wenn Wandpunkt gleich zu keinem Nebenwandpunkt
                     else:
-                        inHole = True
-                        newWallGeom = ogr.Geometry(ogr.wkbPolygon)
-                        newWallRing = ogr.Geometry(ogr.wkbLinearRing)
-                        newWallRing.AddPoint(nextPt[0], nextPt[1], nextPt[2])
-                        newWallRing.AddPoint(pt[0], pt[1], pt[2])
-                        wallHoles.append([pt])
+                        # Nach Öffnungsende: Neue Nebenwand schließen, letzten Punkt merken und setzen
+                        if inHole:
+                            inHole = False
+                            ptLast = wallRing.GetPoint(j - 1)
+                            newWallRing.AddPoint(ptLast[0], ptLast[1], ptLast[2])
+                            newWallRing.AddPoint(lastPt[0], lastPt[1], lastPt[2])
+                            newWallRing.CloseRings()
+                            newWallGeom.AddGeometry(newWallRing)
+                            newWalls.append(newWallGeom)
+                            wallRingTemp.AddPoint(ptLast[0], ptLast[1], lastHeight)
+
+                        # Punkt setzen
                         if not found:
                             height = pt[2]
                         wallRingTemp.AddPoint(pt[0], pt[1], height)
-                        lastHeight = height
-
-                # Wenn Wandpunkt gleich zu keinem Nebenwandpunkt
                 else:
-                    # Nach Öffnungsende: Neue Nebenwand schließen, letzten Punkt merken und setzen
-                    if inHole:
-                        inHole = False
-                        ptLast = wallRing.GetPoint(j - 1)
-                        newWallRing.AddPoint(ptLast[0], ptLast[1], ptLast[2])
-                        newWallRing.AddPoint(lastPt[0], lastPt[1], lastPt[2])
-                        newWallRing.CloseRings()
-                        newWallGeom.AddGeometry(newWallRing)
-                        newWalls.append(newWallGeom)
-                        wallRingTemp.AddPoint(ptLast[0], ptLast[1], lastHeight)
-
-                    # Punkt setzen
-                    if not found:
-                        height = pt[2]
-                    wallRingTemp.AddPoint(pt[0], pt[1], height)
+                    wallRingTemp.AddPoint(pt[0], pt[1], pt[2])
 
             # Geometrie abschließen
             wallRingTemp.CloseRings()

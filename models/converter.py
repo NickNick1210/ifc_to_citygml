@@ -108,10 +108,12 @@ class Converter(QgsTask):
             pass
 
         # Schreiben der CityGML in eine Datei
+        self.parent.dlg.log(self.tr(u'CityGML file is generated'))
         self.writeCGML(root)
 
         # Integration der CityGML in QGIS
         if self.integr:
+            self.parent.dlg.log(self.tr(u'Model is integrated into QGIS'))
             self.parent.gis.loadIntoGIS(self.outPath)
 
         # Abschließen
@@ -180,14 +182,20 @@ class Converter(QgsTask):
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Konvertierung
+            self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             self.convertBldgAttr(ifcBuilding, chBldg)
+            self.parent.dlg.log(self.tr(u'Building footprint is calculated'))
             self.convertLoD0FootPrint(ifcBuilding, chBldg)
+            self.parent.dlg.log(self.tr(u'Building roofedge is calculated'))
             self.convertLoD0RoofEdge(ifcBuilding, chBldg)
+            self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
+                self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
                 pass
 
@@ -215,13 +223,17 @@ class Converter(QgsTask):
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Konvertierung
+            self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             height = self.convertBldgAttr(ifcBuilding, chBldg)
             self.convertLoD1Solid(ifcBuilding, chBldg, height)
+            self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
+                self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
                 pass
 
@@ -249,14 +261,18 @@ class Converter(QgsTask):
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Konvertierung
+            self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             height = self.convertBldgAttr(ifcBuilding, chBldg)
             links = self.convertLoD2BldgBound(ifcBuilding, chBldg, height)
             self.convertLoDSolid(chBldg, links, 2)
+            self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
+                self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
                 pass
 
@@ -284,14 +300,18 @@ class Converter(QgsTask):
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Konvertierung
-            height = self.convertBldgAttr(ifcBuilding, chBldg)
+            self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
+            self.convertBldgAttr(ifcBuilding, chBldg)
             links = self.convertLoD3BldgBound(ifcBuilding, chBldg)
             self.convertLoDSolid(chBldg, links, 3)
+            self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
+                self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
                 pass
 
@@ -824,11 +844,13 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
                 return
 
-        # Berechnung Grundfläche
-        geomBase = self.calcPlane(ifcSlabs)
-
-        # Berechnung Umriss
-        geometries = self.extrude(geomBase, height)
+        # Berechnung der Geometrien
+        self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
+        geometries = [self.calcPlane(ifcSlabs)]
+        self.parent.dlg.log(self.tr(u'Building geometry: roof surface is calculated'))
+        geometries += [self.calcLoD1Roof(geometries[0], height)]
+        self.parent.dlg.log(self.tr(u'Building geometry: walls surfaces are calculated'))
+        geometries += self.calcLoD1Walls(geometries[0], height)
 
         # Geometrie
         if geometries is not None and len(geometries) > 0:
@@ -844,18 +866,17 @@ class Converter(QgsTask):
                 chBldgSolidSM.append(geomXML)
 
     @staticmethod
-    def extrude(geomBase, height):
-        """ Berechnung eines Körpers als Extrusion einer Grundfläche
+    def calcLoD1Roof(geomBase, height):
+        """ Berechnung des Daches als Anhebung der Grundfläche
 
         Args:
             geomBase: Grundfläche des Körpers als Polygon
-            height: Höhe der Extrusion als float
+            height: Höhe der Anhebung als float
 
         Returns:
-            Liste der erzeugten Umriss-Polygone
+            Das erzeugte Dach als Geometrie
         """
         # Grundfläche
-        geometries = [geomBase]
         ringBase = geomBase.GetGeometryRef(0)
 
         # Dachfläche
@@ -865,9 +886,25 @@ class Converter(QgsTask):
             pt = ringBase.GetPoint(i)
             ringRoof.AddPoint(pt[0], pt[1], pt[2] + height)
         geomRoof.AddGeometry(ringRoof)
-        geometries.append(geomRoof)
+
+        return geomRoof
+
+    @staticmethod
+    def calcLoD1Walls(geomBase, height):
+        """ Berechnung der Wände als Extrusion der Grundfläche
+
+        Args:
+            geomBase: Grundfläche des Körpers als Polygon
+            height: Höhe der Extrusion als float
+
+        Returns:
+            Liste der erzeugten Wand-Geometrien
+        """
+        # Grundfläche
+        ringBase = geomBase.GetGeometryRef(0)
 
         # Wandflächen
+        geomWalls = []
         for i in range(0, ringBase.GetPointCount() - 1):
             geomWall = ogr.Geometry(ogr.wkbPolygon)
             ringWall = ogr.Geometry(ogr.wkbLinearRing)
@@ -879,9 +916,9 @@ class Converter(QgsTask):
             ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
             ringWall.CloseRings()
             geomWall.AddGeometry(ringWall)
-            geometries.append(geomWall)
+            geomWalls.append(geomWall)
 
-        return geometries
+        return geomWalls
 
     def convertLoD2BldgBound(self, ifcBuilding, chBldg, height):
         """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 2
@@ -905,6 +942,7 @@ class Converter(QgsTask):
                 return
 
         # Berechnung Grundfläche
+        self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
         geomBase = self.calcPlane(ifcSlabs)
         if geomBase is None:
             return []
@@ -918,10 +956,15 @@ class Converter(QgsTask):
             return None
 
         # Berechnung
+        self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are extracted'))
         geomRoofs = self.extractRoofs(ifcRoofs)
+        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         geomWalls, geomRoofsNew = self.calcLoD2Walls(geomBase, geomRoofs, height)
+        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces between roofs are calculated'))
         geomWallsR, geomRoofs = self.calcLoD2RoofWalls(geomRoofs + geomRoofsNew)
+        self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
         geomRoofs = self.calcLoD2Roofs(geomRoofs, geomBase)
+        self.parent.dlg.log(self.tr(u'Building geometry: roof and wall surfaces are adjusted'))
         geomWalls += self.checkLoD2RoofWalls(geomWallsR, geomRoofs)
         geomRoofs = UtilitiesGeom.simplify(geomRoofs, 0.01, 0.05)
 
@@ -1752,23 +1795,22 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
         """
         # Berechnung
-        print("Start")
+        self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
         bases, basesOrig, floors = self.calcLoD3Bases(ifcBuilding)
-        print("nach Bases")
+        self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
         roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
-        print("nach Roofs")
+        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         walls = self.calcLoD3Walls(ifcBuilding)
-        print("nach Walls")
+        self.parent.dlg.log(self.tr(u'Building geometry: door surfaces are calculated'))
         openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
-        print("nach Doors")
+        self.parent.dlg.log(self.tr(u'Building geometry: window surfaces are calculated'))
         openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
-        print("nach Windows")
+        self.parent.dlg.log(self.tr(u'Building geometry: openings are assigned to walls'))
         walls = self.assignOpenings(openings, walls)
-        print("nach Openings-Zuordnung")
+        self.parent.dlg.log(self.tr(u'Building geometry: wall and opening surfaces are adjusted to each other'))
         walls, wallMainCounts = self.adjustWallOpenings(walls)
-        print("nach Wand-Openings-Anpassung")
+        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are adjusted in their height'))
         walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig, wallMainCounts)
-        print("nach Wand-Höhen-Anpassung")
 
         # Geometrie
         links = []
@@ -2146,7 +2188,6 @@ class Converter(QgsTask):
 
         # Geometrie
         for i in range(0, len(ifcWallsExt)):
-            print("Wall " + str(i) + " von " + str(len(ifcWallsExt)) + ": " + wallNames[i])
             ifcWall = ifcWallsExt[i]
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -2224,10 +2265,6 @@ class Converter(QgsTask):
 
         # Geometrie
         for i in range(0, len(ifcOpeningsExt)):
-            if type == "ifcDoor":
-                print("Door " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
-            else:
-                print("Window " + str(i) + " von " + str(len(ifcOpeningsExt)) + ": " + str(openingNames[i]))
             ifcOpening = ifcOpeningsExt[i]
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)

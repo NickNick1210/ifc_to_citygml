@@ -849,7 +849,7 @@ class Converter(QgsTask):
         geometries = [self.calcPlane(ifcSlabs)]
         self.parent.dlg.log(self.tr(u'Building geometry: roof surface is calculated'))
         geometries += [self.calcLoD1Roof(geometries[0], height)]
-        self.parent.dlg.log(self.tr(u'Building geometry: walls surfaces are calculated'))
+        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         geometries += self.calcLoD1Walls(geometries[0], height)
 
         # Geometrie

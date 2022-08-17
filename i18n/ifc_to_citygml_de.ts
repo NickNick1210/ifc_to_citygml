@@ -4,57 +4,57 @@
 <context>
     <name>Converter</name>
     <message>
-        <location filename="../models/converter.py" line="329"/>
+        <location filename="../models/converter.py" line="372"/>
         <source>Due to the missing geometries, no bounding box can be calculated</source>
         <translation>Wegen fehlender Geometrien kann keine Bounding Box berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="573"/>
+        <location filename="../models/converter.py" line="616"/>
         <source>Due to the missing baseslab and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlender Grundfläche und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="583"/>
+        <location filename="../models/converter.py" line="626"/>
         <source>Due to the missing roof and building/storeys attributes, no building height can be calculated</source>
         <translation>Wegen fehlenden Daches und Gebäude-/Geschossattribute kann keine Gebäudehöhe berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="686"/>
+        <location filename="../models/converter.py" line="729"/>
         <source>Due to the missing baseslab, no FootPrint geometry can be calculated</source>
         <translation>Wegen fehlender Grundfläche kann keine Grundflächengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="715"/>
+        <location filename="../models/converter.py" line="758"/>
         <source>Due to the missing roof, no RoofEdge geometry can be calculated</source>
         <translation>Wegen fehlenden Dachs kann keine Dachkantengeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="810"/>
+        <location filename="../models/converter.py" line="853"/>
         <source>Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated</source>
         <translation>Wegen nicht-metrischen Einheiten oder fehlender Topologie kann keine LoD0-Geometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="933"/>
+        <location filename="../models/converter.py" line="976"/>
         <source>Due to the missing height and roof, no building geometry can be calculated</source>
         <translation>Wegen fehlender Höhe und Dach kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="941"/>
+        <location filename="../models/converter.py" line="984"/>
         <source>Due to the missing baseslab, no building geometry can be calculated</source>
         <translation>Wegen fehlender Grundfläche kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="954"/>
+        <location filename="../models/converter.py" line="997"/>
         <source>Due to the missing roof, no building geometry can be calculated</source>
         <translation>Wegen fehlenden Dachs kann keine Gebäudegeometrie berechnet werden</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1317"/>
+        <location filename="../models/converter.py" line="1360"/>
         <source>Due to a missing roof, a wall height can&apos;t be calculated!</source>
         <translation>Wegen eines fehlenden Daches kann eine Wandhöhe nicht berechnet werden!</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="628"/>
+        <location filename="../models/converter.py" line="671"/>
         <source>No address details existing</source>
         <translation>Keine Adressangabe vorhanden</translation>
     </message>
@@ -69,7 +69,7 @@
         <translation>Modell wird in QGIS integriert</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="303"/>
+        <location filename="../models/converter.py" line="344"/>
         <source>Building attributes are extracted</source>
         <translation>Gebäudeattribute werden entnommen</translation>
     </message>
@@ -84,27 +84,27 @@
         <translation>Gebäude-Dachkante wird berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="307"/>
+        <location filename="../models/converter.py" line="350"/>
         <source>Building address is extracted</source>
         <translation>Gebäudeadresse wird entnommen</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="309"/>
+        <location filename="../models/converter.py" line="352"/>
         <source>Building bound is calculated</source>
         <translation>Gebäudeumgrenzung wird berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="314"/>
+        <location filename="../models/converter.py" line="357"/>
         <source>Energy ADE is calculated</source>
         <translation>Energy ADE wird berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="945"/>
+        <location filename="../models/converter.py" line="988"/>
         <source>Building geometry: base surface is calculated</source>
         <translation>Gebäudegeometrie: Grund-Oberfläche wird berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="850"/>
+        <location filename="../models/converter.py" line="893"/>
         <source>Building geometry: roof surface is calculated</source>
         <translation>Gebäudegeometrie: Dach-Oberfläche wird berechnet</translation>
     </message>
@@ -114,74 +114,84 @@
         <translation type="obsolete">Gebäudegeometrie: Wand-Oberflächen werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="959"/>
+        <location filename="../models/converter.py" line="1002"/>
         <source>Building geometry: roof surfaces are extracted</source>
         <translation>Gebäudegeometrie: Dach-Oberflächen werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1802"/>
+        <location filename="../models/converter.py" line="2913"/>
         <source>Building geometry: wall surfaces are calculated</source>
         <translation>Gebäudegeometrie: Wand-Oberflächen werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="963"/>
+        <location filename="../models/converter.py" line="1006"/>
         <source>Building geometry: wall surfaces between roofs are calculated</source>
         <translation>Gebäudegeometrie: Wand-Oberflächen zwischen Dächern werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1800"/>
+        <location filename="../models/converter.py" line="2911"/>
         <source>Building geometry: roof surfaces are calculated</source>
         <translation>Gebäudegeometrie: Dach-Oberflächen werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="967"/>
+        <location filename="../models/converter.py" line="1010"/>
         <source>Building geometry: roof and wall surfaces are adjusted</source>
         <translation>Gebäudegeometrie: Dach- und Wand-Oberflächen werden angepasst</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1798"/>
+        <location filename="../models/converter.py" line="2909"/>
         <source>Building geometry: base surfaces are calculated</source>
         <translation>Gebäudegeometrie: Grund-Oberflächen werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1804"/>
+        <location filename="../models/converter.py" line="2915"/>
         <source>Building geometry: door surfaces are calculated</source>
         <translation>Gebäudegeometrie: Tür-Oberflächen werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1806"/>
+        <location filename="../models/converter.py" line="2917"/>
         <source>Building geometry: window surfaces are calculated</source>
         <translation>Gebäudegeometrie: Fenster-Oberflächen werden berechnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1808"/>
+        <location filename="../models/converter.py" line="2919"/>
         <source>Building geometry: openings are assigned to walls</source>
         <translation>Gebäudegeometrie: Öffnungen werden den Wänden zugeordnet</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1810"/>
+        <location filename="../models/converter.py" line="2921"/>
         <source>Building geometry: wall and opening surfaces are adjusted to each other</source>
         <translation>Gebäudegeometrie: Wand- und Öffnungs-Oberflächen werden einander angepasst</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1812"/>
+        <location filename="../models/converter.py" line="2923"/>
         <source>Building geometry: wall surfaces are adjusted in their height</source>
         <translation>Gebäudegeometrie: Wand-Oberflächen werden in ihrer Höhe angepasst</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="1920"/>
+        <location filename="../models/converter.py" line="1966"/>
         <source>Due to the missing baseslab, it will also be missing in CityGML</source>
         <translation>Wegen fehlender Grundfläche wird diese auch in CityGML fehlen</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="2072"/>
+        <location filename="../models/converter.py" line="2118"/>
         <source>Due to the missing roofs, it will also be missing in CityGML</source>
         <translation>Wegen fehlenden Daches wird dieses auch in CityGML fehlen</translation>
     </message>
     <message>
-        <location filename="../models/converter.py" line="2165"/>
+        <location filename="../models/converter.py" line="2211"/>
         <source>Due to the missing walls, it will also be missing in CityGML</source>
         <translation>Wegen fehlender Wände werden diese auch in CityGML fehlen</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="348"/>
+        <source>Rooms are calculated</source>
+        <translation>Räume werden berechnet</translation>
+    </message>
+    <message>
+        <location filename="../models/converter.py" line="2948"/>
+        <source>Due to the missing rooms, they will also be missing in CityGML</source>
+        <translation>Wegen fehlender Räume werden diese auch in CityGML fehlen</translation>
     </message>
 </context>
 <context>

@@ -199,7 +199,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
-                self.convertEadeBldgAttr(ifcBuilding, chBldg, footPrint)
+                self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
 
         return root
 
@@ -3174,15 +3174,15 @@ class Converter(QgsTask):
 
             # Position
             chWDPos = etree.SubElement(chWD, QName(XmlNs.energy, "position"))
-            pt = ogr.Geometry(ogr.wkbPoint)
-            pt.AddPoint((bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2, (bbox[4] + bbox[5]) / 2)
-            ptXML = UtilitiesGeom.geomToGml(pt)
-            if ptXML is not None:
-                chWDPos.append(ptXML)
+            chWDPosPt = etree.SubElement(chWDPos, QName(XmlNs.energy, "Point"))
+            chWDPosPtPos = etree.SubElement(chWDPosPt, QName(XmlNs.energy, "pos"))
+            meanX, meanY, meanZ = (bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2, (bbox[4] + bbox[5]) / 2
+            chWDPosPtPos.text = str(meanX) + " " + str(meanY) + " " + str(meanZ)
+
         else:
             self.parent.dlg.log(self.tr(u'Due to the missing weather data, it can\'t get converted'))
 
-    def convertEadeBldgAttr(self, ifcBuilding, chBldg, footPrint):
+    def convertEadeBldgAttr(self, ifcBuilding, chBldg, bbox, footPrint):
 
         # BuildingType
         type = None
@@ -3316,13 +3316,14 @@ class Converter(QgsTask):
             chBldgVolTValue.text = str(netVol)
 
         # ReferencePoint
-        # TODO: EnergyADE-Gebäudeattribute
-
-        # referencePoint (mit Point: pos)
-        #   --> Mittelpunkt der BoundingBox
+        chBldgRefPt = etree.SubElement(chBldg, QName(XmlNs.energy, "referencePoint"))
+        chWDPosPt = etree.SubElement(chBldgRefPt, QName(XmlNs.energy, "Point"))
+        chWDPosPtPos = etree.SubElement(chWDPosPt, QName(XmlNs.energy, "pos"))
+        meanX, meanY, meanZ = (bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2, (bbox[4] + bbox[5]) / 2
+        chWDPosPtPos.text = str(meanX) + " " + str(meanY) + " " + str(meanZ)
 
         # FloorArea
-
+        # TODO: EnergyADE-Gebäudeattribute
         # floorArea (mit FloorArea: type --> GrossFloorArea, value)
         #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
         #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities

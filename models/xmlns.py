@@ -23,3 +23,4 @@ class XmlNs:
     xAL = "urn:oasis:names:tc:ciq:xsdschema:xAL:2.0"
     xlink = "http://www.w3.org/1999/xlink"
     xsi = "http://www.w3.org/2001/XMLSchema-instance"
+    energy = "http://www.sig3d.org/citygml/2.0/energy/1.0"

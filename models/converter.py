@@ -142,7 +142,7 @@ class Converter(QgsTask):
         return etree.Element(QName(XmlNs.core, "CityModel"),
                              nsmap={'core': XmlNs.core, None: XmlNs.xmlns, 'bldg': XmlNs.bldg, 'gen': XmlNs.gen,
                                     'grp': XmlNs.grp, 'app': XmlNs.app, 'gml': XmlNs.gml, 'xAL': XmlNs.xAL,
-                                    'xlink': XmlNs.xlink, 'xsi': XmlNs.xsi})
+                                    'xlink': XmlNs.xlink, 'xsi': XmlNs.xsi, 'energy': XmlNs.energy})
 
     def writeCGML(self, root):
         """ Schreiben der XML-Struktur in eine GML-Datei
@@ -168,6 +168,7 @@ class Converter(QgsTask):
             eade: Ob die EnergyADE gewählt wurde als Boolean
         """
         # IFC-Grundelemente
+        ifcProject = self.ifc.by_type("IfcProject")[0]
         ifcSite = self.ifc.by_type("IfcSite")[0]
         ifcBuildings = self.ifc.by_type("IfcBuilding")
 
@@ -191,34 +192,14 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
-            self.convertBound(self.geom, chBound)
+            bbox = self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
-                self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
-                # TODO: EnergyADE
-                # weatherData
-                #   --> Pset_OutsideDesignCriteria aus IfcBuilding
-                #   --> Pset_SiteWeather aus IfcSite
-                #   --> Ansonsten geht's nicht
-                # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
-                #   --> Aus class/function/usage
-                # constructionWeight (VeryLight, Light, Medium, Heavy)
-                #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
-                #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
-                #   --> Ansonsten: medium
-                # volume (mit VolumeType: type --> GrossVolume, value)
-                #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
-                #   --> aus Fläche des Grundrisses * measuredHeight
-                # referencePoint (mit Point: pos)
-                #   --> Mittelpunkt der BoundingBox
-                # floorArea (mit FloorArea: type --> GrossFloorArea, value)
-                #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
-                #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
-                #   --> aus Anz. Etagen * Grundfläche
-                # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
-                #   --> Grundrisshöhe
-                pass
+                self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
+                self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
+                self.convertEadeBldgAttr(ifcBuilding, chBldg)
 
         return root
 
@@ -481,6 +462,8 @@ class Converter(QgsTask):
         env = self.geom.GetEnvelope3D()
         chBoundEnvLC.text = str(env[0]) + " " + str(env[2]) + " " + str(env[4])
         chBoundEnvUC.text = str(env[1]) + " " + str(env[3]) + " " + str(env[5])
+
+        return env
 
     def convertBldgAttr(self, ifcBuilding, chBldg):
         """ Konvertierung der Gebäudeattribute
@@ -3111,4 +3094,97 @@ class Converter(QgsTask):
         # Setzen als bldg:IntBuildingInstallation in bldg:roomInstallation
         # Entnehmen von grundlegenden Eigenschaften (Name, Description, Function)
         # Berechnung der Geometrie
+        return
+
+    # noinspection PyMethodMayBeStatic
+    def convertWeatherData(self, ifcProject, ifcSite, chBldg, bbox):
+        """ Konvertieren der Wetterdaten eines Grundstücks von IFC zu CityGML als Teil der Energy ADE
+
+        Args:
+            ifcProject: Das Projekt, aus dem die Wettereinheiten entnommen werden sollen
+            ifcSite: Das Grundtück, aus dem die Wetterdaten entnommen werden sollen
+            chBldg: XML-Element an dem die Wetterdaten angefügt werden sollen
+            bbox: BoundingBox, aus dem die Position der Wettermessungen entnommen werden sollen
+        """
+        if UtilitiesIfc.findPset(ifcSite, "Pset_SiteWeather") is not None:
+            # Temperatur
+            maxTemp = element.get_psets(ifcSite)["Pset_SiteWeather"]["MaxAmbientTemp"]
+            minTemp = element.get_psets(ifcSite)["Pset_SiteWeather"]["MinAmbientTemp"]
+
+            # Temperatureinheit
+            unitName = "cel"
+            if ifcProject.UnitsInContext is not None:
+                units = ifcProject.UnitsInContext.Units
+                for unit in units:
+                    if unit.is_a('IfcSIUnit') and unit.UnitType == "THERMODYNAMICTEMPERATUREUNIT":
+                        unitName = "k" if unit.Name == "KELVIN" else "cel"
+
+            # XML-Struktur
+            chwd = etree.SubElement(chBldg, QName(XmlNs.energy, "weatherData"))
+            chWD = etree.SubElement(chwd, QName(XmlNs.energy, "WeatherData"))
+
+            # Datentyp
+            chWDType = etree.SubElement(chWD, QName(XmlNs.energy, "weatherDataType"))
+            chWDType.text = "airTemperature"
+
+            # Werte
+            chWDValues = etree.SubElement(chWD, QName(XmlNs.energy, "values"))
+            chWDTimeSeries = etree.SubElement(chWDValues, QName(XmlNs.energy, "RegularTimeSeries"))
+            chWdTsVarProp = etree.SubElement(chWDTimeSeries, QName(XmlNs.energy, "variableProperties"))
+            chWdTsTvp = etree.SubElement(chWdTsVarProp, QName(XmlNs.energy, "TimeValuesProperties"))
+            chWdTsTvpAm = etree.SubElement(chWdTsTvp, QName(XmlNs.energy, "acqusitionMethod"))
+            chWdTsTvpAm.text = "unknown"
+            chWdTsTvpIt = etree.SubElement(chWdTsTvp, QName(XmlNs.energy, "interpolationType"))
+            chWdTsTvpIt.text = "continuous"
+            chWdTsTvpSource = etree.SubElement(chWdTsTvp, QName(XmlNs.energy, "source"))
+            chWdTsTvpSource.text = "IFC building model"
+            chWdTsTvpTd = etree.SubElement(chWdTsTvp, QName(XmlNs.energy, "thematicDescription"))
+            chWdTsTvpTd.text = "ambient temperature"
+
+            chWdTsTempExt = etree.SubElement(chWDTimeSeries, QName(XmlNs.energy, "temporalExtent"))
+            chWdTsTimePer = etree.SubElement(chWdTsTempExt, QName(XmlNs.energy, "TimePeriod"))
+            chWdTsTpBegin = etree.SubElement(chWdTsTimePer, QName(XmlNs.energy, "beginPosition"))
+            chWdTsTpBegin.text = "2020-01-01T00:00:00"
+            chWdTsTpEnd = etree.SubElement(chWdTsTimePer, QName(XmlNs.energy, "endPosition"))
+            chWdTsTpEnd.text = "2025-12-31T23:59:59"
+
+            chWdTsTimeInt = etree.SubElement(chWDTimeSeries, QName(XmlNs.energy, "timeInterval"))
+            chWdTsTimeInt.set("unit", "month")
+            chWdTsTimeInt.text = "6"
+
+            chWdTsValues = etree.SubElement(chWDTimeSeries, QName(XmlNs.energy, "values"))
+            chWdTsValues.set("uom", unitName)
+            values, countYears = "", 6
+            for i in range(0, countYears):
+                values += (str(minTemp) + " " + str(maxTemp) + " ")
+            chWdTsValues.text = values
+
+            # Position
+            chWDPos = etree.SubElement(chWD, QName(XmlNs.energy, "position"))
+            pt = ogr.Geometry(ogr.wkbPoint)
+            pt.AddPoint((bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2, (bbox[4] + bbox[5]) / 2)
+            ptXML = UtilitiesGeom.geomToGml(pt)
+            if ptXML is not None:
+                chWDPos.append(ptXML)
+
+    def convertEadeBldgAttr(self, ifcBuilding, chBldg):
+        # TODO: EnergyADE-Gebäudeattribute
+        # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
+        #   --> Aus class/function/usage
+        # constructionWeight (VeryLight, Light, Medium, Heavy)
+        #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
+        #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
+        #   --> Ansonsten: medium
+        # volume (mit VolumeType: type --> GrossVolume, value)
+        #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
+        #   --> aus Fläche des Grundrisses * measuredHeight
+        # referencePoint (mit Point: pos)
+        #   --> Mittelpunkt der BoundingBox
+        # floorArea (mit FloorArea: type --> GrossFloorArea, value)
+        #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
+        #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
+        #   --> aus Anz. Etagen * Grundfläche
+        # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
+        #   --> Grundrisshöhe
+
         return

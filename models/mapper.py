@@ -116,4 +116,22 @@ class Mapper:
         "bestattungsinstitut": 2460, "krematorium": 2470, "bahnhof": 2480, "s-bahnhof": 2480, "flughafen": 2490,
         "u-bahnhof": 2500, "straßenbahn": 2510, "busbahnhof": 2520, "schiffsterminal": 2530, "erholung": 2540,
         "sport": 2550, "sporthalle": 2560, "sportplatz": 2570, "schwimmen": 2580, "schwimmbad": 2590,
-        "gewächshaus": 2620, "botanisch": 2630, "hütte": 2640}
+        "gewächshaus": 2620, "botanisch": 2630, "hütte": 2640
+    }
+
+    bldgTypeDict = {
+        "Apartment": "Apartment Block", "Block": "Apartment Block", "Multi": "Multi Family House",
+        "Single": "Single Family House", "Terraced": "Terraced House", "Wohnung": "Apartment Block",
+        "Wohnblock": "Apartment Block", "Mehrfamilienhaus": "Multi Family House",
+        "Einfamilienhaus": "Single Family House", "Wohnhaus": "Single Family House", "Reihenhaus": "Terraced House",
+        "Doppelhaus": "Terraced House"
+    }
+
+    layerCatDict = {
+        "concrete": 1, "steel": 3.27, "aluminium": 1.13, "block": 1, "brick": 0.71, "stone": 1.17, "glass": 1.04,
+        "gypsum": 0.96, "plastic": 0.96, "earth": 2.3
+    }
+
+    thicknessCatDict = {
+        0.0: "veryLight", 0.1: "light", 0.25: "medium", 0.4: "heavy"
+    }

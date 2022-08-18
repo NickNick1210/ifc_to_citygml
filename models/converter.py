@@ -494,7 +494,7 @@ class Converter(QgsTask):
         occType = None
         if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
-        if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingUse", "MarketCategory") is not None:
+        elif UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingUse", "MarketCategory") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingUse"]["MarketCategory"]
         elif ifcBuilding.Description is not None:
             occType = ifcBuilding.Description
@@ -2636,8 +2636,9 @@ class Converter(QgsTask):
                                     openBoundRing = openBound[1].GetGeometryRef(0)
                                     for o in range(0, openBoundRing.GetPointCount()):
                                         boundPt = openBoundRing.GetPoint(o)
-                                        dist = math.sqrt((boundPt[0] - wallPt[0]) ** 2 + (boundPt[1] - wallPt[1]) ** 2 + (
-                                                boundPt[2] - wallPt[2]) ** 2)
+                                        dist = math.sqrt(
+                                            (boundPt[0] - wallPt[0]) ** 2 + (boundPt[1] - wallPt[1]) ** 2 + (
+                                                    boundPt[2] - wallPt[2]) ** 2)
                                         if wallPt[0] - tol < boundPt[0] < wallPt[0] + tol and wallPt[1] - tol < \
                                                 boundPt[1] < wallPt[1] + tol and wallPt[2] - tol < boundPt[2] < \
                                                 wallPt[2] + tol:
@@ -2812,7 +2813,7 @@ class Converter(QgsTask):
                         if intOp:
                             break
                     if not intOp:
-                        startPt = j+1
+                        startPt = j + 1
                         break
                 endPt = wallRing.GetPointCount()
 
@@ -2862,7 +2863,8 @@ class Converter(QgsTask):
                                         # Prüfen, ob die Wandhöhe und Höhe der originalen Grundfläche/Dach in etwa gleich ist
                                         origPlane = UtilitiesGeom.getPlane(origRing.GetPoint(0), origRing.GetPoint(1),
                                                                            origRing.GetPoint(2))
-                                        ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100), Point3D(pt[0], pt[1], pt[2] + 100))
+                                        ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100),
+                                                      Point3D(pt[0], pt[1], pt[2] + 100))
                                         sRes = origPlane.intersection(ptLine)
                                         if len(sRes) != 0 and isinstance(sRes[0], sympy.geometry.point.Point3D):
                                             sZ = float(sRes[0][2])
@@ -3074,7 +3076,7 @@ class Converter(QgsTask):
         #   in bldg:boundedBy
         # Entnehmen von grundlegenden Eigenschaften (Name)
         # Berechnung der Geometrie
-        return[]
+        return []
 
     # noinspection PyMethodMayBeStatic
     def convertLoD4Furniture(self, ifcSpace, chRoom):
@@ -3176,21 +3178,49 @@ class Converter(QgsTask):
             ptXML = UtilitiesGeom.geomToGml(pt)
             if ptXML is not None:
                 chWDPos.append(ptXML)
+        else:
+            self.parent.dlg.log(self.tr(u'Due to the missing weather data, it can\'t get converted'))
 
     def convertEadeBldgAttr(self, ifcBuilding, chBldg):
-        # TODO: EnergyADE-Gebäudeattribute
 
         # BuildingType
+        type = None
+        for child in chBldg:
+            if "class" in child.tag:
+                type = child.text
+                break
+        if type == "1000":
+            bldgTypeCode = None
+            if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
+                bldgType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+                if bldgType in Mapper.bldgTypeDict:
+                    bldgTypeCode = str(Mapper.bldgTypeDict[bldgType])
+            if bldgTypeCode is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingUse",
+                                                              "MarketCategory") is not None:
+                bldgType = element.get_psets(ifcBuilding)["Pset_BuildingUse"]["MarketCategory"]
+                if bldgType in Mapper.bldgTypeDict:
+                    bldgTypeCode = str(Mapper.bldgTypeDict[bldgType])
+            if bldgTypeCode is None and ifcBuilding.ObjectType is not None:
+                bldgType = ifcBuilding.ObjectType
+                if bldgType in Mapper.bldgTypeDict:
+                    bldgTypeCode = str(Mapper.bldgTypeDict[bldgType])
+            if bldgTypeCode is None and ifcBuilding.Description is not None:
+                bldgType = ifcBuilding.Description
+                if bldgType in Mapper.bldgTypeDict:
+                    bldgTypeCode = str(Mapper.bldgTypeDict[bldgType])
+            if bldgTypeCode is None and ifcBuilding.LongName is not None:
+                bldgType = ifcBuilding.LongName
+                if bldgType in Mapper.bldgTypeDict:
+                    bldgTypeCode = str(Mapper.bldgTypeDict[bldgType])
+            if bldgTypeCode is None and ifcBuilding.Name is not None:
+                bldgType = ifcBuilding.Name
+                if bldgType in Mapper.bldgTypeDict:
+                    bldgTypeCode = str(Mapper.bldgTypeDict[bldgType])
+            if bldgTypeCode is not None:
+                chBldgType = etree.SubElement(chBldg, QName(XmlNs.energy, "buildingType"))
+                chBldgType.text = bldgTypeCode
 
-        # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
-        #   --> Aus class/function/usage
-
-        # in chBldg nach class suchen
-        # Prüfen, ob class == 1000
-        # Wenn ja: MarketSubCategory aus Pset_BuildingUse, OccupancyType aus Pset_BuildingCommon,
-        #   Description, LongName oder Name aus IfcBuilding nehmen
-        # Dieses in einem neuen Mapping einem buildingType zuordnen
-        # Wenn zugeordnet: XML-Struktur aufbauen und einfügen
+        # TODO: EnergyADE-Gebäudeattribute
 
         # ConstructionWeight
 
@@ -3198,6 +3228,55 @@ class Converter(QgsTask):
         #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
         #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
         #   --> Ansonsten: medium
+
+        ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
+        ifcWallsExt = []
+        ifcRelSpaceBoundaries = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
+        for ifcWall in ifcWalls:
+            extCount, intCount = 0, 0
+            for ifcRelSpaceBoundary in ifcRelSpaceBoundaries:
+                relElem = ifcRelSpaceBoundary.RelatedBuildingElement
+                if relElem == ifcWall:
+                    if ifcRelSpaceBoundary.InternalOrExternalBoundary == "EXTERNAL":
+                        extCount += 1
+                    elif ifcRelSpaceBoundary.InternalOrExternalBoundary == "INTERNAL":
+                        intCount += 1
+            if extCount > 0:
+                ifcWallsExt.append(ifcWall)
+            elif intCount == 0 and UtilitiesIfc.findPset(ifcWall, "Pset_WallCommon", "IsExternal"):
+                ifcWallsExt.append(ifcWall)
+        if len(ifcWallsExt) != 0:
+            thicknesses = []
+            for ifcWall in ifcWallsExt:
+                rels = self.ifc.get_inverse(ifcWall)
+                for rel in rels:
+                    if rel.is_a('IfcRelAssociatesMaterial') and ifcWall in rel.RelatedObjects:
+                        if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a("IfcMaterialLayerSetUsage"):
+                            ifcMLSU = rel.RelatingMaterial
+                            if ifcMLSU.ForLayerSet is not None:
+                                ifcMLS = ifcMLSU.ForLayerSet
+                                if ifcMLS.MaterialLayers is not None:
+                                    thicknessAll = 0
+                                    for layer in ifcMLS.MaterialLayers:
+                                        thickness = layer.LayerThickness
+                                        factor = 1
+                                        if layer.Material is not None:
+                                            material = layer.Material
+                                            if material.Category is not None:
+                                                matCat = material.Category
+                                                if matCat in Mapper.layerCatDict:
+                                                    factor = str(Mapper.layerCatDict[matCat])
+                                        thicknessAll += (thickness * factor)
+                                    thicknesses.append(thicknessAll)
+
+            if len(thicknesses) != 0:
+                thickness = sum(thicknesses)/len(thicknesses)
+                for key in Mapper.thicknessCatDict.keys():
+                    if thickness > key:
+                        thisKey = key
+                constrWeight = str(Mapper.thicknessCatDict[thisKey])
+                chBldgConstr = etree.SubElement(chBldg, QName(XmlNs.energy, "constructionWeight"))
+                chBldgConstr.text = constrWeight
 
         # Volume
 

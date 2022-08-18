@@ -197,6 +197,27 @@ class Converter(QgsTask):
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
+                # weatherData
+                #   --> Pset_OutsideDesignCriteria aus IfcBuilding
+                #   --> Pset_SiteWeather aus IfcSite
+                #   --> Ansonsten geht's nicht
+                # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
+                #   --> Aus class/function/usage
+                # constructionWeight (VeryLight, Light, Medium, Heavy)
+                #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
+                #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
+                #   --> Ansonsten: medium
+                # volume (mit VolumeType: type --> GrossVolume, value)
+                #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
+                #   --> aus Fläche des Grundrisses * measuredHeight
+                # referencePoint (mit Point: pos)
+                #   --> Mittelpunkt der BoundingBox
+                # floorArea (mit FloorArea: type --> GrossFloorArea, value)
+                #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
+                #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
+                #   --> aus Anz. Etagen * Grundfläche
+                # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
+                #   --> Grundrisshöhe
                 pass
 
         return root
@@ -235,6 +256,29 @@ class Converter(QgsTask):
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
+                # weatherData
+                #   --> Pset_OutsideDesignCriteria aus IfcBuilding
+                #   --> Pset_SiteWeather aus IfcSite
+                #   --> Ansonsten geht's nicht
+                # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
+                #   --> Aus class/function/usage
+                # constructionWeight (VeryLight, Light, Medium, Heavy)
+                #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
+                #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
+                #   --> Ansonsten: medium
+                # volume (mit VolumeType: type --> GrossVolume, value)
+                #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
+                #   --> aus Fläche des Grundrisses * measuredHeight
+                # referencePoint (mit Point: pos)
+                #   --> Mittelpunkt der BoundingBox
+                # floorArea (mit FloorArea: type --> GrossFloorArea, value)
+                #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
+                #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
+                #   --> aus Anz. Etagen * Grundfläche
+                # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
+                #   --> Grundrisshöhe
+                # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
+                # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventialationSchedule
                 pass
 
         return root
@@ -274,6 +318,32 @@ class Converter(QgsTask):
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
+                # weatherData
+                #   --> Pset_OutsideDesignCriteria aus IfcBuilding
+                #   --> Pset_SiteWeather aus IfcSite
+                #   --> Ansonsten geht's nicht
+                # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
+                #   --> Aus class/function/usage
+                # constructionWeight (VeryLight, Light, Medium, Heavy)
+                #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
+                #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
+                #   --> Ansonsten: medium
+                # volume (mit VolumeType: type --> GrossVolume, value)
+                #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
+                #   --> aus Fläche des Grundrisses * measuredHeight mit Abziehen von Faktor Dach (*0,5 bei den letzten Metern?)
+                # referencePoint (mit Point: pos)
+                #   --> Mittelpunkt der BoundingBox
+                # floorArea (mit FloorArea: type --> GrossFloorArea, value)
+                #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
+                #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
+                #   --> aus Anz. Etagen * Grundfläche
+                # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
+                #   --> Grundrisshöhe
+                # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
+                # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
+                # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventialationSchedule
+                # Construction (Attribute, Layer, OptivalProperties)
+                # AbstractMaterial: SolidMaterial/Gas (Attribute)
                 pass
 
         return root
@@ -313,6 +383,33 @@ class Converter(QgsTask):
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE
+                # weatherData
+                #   --> Pset_OutsideDesignCriteria aus IfcBuilding
+                #   --> Pset_SiteWeather aus IfcSite
+                #   --> Ansonsten geht's nicht
+                # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
+                #   --> Aus class/function/usage
+                # constructionWeight (VeryLight, Light, Medium, Heavy)
+                #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
+                #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
+                #   --> Ansonsten: medium
+                # volume (mit VolumeType: type --> GrossVolume, value)
+                #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
+                #   --> aus Fläche des Grundrisses * measuredHeight mit Abziehen von Faktor Dach (*0,5 bei den letzten Metern?)
+                # referencePoint (mit Point: pos)
+                #   --> Mittelpunkt der BoundingBox
+                # floorArea (mit FloorArea: type --> GrossFloorArea, value)
+                #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
+                #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
+                #   --> aus Anz. Etagen * Grundfläche
+                # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
+                #   --> Grundrisshöhe
+                # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
+                # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
+                # thermalOpening (Attribute, surfaceGeometry, construction)
+                # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventialationSchedule
+                # Construction (Attribute, Layer, OptivalProperties)
+                # AbstractMaterial: SolidMaterial/Gas (Attribute)
                 pass
 
         return root
@@ -324,7 +421,6 @@ class Converter(QgsTask):
             root: Das vorbereitete XML-Schema
             eade: Ob die EnergyADE gewählt wurde als Boolean
         """
-
 
         # IFC-Grundelemente
         ifcSite = self.ifc.by_type("IfcSite")[0]

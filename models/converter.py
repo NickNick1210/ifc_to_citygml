@@ -186,7 +186,7 @@ class Converter(QgsTask):
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             self.convertBldgAttr(ifcBuilding, chBldg)
             self.parent.dlg.log(self.tr(u'Building footprint is calculated'))
-            self.convertLoD0FootPrint(ifcBuilding, chBldg)
+            footPrint = self.convertLoD0FootPrint(ifcBuilding, chBldg)
             self.parent.dlg.log(self.tr(u'Building roofedge is calculated'))
             self.convertLoD0RoofEdge(ifcBuilding, chBldg)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
@@ -199,7 +199,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
-                self.convertEadeBldgAttr(ifcBuilding, chBldg)
+                self.convertEadeBldgAttr(ifcBuilding, chBldg, footPrint)
 
         return root
 
@@ -829,6 +829,7 @@ class Converter(QgsTask):
                 chBldgFootPrintMS = etree.SubElement(chBldgFootPrint, QName(XmlNs.gml, "MultiSurface"))
                 chBldgFootPrintSM = etree.SubElement(chBldgFootPrintMS, QName(XmlNs.gml, "surfaceMember"))
                 chBldgFootPrintSM.append(geomXML)
+        return geometry
 
     def convertLoD0RoofEdge(self, ifcBuilding, chBldg):
         """ Konvertieren der Dachkantenfläche von IFC zu CityGML
@@ -3181,7 +3182,7 @@ class Converter(QgsTask):
         else:
             self.parent.dlg.log(self.tr(u'Due to the missing weather data, it can\'t get converted'))
 
-    def convertEadeBldgAttr(self, ifcBuilding, chBldg):
+    def convertEadeBldgAttr(self, ifcBuilding, chBldg, footPrint):
 
         # BuildingType
         type = None
@@ -3220,15 +3221,7 @@ class Converter(QgsTask):
                 chBldgType = etree.SubElement(chBldg, QName(XmlNs.energy, "buildingType"))
                 chBldgType.text = bldgTypeCode
 
-        # TODO: EnergyADE-Gebäudeattribute
-
         # ConstructionWeight
-
-        # constructionWeight (VeryLight, Light, Medium, Heavy)
-        #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
-        #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
-        #   --> Ansonsten: medium
-
         ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
         ifcWallsExt = []
         ifcRelSpaceBoundaries = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
@@ -3270,7 +3263,7 @@ class Converter(QgsTask):
                                     thicknesses.append(thicknessAll)
 
             if len(thicknesses) != 0:
-                thickness = sum(thicknesses)/len(thicknesses)
+                thickness = sum(thicknesses) / len(thicknesses)
                 for key in Mapper.thicknessCatDict.keys():
                     if thickness > key:
                         thisKey = key
@@ -3279,12 +3272,51 @@ class Converter(QgsTask):
                 chBldgConstr.text = constrWeight
 
         # Volume
-
-        # volume (mit VolumeType: type --> GrossVolume, value)
-        #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
-        #   --> aus Fläche des Grundrisses * measuredHeight
+        grossVol, netVol = None, None
+        if UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "GrossVolume") is not None:
+            grossVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossVolume"]
+        if UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetVolume") is not None:
+            netVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetVolume"]
+        if grossVol is None and UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities",
+                                                      "GrossVolume") is not None:
+            grossVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossVolume"]
+        if netVol is None and UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetVolume") is not None:
+            netVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetVolume"]
+        if grossVol is None and netVol is None:
+            height = None
+            for child in chBldg:
+                if "measuredHeight" in child.tag:
+                    height = child.text
+                    break
+            if height is not None:
+                grossArea = None
+                if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "GrossPlannedArea") is not None:
+                    grossArea = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["GrossPlannedArea"]
+                if grossArea is None and UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities",
+                                                               "GrossFloorArea") is not None:
+                    grossArea = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossFloorArea"]
+                if grossArea is None:
+                    grossArea = footPrint.Area()
+                grossVol = round(grossArea * float(height), 3)
+        if grossVol is not None:
+            chBldgVol = etree.SubElement(chBldg, QName(XmlNs.energy, "volume"))
+            chBldgVolType = etree.SubElement(chBldgVol, QName(XmlNs.energy, "VolumeType"))
+            chBldgVolTType = etree.SubElement(chBldgVolType, QName(XmlNs.energy, "type"))
+            chBldgVolTType.text = "grossVolume"
+            chBldgVolTValue = etree.SubElement(chBldgVolType, QName(XmlNs.energy, "value"))
+            chBldgVolTValue.set("uom", "m3")
+            chBldgVolTValue.text = str(grossVol)
+        if netVol is not None:
+            chBldgVol = etree.SubElement(chBldg, QName(XmlNs.energy, "volume"))
+            chBldgVolType = etree.SubElement(chBldgVol, QName(XmlNs.energy, "VolumeType"))
+            chBldgVolTType = etree.SubElement(chBldgVolType, QName(XmlNs.energy, "type"))
+            chBldgVolTType.text = "netVolume"
+            chBldgVolTValue = etree.SubElement(chBldgVolType, QName(XmlNs.energy, "value"))
+            chBldgVolTValue.set("uom", "m3")
+            chBldgVolTValue.text = str(netVol)
 
         # ReferencePoint
+        # TODO: EnergyADE-Gebäudeattribute
 
         # referencePoint (mit Point: pos)
         #   --> Mittelpunkt der BoundingBox

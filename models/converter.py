@@ -3330,8 +3330,10 @@ class Converter(QgsTask):
         #   --> aus Anz. Etagen * Grundfläche
 
         # HeightAboveGround
-
-        # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
-        #   --> Grundrisshöhe
-
-        return
+        chBldgHeightag = etree.SubElement(chBldg, QName(XmlNs.energy, "heightAboveGround"))
+        chBldgHeightAg = etree.SubElement(chBldgHeightag, QName(XmlNs.energy, "HeightAboveGround"))
+        chBldgHeightAgRef = etree.SubElement(chBldgHeightAg, QName(XmlNs.energy, "heightReference"))
+        chBldgHeightAgRef.text = "bottomOfConstruction"
+        chBldgHeightAgVal = etree.SubElement(chBldgHeightAg, QName(XmlNs.energy, "value"))
+        chBldgHeightAgVal.set("uom", "m")
+        chBldgHeightAgVal.text = str(footPrint.GetGeometryRef(0).GetPoint(0)[2])

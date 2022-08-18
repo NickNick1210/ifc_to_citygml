@@ -491,8 +491,18 @@ class Converter(QgsTask):
 
         # Klasse, Typ und Funktion
         # Prüfung des OccupancyType im PropertySet BuildingCommon
+        occType = None
         if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingUse", "MarketCategory") is not None:
+            occType = element.get_psets(ifcBuilding)["Pset_BuildingUse"]["MarketCategory"]
+        elif ifcBuilding.Description is not None:
+            occType = ifcBuilding.Description
+        elif ifcBuilding.LongName is not None:
+            occType = ifcBuilding.LongName
+        elif ifcBuilding.Name is not None:
+            occType = ifcBuilding.Name
+        if occType is not None:
             type = self.convertFunctionUsage(occType)
             if type is None:
                 type = self.convertFunctionUsage(ifcBuilding.ObjectType)
@@ -3169,21 +3179,46 @@ class Converter(QgsTask):
 
     def convertEadeBldgAttr(self, ifcBuilding, chBldg):
         # TODO: EnergyADE-Gebäudeattribute
+
+        # BuildingType
+
         # buildingType (Apartment Block, Multi Family House, Single Family House, Terraced House)
         #   --> Aus class/function/usage
+
+        # in chBldg nach class suchen
+        # Prüfen, ob class == 1000
+        # Wenn ja: MarketSubCategory aus Pset_BuildingUse, OccupancyType aus Pset_BuildingCommon,
+        #   Description, LongName oder Name aus IfcBuilding nehmen
+        # Dieses in einem neuen Mapping einem buildingType zuordnen
+        # Wenn zugeordnet: XML-Struktur aufbauen und einfügen
+
+        # ConstructionWeight
+
         # constructionWeight (VeryLight, Light, Medium, Heavy)
         #   --> Alle external Walls heraussuchen: IfcRelAssociatesMaterial, IfcMaterialLayerSetUsage,
         #       IfcMaterialLayerSet, IfcMaterialLayer: LayerThickness, IfcMaterial: Category
         #   --> Ansonsten: medium
+
+        # Volume
+
         # volume (mit VolumeType: type --> GrossVolume, value)
         #   --> GrossVolume/NetVolume aus Qto_BuildingBaseQuantities
         #   --> aus Fläche des Grundrisses * measuredHeight
+
+        # ReferencePoint
+
         # referencePoint (mit Point: pos)
         #   --> Mittelpunkt der BoundingBox
+
+        # FloorArea
+
         # floorArea (mit FloorArea: type --> GrossFloorArea, value)
         #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
         #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
         #   --> aus Anz. Etagen * Grundfläche
+
+        # HeightAboveGround
+
         # heightAboveGround (mit HeightAboveGround: heightReference --> bottomOfConstruction, value)
         #   --> Grundrisshöhe
 

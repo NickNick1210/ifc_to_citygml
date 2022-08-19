@@ -242,10 +242,10 @@ class Converter(QgsTask):
                 self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
-                self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                linkUZ = self.calcLoD1UsageZone(ifcBuilding, chBldg)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                self.calcLoD1ThermalZone(ifcBuilding, chBldg, linkUZ)
+                linkUZ, chBldgTZ = self.calcLoD1ThermalZone(ifcBuilding, chBldg)
+                self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
+                self.calcLoD1UsageZone(ifcBuilding, chBldg, linkUZ, chBldgTZ)
 
         return root
 
@@ -451,36 +451,39 @@ class Converter(QgsTask):
         chBldgCrDate.text = datetime.now().strftime("%Y-%m-%d")
 
         # Klasse, Typ und Funktion
-        # Prüfung des OccupancyType im PropertySet BuildingCommon
-        occType = None
+        type = None
         if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
-        elif UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingUse", "MarketCategory") is not None:
-            occType = element.get_psets(ifcBuilding)["Pset_BuildingUse"]["MarketCategory"]
-        elif ifcBuilding.Description is not None:
-            occType = ifcBuilding.Description
-        elif ifcBuilding.LongName is not None:
-            occType = ifcBuilding.LongName
-        elif ifcBuilding.Name is not None:
-            occType = ifcBuilding.Name
-        if occType is not None:
             type = self.convertFunctionUsage(occType)
-            if type is None:
-                type = self.convertFunctionUsage(ifcBuilding.ObjectType)
-            if type is not None:
-                # XML-Struktur + Eintragen
-                chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
-                chBldgClass.set("codeSpace",
-                                "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
-                chBldgClass.text = str(Mapper.classFunctionUsage[int(type)])
-                chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
-                chBldgFunc.set("codeSpace",
-                               "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
-                chBldgFunc.text = str(type)
-                chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
-                chBldgUsage.set("codeSpace",
-                                "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
-                chBldgUsage.text = str(type)
+        if type is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingUse", "MarketCategory") is not None:
+            occType = element.get_psets(ifcBuilding)["Pset_BuildingUse"]["MarketCategory"]
+            type = self.convertFunctionUsage(occType)
+        if type is None and ifcBuilding.ObjectType is not None:
+            occType = ifcBuilding.ObjectType
+            type = self.convertFunctionUsage(occType)
+        if type is None and ifcBuilding.Description is not None:
+            occType = ifcBuilding.Description
+            type = self.convertFunctionUsage(occType)
+        if type is None and ifcBuilding.LongName is not None:
+            occType = ifcBuilding.LongName
+            type = self.convertFunctionUsage(occType)
+        if type is None and ifcBuilding.Name is not None:
+            occType = ifcBuilding.Name
+            type = self.convertFunctionUsage(occType)
+        if type is not None:
+            # XML-Struktur + Eintragen
+            chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
+            chBldgClass.set("codeSpace",
+                            "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml")
+            chBldgClass.text = str(Mapper.classFunctionUsage[int(type)])
+            chBldgFunc = etree.SubElement(chBldg, QName(XmlNs.bldg, "function"))
+            chBldgFunc.set("codeSpace",
+                           "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml")
+            chBldgFunc.text = str(type)
+            chBldgUsage = etree.SubElement(chBldg, QName(XmlNs.bldg, "usage"))
+            chBldgUsage.set("codeSpace",
+                            "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml")
+            chBldgUsage.text = str(type)
 
         # Baujahr
         if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "YearOfConstruction") is not None:
@@ -3346,48 +3349,76 @@ class Converter(QgsTask):
         chBldgHeightAgVal.text = str(footPrint.GetGeometryRef(0).GetPoint(0)[2])
 
     # noinspection PyMethodMayBeStatic
-    def calcLoD1UsageZone(self, ifcBuilding, chBldg):
+    def calcLoD1UsageZone(self, ifcBuilding, chBldg, linkUZ, chBldgTZ):
         """ Berechnung der Nutzungszone für die Energy ADE in LoD1
 
         Args:
             ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
             chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
-
-        Returns:
-            GML-ID der Nutzungszone als String
+            linkUZ: GML-ID der Nutzungszone als String
+            chBldgTZ: XML-Objekt der Thermal Zone
         """
+
         # XML-Struktur
         chBldgUz = etree.SubElement(chBldg, QName(XmlNs.energy, "usageZone"))
         chBldgUZ = etree.SubElement(chBldgUz, QName(XmlNs.energy, "UsageZone"))
-        gmlId = "GML_" + str(uuid.uuid4())
-        chBldgUZ.set(QName(XmlNs.gml, "id"), gmlId)
+        chBldgUZ.set(QName(XmlNs.gml, "id"), linkUZ)
 
-        # TODO: EnergyADE - UsageZone
         # coolingSchedule
-        # falls isCooled == True
+        isCooled, isHeated = False, False
+        for child in chBldgTZ:
+            if "isCooled" in child.tag:
+                isCooled = True
+            if "isCooled" in child.tag:
+                isHeated = True
+
+        if isCooled:
+            chBldgUzCoolSch = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "coolingSchedule"))
+            # TODO: UsageZone - coolingSchedule
 
         # heatingSchedule
-        # falls isHeated == True
+        if isHeated:
+            chBldgUzHeatSch = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "heatingSchedule"))
+            # TODO: UsageZone - heatingSchedule
 
         # usageZoneType
+        classType = None
+        for child in chBldg:
+            if "class" in child.tag:
+                classType = child.text
+        if classType is not None:
+            chBldgUzType = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "usageZoneType"))
+            chBldgUzType.set("codeSpace", "https://inspire.ec.europa.eu/codelist/CurrentUseValue/")
+            chBldgUzType.text = str(Mapper.usageZoneTypeDict[int(classType)])
 
         # ventilationSchedule
         # falls Ventilation vorhanden
+        chBldgUzVentSch = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "ventilationSchedule"))
+        # TODO: UsageZone - ventilationSchedule
 
         # occupiedBy: Occupants
+        chBldgUzOccBy = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "occupiedBy"))
+        chBldgUzOcc = etree.SubElement(chBldgUzOccBy, QName(XmlNs.energy, "Occupants"))
+        chBldgUzOcc.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+        # TODO: UsageZone - occupiedBy
 
         # equippedWith: Facilities
+        # mehrere möglich
         # ElectricalAppliances / LightingFacilities / DHWFacilities
-        return gmlId
+        chBldgUzEqW = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "equippedWith"))
+        # TODO: UsageZone - equippedWith
 
     # noinspection PyMethodMayBeStatic
-    def calcLoD1ThermalZone(self, ifcBuilding, chBldg, linkUZ):
+    def calcLoD1ThermalZone(self, ifcBuilding, chBldg):
         """ Berechnung der thermischen Zone für die Energy ADE in LoD1
 
         Args:
             ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
             chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
+
+        Returns
             linkUZ: GML-ID der anzufügenden Nutzungszone
+            chBldgTZ: XML-Objekt der Thermal Zone
         """
         # XML-Struktur
         chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
@@ -3395,9 +3426,9 @@ class Converter(QgsTask):
         chBldgTzBound = etree.SubElement(chBldgTZ, QName(XmlNs.gml, "boundedBy"))
 
         # contains: UsageZone
-        if linkUZ is not None:
-            chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
-            chBldgTzContains.set(QName(XmlNs.xlink, "href"), linkUZ)
+        chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
+        linkUZ = "GML_" + str(uuid.uuid4())
+        chBldgTzContains.set(QName(XmlNs.xlink, "href"), linkUZ)
 
         # floorArea & volume
         for child in chBldg:
@@ -3454,3 +3485,5 @@ class Converter(QgsTask):
 
         # boundedBy: Envelope
         self.convertBound(self.bldgGeom, chBldgTzBound)
+
+        return linkUZ, chBldgTZ

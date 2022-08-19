@@ -26,7 +26,7 @@ class Mapper:
         "Erholung": 1050, "Sport": 1060, "Kultur": 1070, "Kirche": 1080, "Landwirtschaft": 1090,
         "Forstwirtschaft": 1090, "Schule": 1100, "Bildung": 1100, "Forschung": 1100, "Instandhaltung": 1110,
         "Abfall": 1110, "Gesundheit": 1120, "Gesundheitswesen": 1120, "Kommunikation": 1130, "Sicherheit": 1140,
-        "Lagerung": 1150, "Industrie": 1160, "Verkehr": 1170, "Funktion": 1180
+        "Lagerung": 1150, "Industrie": 1160, "Verkehr": 1170, "Funktion": 1180, "Sanitaer": 1010, "Geschaeft": 1030
     }
 
     classFunctionUsage = {
@@ -89,7 +89,7 @@ class Mapper:
         "tourist": 2650, "wohnen": 1000, "wohnung": 1010, "herberge": 1020, "wohnen und verwaltung": 1030,
         "wohnen und büro": 1040, "wohnen und gewerbe": 1050, "wohnen und betrieb": 1060, "agrarwirtschaft": 1070,
         "forstwirtschaft": 1070, "wohnen und Einzelhandel": 1080, "forsthütte": 1090, "ferienhaus": 1100,
-        "gartenhaus": 1110, "büro": 1120, "kreditinstitut": 1130, "versicherung": 1140, "geschäft": 1150,
+        "gartenhaus": 1110, "büro": 1120, "buero": 1120, "kreditinstitut": 1130, "versicherung": 1140, "geschäft": 1150,
         "kaufhaus": 1160, "einkaufen": 1170, "einzelhandel": 1170, "apotheke": 1190, "pavillon": 1200,
         "jugendherberge": 1220, "campingplatz": 1230, "kantine": 1250, "freizeit": 1260, "funktion": 1270, "kino": 1280,
         "kasino": 1300, "industrie": 1310, "fabrik": 1320, "werkstatt": 1330, "benzin": 1340, "tankstelle": 1340,
@@ -116,7 +116,12 @@ class Mapper:
         "bestattungsinstitut": 2460, "krematorium": 2470, "bahnhof": 2480, "s-bahnhof": 2480, "flughafen": 2490,
         "u-bahnhof": 2500, "straßenbahn": 2510, "busbahnhof": 2520, "schiffsterminal": 2530, "erholung": 2540,
         "sport": 2550, "sporthalle": 2560, "sportplatz": 2570, "schwimmen": 2580, "schwimmbad": 2590,
-        "gewächshaus": 2620, "botanisch": 2630, "hütte": 2640
+        "gewächshaus": 2620, "botanisch": 2630, "hütte": 2640, "wohnen und buero": 1040, "forsthuette": 1090,
+        "kuehlhaus": 1360, "muehle": 1420, "windmuehle": 1430, "wassermuehle": 1440, "muellbunker": 1840,
+        "muellverbrennung": 1850, "muellabfuhr": 1860, "almhuette": 1910, "huette": 2640, "oeffentlichkeit": 1950,
+        "religioes": 2210, "geschaeft": 1150, "waerme": 1780, "universitaet": 2100, "aktivitaet": 2180,
+        "kindertagesstaette": 2380, "gefaengnis": 2440, "gewaechshaus": 2620, "wohngebäude": 1000, "wohngebaeude": 1000,
+        "bürogebäude": 1120, "buerogebaeude": 1120
     }
 
     bldgTypeDict = {
@@ -134,4 +139,12 @@ class Mapper:
 
     thicknessCatDict = {
         0.0: "veryLight", 0.1: "light", 0.25: "medium", 0.4: "heavy"
+    }
+
+    usageZoneTypeDict = {
+        1000: "residential", 1010: "ancillary", 1020: "commerceAndServices", 1030: "commerceAndServices",
+        1040: "commerceAndServices", 1050: "commerceAndServices", 1060: "commerceAndServices",
+        1070: "commerceAndServices", 1080: "commerceAndServices", 1090: "agriculture", 1100: "commerceAndServices",
+        1110: "commerceAndServices", 1120: "commerceAndServices", 1130: "commerceAndServices",
+        1140: "commerceAndServices", 1150: "commerceAndServices", 1160: "industry", 1170: "ancillary", 1180: "ancillary"
     }

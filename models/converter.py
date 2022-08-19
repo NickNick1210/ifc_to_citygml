@@ -3381,29 +3381,54 @@ class Converter(QgsTask):
             chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
             chBldgTzContains.set(QName(XmlNs.xlink, "href"), linkUZ)
 
-        # floorArea
+        # floorArea & volume
         for child in chBldg:
             if "floorArea" in child.tag:
                 chBldgTZ.append(deepcopy(child))
-
-        # volume
-        for child in chBldg:
             if "volume" in child.tag:
                 chBldgTZ.append(deepcopy(child))
 
+        # infiltrationRate
+        infRateS, infRateW = None, None
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversitySummer") is not None:
+            infRateS = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversitySummer"]
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversityWinter") is not None:
+            infRateW = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversityWinter"]
+        if infRateS is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
+                                                      "InfiltrationDiversitySummer") is not None:
+            infRateS = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversitySummer"]
+        if infRateW is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
+                                                      "InfiltrationDiversityWinter") is not None:
+            infRateW = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversityWinter"]
+        if infRateS is not None or infRateW is not None:
+            chBldgTzInfRate = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "infiltrationRate"))
+            if infRateS is not None and infRateW is not None:
+                infRate = (infRateS + infRateW) / 2
+            else:
+                infRate = infRateS if infRateS is not None else infRateW
+            chBldgTzInfRate.text = infRate
+
+        # isCooled
+        ifcCooler = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcChiller", result=[])
+        ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCoolingTower", result=[])
+        ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCooledBeam", result=[])
+        ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
+        isCooled = True if len(ifcCooler) > 0 else False
+        chBldgTzIsCooled = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isCooled"))
+        chBldgTzIsCooled.text = str(isCooled)
+
+        # isHeated
+        if len(UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDistributionElement", result=[])) == 0:
+            isHeated = True
+        else:
+            ifcHeater = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpaceHeater", result=[])
+            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcBurner", result=[])
+            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcHeatExchanger", result=[])
+            isHeated = True if len(ifcHeater) > 0 else False
+        chBldgTzIsHeated = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isHeated"))
+        chBldgTzIsHeated.text = str(isHeated)
+
         # TODO: EnergyADE - ThermalZone
-        # infiltrationRate: Zahl
-
-
-        # isCooled: Boolean
-
-
-        # isHeated: Boolean
-
-
         # volumeGeometry: Solid-Geometrie
 
-
         # boundedBy: Envelope
-
-

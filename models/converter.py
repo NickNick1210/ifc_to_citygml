@@ -3277,11 +3277,11 @@ class Converter(QgsTask):
             grossVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossVolume"]
         if UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetVolume") is not None:
             netVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetVolume"]
-        if grossVol is None and UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities",
+        if grossVol is None and UtilitiesIfc.findPset(ifcBuilding, "Qto_BodyGeometryValidation",
                                                       "GrossVolume") is not None:
-            grossVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossVolume"]
-        if netVol is None and UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetVolume") is not None:
-            netVol = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetVolume"]
+            grossVol = element.get_psets(ifcBuilding)["Qto_BodyGeometryValidation"]["GrossVolume"]
+        if netVol is None and UtilitiesIfc.findPset(ifcBuilding, "Qto_BodyGeometryValidation", "NetVolume") is not None:
+            netVol = element.get_psets(ifcBuilding)["Qto_BodyGeometryValidation"]["NetVolume"]
         if grossVol is None and netVol is None:
             height = None
             for child in chBldg:
@@ -3323,11 +3323,44 @@ class Converter(QgsTask):
         chWDPosPtPos.text = str(meanX) + " " + str(meanY) + " " + str(meanZ)
 
         # FloorArea
-        # TODO: EnergyADE-Gebäudeattribute
-        # floorArea (mit FloorArea: type --> GrossFloorArea, value)
-        #   --> GrossPlannedArea/NetPlannedArea aus Pset_BuildingCommon
-        #   --> GrossFloorArea/NetFloorArea aus Qto_BuildingBaseQuantities
-        #   --> aus Anz. Etagen * Grundfläche
+        grossArea, netArea, grossAreaFloor, netAreaFloor = None, None, None, None
+        if UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "GrossFloorArea") is not None:
+            grossArea = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["GrossFloorArea"]
+        if UtilitiesIfc.findPset(ifcBuilding, "Qto_BuildingBaseQuantities", "NetFloorArea") is not None:
+            netArea = element.get_psets(ifcBuilding)["Qto_BuildingBaseQuantities"]["NetFloorArea"]
+        if grossArea is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon",
+                                                       "GrossPlannedArea") is not None:
+            grossAreaFloor = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["GrossPlannedArea"]
+        if netArea is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "NetPlannedArea") is not None:
+            netAreaFloor = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["NetPlannedArea"]
+        if netArea is None and netVol is None:
+            storeyCount = 0
+            for child in chBldg:
+                if "storeysAboveGround" in child.tag or "storeysBelowGround" in child.tag:
+                    storeyCount += int(child.text)
+            if storeyCount != 0:
+                if grossAreaFloor is not None:
+                    grossArea = grossAreaFloor * storeyCount
+                if netAreaFloor is not None:
+                    netArea = netAreaFloor * storeyCount
+                if grossAreaFloor is None and netAreaFloor is None:
+                    grossArea = footPrint.Area() * storeyCount
+        if grossArea is not None:
+            chBldgArea = etree.SubElement(chBldg, QName(XmlNs.energy, "floorArea"))
+            chBldgFa = etree.SubElement(chBldgArea, QName(XmlNs.energy, "FloorArea"))
+            chBldgFaType = etree.SubElement(chBldgFa, QName(XmlNs.energy, "type"))
+            chBldgFaType.text = "grossFloorArea"
+            chBldgFaValue = etree.SubElement(chBldgFa, QName(XmlNs.energy, "value"))
+            chBldgFaValue.set("uom", "m2")
+            chBldgFaValue.text = str(grossArea)
+        if netArea is not None:
+            chBldgArea = etree.SubElement(chBldg, QName(XmlNs.energy, "floorArea"))
+            chBldgFa = etree.SubElement(chBldgArea, QName(XmlNs.energy, "FloorArea"))
+            chBldgFaType = etree.SubElement(chBldgFa, QName(XmlNs.energy, "type"))
+            chBldgFaType.text = "netFloorArea"
+            chBldgFaValue = etree.SubElement(chBldgFa, QName(XmlNs.energy, "value"))
+            chBldgFaValue.set("uom", "m2")
+            chBldgFaValue.text = str(netArea)
 
         # HeightAboveGround
         chBldgHeightag = etree.SubElement(chBldg, QName(XmlNs.energy, "heightAboveGround"))

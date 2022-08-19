@@ -443,6 +443,9 @@ class Converter(QgsTask):
         Args:
             geometry: Die konvertierten Geometrien
             chBound: XML-Objekt, an das die Bounding Box angehängt werden soll
+
+        Returns:
+            Die ergebene Bounding Box-Geometrie
         """
         # Prüfung, ob Geometrien vorhanden
         if geometry.GetGeometryCount() == 0:
@@ -3180,9 +3183,17 @@ class Converter(QgsTask):
             chWDPosPtPos.text = str(meanX) + " " + str(meanY) + " " + str(meanZ)
 
         else:
-            self.parent.dlg.log(self.tr(u'Due to the missing weather data, it can\'t get converted'))
+            self.parent.dlg.log(self.tr(u'Due to the missing weather data, it will also be missing in CityGML'))
 
     def convertEadeBldgAttr(self, ifcBuilding, chBldg, bbox, footPrint):
+        """ Konvertierung der Gebäudeattribute für die Energy ADE
+
+        Args:
+            ifcBuilding: IFC-Gebäude, aus dem die Attribute entnommen werden sollen
+            chBldg: XML-Objekt, an das die Gebäudeattribute angehängt werden soll
+            bbox: Die Bounding Box des Gebäudes
+            footPrint: Der Grundriss des Gebäudes
+        """
 
         # BuildingType
         type = None

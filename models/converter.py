@@ -241,9 +241,9 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                linkUZ = self.calcLoD1UsageZone(self, ifcBuilding, chBldg)
+                linkUZ = self.calcLoD1UsageZone(ifcBuilding, chBldg)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                self.calcLoD1ThermalZone(self, ifcBuilding, chBldg, linkUZ)
+                self.calcLoD1ThermalZone(ifcBuilding, chBldg, linkUZ)
 
         return root
 
@@ -3376,12 +3376,34 @@ class Converter(QgsTask):
         chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
         chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
 
-        # TODO: EnergyADE - ThermalZone
         # contains: UsageZone
-        # floorArea: wie Gebäudeattribut
-        # volume: wie Gebäudeattribut
+        if linkUZ is not None:
+            chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
+            chBldgTzContains.set(QName(XmlNs.xlink, "href"), linkUZ)
+
+        # floorArea
+        for child in chBldg:
+            if "floorArea" in child.tag:
+                chBldgTZ.append(deepcopy(child))
+
+        # volume
+        for child in chBldg:
+            if "volume" in child.tag:
+                chBldgTZ.append(deepcopy(child))
+
+        # TODO: EnergyADE - ThermalZone
         # infiltrationRate: Zahl
+
+
         # isCooled: Boolean
+
+
         # isHeated: Boolean
+
+
         # volumeGeometry: Solid-Geometrie
+
+
         # boundedBy: Envelope
+
+

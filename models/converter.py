@@ -72,6 +72,7 @@ class Converter(QgsTask):
         self.ifc = None
         self.trans = None
         self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
 
     @staticmethod
     def tr(msg):
@@ -222,6 +223,7 @@ class Converter(QgsTask):
 
         # Über alle enthaltenen Gebäude iterieren
         for ifcBuilding in ifcBuildings:
+            self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
@@ -418,7 +420,7 @@ class Converter(QgsTask):
         chBoundEnvUC.set("srsDimension", "3")
 
         # Envelope-Berechnung
-        env = self.geom.GetEnvelope3D()
+        env = geometry.GetEnvelope3D()
         chBoundEnvLC.text = str(env[0]) + " " + str(env[2]) + " " + str(env[4])
         chBoundEnvUC.text = str(env[1]) + " " + str(env[3]) + " " + str(env[5])
 
@@ -953,6 +955,7 @@ class Converter(QgsTask):
             chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
             for geometry in geometries:
                 self.geom.AddGeometry(geometry)
+                self.bldgGeom.AddGeometry(geometry)
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
                 geomXML = UtilitiesGeom.geomToGml(geometry)
                 chBldgSolidSM.append(geomXML)
@@ -3353,14 +3356,28 @@ class Converter(QgsTask):
         Returns:
             GML-ID der Nutzungszone als String
         """
-        # TODO: EnergyADE - UsageZone
-        # Attribute
-        # Occupants
-        # Facilities
-        # heatingSchedule
-        # ventilationSchedule
+        # XML-Struktur
+        chBldgUz = etree.SubElement(chBldg, QName(XmlNs.energy, "usageZone"))
+        chBldgUZ = etree.SubElement(chBldgUz, QName(XmlNs.energy, "UsageZone"))
+        gmlId = "GML_" + str(uuid.uuid4())
+        chBldgUZ.set(QName(XmlNs.gml, "id"), gmlId)
 
-        gmlId = ""
+        # TODO: EnergyADE - UsageZone
+        # coolingSchedule
+        # falls isCooled == True
+
+        # heatingSchedule
+        # falls isHeated == True
+
+        # usageZoneType
+
+        # ventilationSchedule
+        # falls Ventilation vorhanden
+
+        # occupiedBy: Occupants
+
+        # equippedWith: Facilities
+        # ElectricalAppliances / LightingFacilities / DHWFacilities
         return gmlId
 
     # noinspection PyMethodMayBeStatic
@@ -3375,6 +3392,7 @@ class Converter(QgsTask):
         # XML-Struktur
         chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
         chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
+        chBldgTzBound = etree.SubElement(chBldgTZ, QName(XmlNs.gml, "boundedBy"))
 
         # contains: UsageZone
         if linkUZ is not None:
@@ -3415,7 +3433,7 @@ class Converter(QgsTask):
         ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
         isCooled = True if len(ifcCooler) > 0 else False
         chBldgTzIsCooled = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isCooled"))
-        chBldgTzIsCooled.text = str(isCooled)
+        chBldgTzIsCooled.text = str(isCooled).lower()
 
         # isHeated
         if len(UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDistributionElement", result=[])) == 0:
@@ -3426,9 +3444,13 @@ class Converter(QgsTask):
             ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcHeatExchanger", result=[])
             isHeated = True if len(ifcHeater) > 0 else False
         chBldgTzIsHeated = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isHeated"))
-        chBldgTzIsHeated.text = str(isHeated)
+        chBldgTzIsHeated.text = str(isHeated).lower()
 
-        # TODO: EnergyADE - ThermalZone
-        # volumeGeometry: Solid-Geometrie
+        # volumeGeometry
+        chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
+        for child in chBldg:
+            if "lod1Solid" in child.tag:
+                chBldgTzVolGeom.append(deepcopy(child[0]))
 
         # boundedBy: Envelope
+        self.convertBound(self.bldgGeom, chBldgTzBound)

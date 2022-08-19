@@ -240,9 +240,10 @@ class Converter(QgsTask):
                 self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
-                # TODO: EnergyADE
-                # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
-                # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventilationSchedule
+                self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
+                linkUZ = self.calcLoD1UsageZone(self, ifcBuilding, chBldg)
+                self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
+                self.calcLoD1ThermalZone(self, ifcBuilding, chBldg, linkUZ)
 
         return root
 
@@ -1929,6 +1930,9 @@ class Converter(QgsTask):
                 default: None
             openings: Öffnungen des Objektes
                 default: []
+
+        Returns:
+            GML-IDs der Geometrien als Liste
         """
         for geometry in geometries:
             self.geom.AddGeometry(geometry)
@@ -3337,3 +3341,47 @@ class Converter(QgsTask):
         chBldgHeightAgVal = etree.SubElement(chBldgHeightAg, QName(XmlNs.energy, "value"))
         chBldgHeightAgVal.set("uom", "m")
         chBldgHeightAgVal.text = str(footPrint.GetGeometryRef(0).GetPoint(0)[2])
+
+    # noinspection PyMethodMayBeStatic
+    def calcLoD1UsageZone(self, ifcBuilding, chBldg):
+        """ Berechnung der Nutzungszone für die Energy ADE in LoD1
+
+        Args:
+            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
+            chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
+
+        Returns:
+            GML-ID der Nutzungszone als String
+        """
+        # TODO: EnergyADE - UsageZone
+        # Attribute
+        # Occupants
+        # Facilities
+        # heatingSchedule
+        # ventilationSchedule
+
+        gmlId = ""
+        return gmlId
+
+    # noinspection PyMethodMayBeStatic
+    def calcLoD1ThermalZone(self, ifcBuilding, chBldg, linkUZ):
+        """ Berechnung der thermischen Zone für die Energy ADE in LoD1
+
+        Args:
+            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
+            chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
+            linkUZ: GML-ID der anzufügenden Nutzungszone
+        """
+        # XML-Struktur
+        chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
+        chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
+
+        # TODO: EnergyADE - ThermalZone
+        # contains: UsageZone
+        # floorArea: wie Gebäudeattribut
+        # volume: wie Gebäudeattribut
+        # infiltrationRate: Zahl
+        # isCooled: Boolean
+        # isHeated: Boolean
+        # volumeGeometry: Solid-Geometrie
+        # boundedBy: Envelope

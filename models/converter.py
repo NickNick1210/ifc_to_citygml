@@ -245,7 +245,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ = self.calcLoD1ThermalZone(ifcBuilding, chBldg)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                self.calcLoD1UsageZone(ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                self.calcLoD1UsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
 
         return root
 
@@ -3094,12 +3094,12 @@ class Converter(QgsTask):
             minTemp = element.get_psets(ifcSite)["Pset_SiteWeather"]["MinAmbientTemp"]
 
             # Temperatureinheit
-            unitName = "cel"
+            unitName = "C"
             if ifcProject.UnitsInContext is not None:
                 units = ifcProject.UnitsInContext.Units
                 for unit in units:
                     if unit.is_a('IfcSIUnit') and unit.UnitType == "THERMODYNAMICTEMPERATUREUNIT":
-                        unitName = "k" if unit.Name == "KELVIN" else "cel"
+                        unitName = "K" if unit.Name == "KELVIN" else "C"
 
             # XML-Struktur
             chwd = etree.SubElement(chBldg, QName(XmlNs.energy, "weatherData"))
@@ -3349,11 +3349,12 @@ class Converter(QgsTask):
         chBldgHeightAgVal.text = str(footPrint.GetGeometryRef(0).GetPoint(0)[2])
 
     # noinspection PyMethodMayBeStatic
-    def calcLoD1UsageZone(self, ifcBuilding, chBldg, linkUZ, chBldgTZ):
+    def calcLoD1UsageZone(self, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ):
         """ Berechnung der Nutzungszone für die Energy ADE in LoD1
 
         Args:
-            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
+            ifcProject: IFC-Projekt, aus dem die Zeiteinheit entnommen werden soll
+            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnet werden soll
             chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
             linkUZ: GML-ID der Nutzungszone als String
             chBldgTZ: XML-Objekt der Thermal Zone
@@ -3364,22 +3365,13 @@ class Converter(QgsTask):
         chBldgUZ = etree.SubElement(chBldgUz, QName(XmlNs.energy, "UsageZone"))
         chBldgUZ.set(QName(XmlNs.gml, "id"), linkUZ)
 
-        # coolingSchedule
-        isCooled, isHeated = False, False
+        # heatingSchedule & coolingSchedule
         for child in chBldgTZ:
-            if "isCooled" in child.tag:
-                isCooled = True
-            if "isCooled" in child.tag:
-                isHeated = True
-
-        if isCooled:
-            chBldgUzCoolSch = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "coolingSchedule"))
-            # TODO: UsageZone - coolingSchedule
-
-        # heatingSchedule
-        if isHeated:
-            chBldgUzHeatSch = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "heatingSchedule"))
-            # TODO: UsageZone - heatingSchedule
+            if "isCooled" in child.tag and child.text == "true":
+                self.constructTempSchedule(chBldgUZ, "Cooling", ifcBuilding)
+        for child in chBldgTZ:
+            if "isHeated" in child.tag and child.text == "true":
+                self.constructTempSchedule(chBldgUZ, "Heating", ifcBuilding)
 
         # usageZoneType
         classType = None
@@ -3392,21 +3384,177 @@ class Converter(QgsTask):
             chBldgUzType.text = str(Mapper.usageZoneTypeDict[int(classType)])
 
         # ventilationSchedule
-        # falls Ventilation vorhanden
-        chBldgUzVentSch = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "ventilationSchedule"))
-        # TODO: UsageZone - ventilationSchedule
+        ventRate = None
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "MechanicalVentilation") is not None and \
+                element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["MechanicalVentilation"] and \
+                UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "MechanicalVentilationRate") is not None:
+            ventRate = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["MechanicalVentilationRate"]
+        if ventRate is None:
+            ventRateAll, count = 0, 0
+            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            for ifcSpace in ifcSpaces:
+                if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "MechanicalVentilation") is not None and \
+                        element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["MechanicalVentilation"] and \
+                        UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "MechanicalVentilationRate") is not None:
+                    ventRateAll += element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["MechanicalVentilationRate"]
+                    count += 1
+            if count != 0:
+                ventRate = ventRateAll / count
+        if ventRate is not None:
+            chBldgUzVentSch = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "ventilationSchedule"))
+            chBldgUzVsCVS = etree.SubElement(chBldgUzVentSch, QName(XmlNs.energy, "ConstantValueSchedule"))
+            chBldgUzVsAV = etree.SubElement(chBldgUzVsCVS, QName(XmlNs.energy, "averageValue"))
+            chBldgUzVsAV.text = str(element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["MechanicalVentilationRate"])
 
         # occupiedBy: Occupants
-        chBldgUzOccBy = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "occupiedBy"))
-        chBldgUzOcc = etree.SubElement(chBldgUzOccBy, QName(XmlNs.energy, "Occupants"))
-        chBldgUzOcc.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
-        # TODO: UsageZone - occupiedBy
+        occCount, occRate = None, None
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceOccupancyRequirements", "OccupancyNumber") is not None:
+            occCount = element.get_psets(ifcBuilding)["Pset_SpaceOccupancyRequirements"]["OccupancyNumber"]
+        if occCount is None:
+            OccCountAll, count = 0, 0
+            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            for ifcSpace in ifcSpaces:
+                if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceOccupancyRequirements", "OccupancyNumber") is not None:
+                    OccCountAll += element.get_psets(ifcSpace)["Pset_SpaceOccupancyRequirements"]["OccupancyNumber"]
+                    count += 1
+            if count != 0:
+                occCount = OccCountAll / count
+        if occCount is not None:
+            chBldgUzOccBy = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "occupiedBy"))
+            chBldgUzOcc = etree.SubElement(chBldgUzOccBy, QName(XmlNs.energy, "Occupants"))
+            chBldgUzOcc.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+            chBldgUzOccNr = etree.SubElement(chBldgUzOcc, QName(XmlNs.energy, "numberOfOccupants"))
+            chBldgUzOccNr.text = str(occCount)
+
+            if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceOccupancyRequirements", "OccupancyTimePerDay") is not None:
+                occRate = element.get_psets(ifcBuilding)["Pset_SpaceOccupancyRequirements"]["OccupancyTimePerDay"]
+            if occRate is None:
+                occRateAll, count = 0, 0
+                ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+                for ifcSpace in ifcSpaces:
+                    if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceOccupancyRequirements",
+                                             "OccupancyTimePerDay") is not None:
+                        occRateAll += element.get_psets(ifcSpace)["Pset_SpaceOccupancyRequirements"]["OccupancyTimePerDay"]
+                        count += 1
+                if count != 0:
+                    occRate = occRateAll / count
+            if occRate is not None:
+                # Zeiteinheit
+                if ifcProject.UnitsInContext is not None:
+                    units = ifcProject.UnitsInContext.Units
+                    for unit in units:
+                        if unit.is_a('IfcSIUnit') and unit.UnitType == "TIMEUNIT":
+                            if unit.Name == "MINUTE":
+                                occRate = occRate/60
+                            elif unit.Name == "SECOND":
+                                occRate = occRate/60/60
+
+                chBldgUzOccRate = etree.SubElement(chBldgUzOcc, QName(XmlNs.energy, "occupancyRate"))
+                chBldgUzOccDVS = etree.SubElement(chBldgUzOccRate, QName(XmlNs.energy, "DualValueSchedule"))
+                chBldgUzOccDVS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+                chBldgUzOccName = etree.SubElement(chBldgUzOccDVS, QName(XmlNs.gml, "name"))
+                chBldgUzOccName.text = "Occupants"
+                chBldgUzOccUH = etree.SubElement(chBldgUzOccDVS, QName(XmlNs.energy, "usageHoursPerDay"))
+                chBldgUzOccUH.text = str(occRate)
+                chBldgUzOccUD = etree.SubElement(chBldgUzOccDVS, QName(XmlNs.energy, "usageDaysPerYear"))
+                chBldgUzOccUD.text = "365"
+                chBldgUzOccUVal = etree.SubElement(chBldgUzOccDVS, QName(XmlNs.energy, "usageValue"))
+                chBldgUzOccUVal.text = str(occCount)
+                chBldgUzOccIVal = etree.SubElement(chBldgUzOccDVS, QName(XmlNs.energy, "idleValue"))
+                chBldgUzOccIVal.text = "0"
 
         # equippedWith: Facilities
-        # mehrere möglich
-        # ElectricalAppliances / LightingFacilities / DHWFacilities
-        chBldgUzEqW = etree.SubElement(chBldgUZ, QName(XmlNs.energy, "equippedWith"))
-        # TODO: UsageZone - equippedWith
+        hasOccSchedule = False
+        for child in chBldg:
+            if "occupiedBy" in child.tag:
+                hasOccSchedule = True
+        if hasOccSchedule:
+            ifcElectricalAppl = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcAudioVisualAppliance", result=[])
+            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCommunicationAppliance", result=[])
+            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcElectricAppliance", result=[])
+            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcMobileTelecommunicationsAppliance", result=[])
+            if len(ifcElectricalAppl) != 0:
+                self.constructEquipSchedule(chBldgUZ, "ElectricalAppliances", ifcBuilding)
+            ifcLightingFac = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcLamp", result=[])
+            ifcLightingFac += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcLightFixture", result=[])
+            if len(ifcLightingFac) != 0:
+                self.constructEquipSchedule(chBldgUZ, "LightingFacilities", ifcBuilding)
+            ifcDhwFac = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpaceHeater", result=[])
+            ifcDhwFac += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSanitaryTerminal", result=[])
+            if len(ifcDhwFac) != 0:
+                self.constructEquipSchedule(chBldgUZ, "DHWFacilities", ifcBuilding)
+
+    # noinspection PyMethodMayBeStatic
+    def constructTempSchedule(self, ch, mode, ifcBuilding):
+        """ Erstellung des Zeitplanes der Temperaturen für die Energy ADE in LoD1
+
+        Args:
+            ch: XML-Objekt, an das der Zeitplan angehängt werden soll
+            mode: Modus (Heating oder Cooling)
+            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
+        """
+
+        # min. und max. Temperaturen heraussuchen
+        tempMax, tempMin = None, None
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "TemperatureMax") is not None and \
+                UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "TemperatureMin") is not None:
+            tempMax = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["TemperatureMax"]
+            tempMin = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["TemperatureMin"]
+        if tempMax is None or tempMin is None:
+            tempMaxAll, tempMinAll, count = 0, 0, 0
+            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            for ifcSpace in ifcSpaces:
+                if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "TemperatureMax") is not None and \
+                        UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "TemperatureMin") is not None:
+                    tempMaxAll += element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["TemperatureMax"]
+                    tempMinAll += element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["TemperatureMin"]
+                    count += 1
+            if count != 0:
+                tempMax, tempMin = tempMaxAll / count, tempMinAll / count
+
+        # XML-Struktur
+        if tempMax is not None and tempMin is not None:
+            scheduleName = "heatingSchedule" if mode == "Heating" else "coolingSchedule"
+            chBldgUzHeatSch = etree.SubElement(ch, QName(XmlNs.energy, scheduleName))
+            chBldgUzHsDVS = etree.SubElement(chBldgUzHeatSch, QName(XmlNs.energy, "DualValueSchedule"))
+            chBldgUzHsDVS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+            chBldgUzHsName = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.gml, "name"))
+            chBldgUzHsName.text = mode
+            chBldgUzHsUH = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageHoursPerDay"))
+            chBldgUzHsUH.text = "8" if mode == "Heating" else "5"
+            chBldgUzHsUD = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageDaysPerYear"))
+            chBldgUzHsUD.text = "200" if mode == "Heating" else "50"
+            chBldgUzHsUVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageValue"))
+            chBldgUzHsUVal.text = str(tempMax) if mode == "Heating" else str(tempMin)
+            chBldgUzHsIVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "idleValue"))
+            chBldgUzHsIVal.text = str(tempMin) if mode == "Heating" else str(tempMax)
+
+    # noinspection PyMethodMayBeStatic
+    def constructEquipSchedule(self, ch, mode):
+        """ Erstellung des Zeitplanes der Nutzung für die Energy ADE in LoD1
+
+        Args:
+            ch: XML-Objekt, an das der Zeitplan angehängt werden soll
+            mode: Modus (ElectricalAppliances, LightingFacilities oder DHWFacilities)
+        """
+
+        # XML-Struktur
+        chBldgUzEqW = etree.SubElement(ch, QName(XmlNs.energy, "equippedWith"))
+        chBldgUzEq = etree.SubElement(chBldgUzEqW, QName(XmlNs.energy, mode))
+        scheduleName = mode + "Schedule"
+        chBldgUzHeatSch = etree.SubElement(chBldgUzEq, QName(XmlNs.energy, scheduleName))
+        chBldgUzHsDVS = etree.SubElement(chBldgUzHeatSch, QName(XmlNs.energy, "DualValueSchedule"))
+        chBldgUzHsDVS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+        chBldgUzHsName = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.gml, "name"))
+        chBldgUzHsName.text = mode
+        chBldgUzHsUH = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageHoursPerDay"))
+        chBldgUzHsUH.text = "3" if mode == "LightingFacilities" else "8"
+        chBldgUzHsUD = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageDaysPerYear"))
+        chBldgUzHsUD.text = "365"
+        chBldgUzHsUVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageValue"))
+        chBldgUzHsUVal.text = "1"
+        chBldgUzHsIVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "idleValue"))
+        chBldgUzHsIVal.text = "0"
 
     # noinspection PyMethodMayBeStatic
     def calcLoD1ThermalZone(self, ifcBuilding, chBldg):
@@ -3458,11 +3606,21 @@ class Converter(QgsTask):
             chBldgTzInfRate.text = infRate
 
         # isCooled
-        ifcCooler = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcChiller", result=[])
-        ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCoolingTower", result=[])
-        ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCooledBeam", result=[])
-        ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
-        isCooled = True if len(ifcCooler) > 0 else False
+        isCooled = None
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "AirConditioning") is not None:
+            isCooled = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["AirConditioning"]
+        if isCooled is None:
+            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            for ifcSpace in ifcSpaces:
+                if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "AirConditioning") is not None and \
+                        element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["AirConditioning"]:
+                    isCooled = True
+        if isCooled is None:
+            ifcCooler = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcChiller", result=[])
+            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCoolingTower", result=[])
+            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCooledBeam", result=[])
+            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
+            isCooled = True if len(ifcCooler) > 0 else False
         chBldgTzIsCooled = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isCooled"))
         chBldgTzIsCooled.text = str(isCooled).lower()
 

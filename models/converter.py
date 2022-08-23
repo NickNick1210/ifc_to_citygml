@@ -274,27 +274,30 @@ class Converter(QgsTask):
             # Konvertierung
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             height = self.convertBldgAttr(ifcBuilding, chBldg)
-            links = self.convertLoD2BldgBound(ifcBuilding, chBldg, height)
+            links, footPrint = self.convertLoD2BldgBound(ifcBuilding, chBldg, height)
             self.convertLoDSolid(chBldg, links, 2)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
-            self.convertBound(self.geom, chBound)
+            bbox = self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
-                # TODO: EnergyADE
-                # weatherData
-                #   --> wie LoD0/1
-                # Gebäudeattribute
-                #   --> wie LoD0/1
-                # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
-                # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
-                # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventilationSchedule
-                # Construction (Attribute, Layer, OptivalProperties)
+                self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
+                self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
+                self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
+                self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
+                linkUZ, chBldgTZ = self.calcLoD2ThermalZone(ifcBuilding, chBldg)
+                self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
+                self.calcLoD1UsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
+                # TODO: EnergyADE LoD2 - Construction
+                # Construction (Attribute, Layer, OpticalProperties)
+                self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
+                # TODO: EnergyADE LoD2 - Material
                 # AbstractMaterial: SolidMaterial/Gas (Attribute)
-                pass
 
         return root
 
@@ -1026,6 +1029,10 @@ class Converter(QgsTask):
             ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
             height: Gebäudehöhe
+
+        Returns:
+            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses als Liste
+            Die Grundflächengeometrie
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
@@ -1078,7 +1085,7 @@ class Converter(QgsTask):
             for geomWall in geomWalls:
                 link = self.setElement(chBldg, geomWall, "WallSurface", 2)
                 links.append(link)
-        return links
+        return links, geomBase
 
     def setElement(self, chBldg, geometry, type, lod):
         """ Setzen eines CityGML-Objekts
@@ -3568,6 +3575,100 @@ class Converter(QgsTask):
             linkUZ: GML-ID der anzufügenden Nutzungszone
             chBldgTZ: XML-Objekt der Thermal Zone
         """
+        # XML-Struktur
+        chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
+        chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
+        chBldgTzBound = etree.SubElement(chBldgTZ, QName(XmlNs.gml, "boundedBy"))
+
+        # contains: UsageZone
+        chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
+        linkUZ = "GML_" + str(uuid.uuid4())
+        chBldgTzContains.set(QName(XmlNs.xlink, "href"), linkUZ)
+
+        # floorArea & volume
+        for child in chBldg:
+            if "floorArea" in child.tag:
+                chBldgTZ.append(deepcopy(child))
+            if "volume" in child.tag:
+                chBldgTZ.append(deepcopy(child))
+
+        # infiltrationRate
+        infRateS, infRateW = None, None
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversitySummer") is not None:
+            infRateS = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversitySummer"]
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversityWinter") is not None:
+            infRateW = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversityWinter"]
+        if infRateS is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
+                                                      "InfiltrationDiversitySummer") is not None:
+            infRateS = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversitySummer"]
+        if infRateW is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
+                                                      "InfiltrationDiversityWinter") is not None:
+            infRateW = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversityWinter"]
+        if infRateS is not None or infRateW is not None:
+            chBldgTzInfRate = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "infiltrationRate"))
+            if infRateS is not None and infRateW is not None:
+                infRate = (infRateS + infRateW) / 2
+            else:
+                infRate = infRateS if infRateS is not None else infRateW
+            chBldgTzInfRate.text = infRate
+
+        # isCooled
+        isCooled = None
+        if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "AirConditioning") is not None:
+            isCooled = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["AirConditioning"]
+        if isCooled is None:
+            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            for ifcSpace in ifcSpaces:
+                if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "AirConditioning") is not None and \
+                        element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["AirConditioning"]:
+                    isCooled = True
+        if isCooled is None:
+            ifcCooler = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcChiller", result=[])
+            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCoolingTower", result=[])
+            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCooledBeam", result=[])
+            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
+            isCooled = True if len(ifcCooler) > 0 else False
+        chBldgTzIsCooled = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isCooled"))
+        chBldgTzIsCooled.text = str(isCooled).lower()
+
+        # isHeated
+        if len(UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDistributionElement", result=[])) == 0:
+            isHeated = True
+        else:
+            ifcHeater = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpaceHeater", result=[])
+            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcBurner", result=[])
+            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcHeatExchanger", result=[])
+            isHeated = True if len(ifcHeater) > 0 else False
+        chBldgTzIsHeated = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isHeated"))
+        chBldgTzIsHeated.text = str(isHeated).lower()
+
+        # volumeGeometry
+        chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
+        for child in chBldg:
+            if "lod1Solid" in child.tag:
+                chBldgTzVolGeom.append(deepcopy(child[0]))
+
+        # boundedBy: Envelope
+        self.convertBound(self.bldgGeom, chBldgTzBound)
+
+        return linkUZ, chBldgTZ
+
+    # noinspection PyMethodMayBeStatic
+    def calcLoD2ThermalZone(self, ifcBuilding, chBldg):
+        """ Berechnung der thermischen Zone für die Energy ADE in LoD2
+
+        Args:
+            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
+            chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
+
+        Returns
+            linkUZ: GML-ID der anzufügenden Nutzungszone
+            chBldgTZ: XML-Objekt der Thermal Zone
+        """
+
+        # TODO: EnergyADE LoD2 - ThermalZone
+        # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
+
         # XML-Struktur
         chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
         chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))

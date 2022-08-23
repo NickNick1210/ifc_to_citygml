@@ -245,7 +245,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ = self.calcLoD1ThermalZone(ifcBuilding, chBldg)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                self.calcLoD1UsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
 
         return root
 
@@ -291,7 +291,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ = self.calcLoD2ThermalZone(ifcBuilding, chBldg)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                self.calcLoD1UsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
                 # TODO: EnergyADE LoD2 - Construction
                 # Construction (Attribute, Layer, OpticalProperties)
@@ -3356,8 +3356,8 @@ class Converter(QgsTask):
         chBldgHeightAgVal.text = str(footPrint.GetGeometryRef(0).GetPoint(0)[2])
 
     # noinspection PyMethodMayBeStatic
-    def calcLoD1UsageZone(self, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ):
-        """ Berechnung der Nutzungszone für die Energy ADE in LoD1
+    def calcLoDUsageZone(self, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ):
+        """ Berechnung der Nutzungszone für die Energy ADE
 
         Args:
             ifcProject: IFC-Projekt, aus dem die Zeiteinheit entnommen werden soll
@@ -3666,12 +3666,11 @@ class Converter(QgsTask):
             chBldgTZ: XML-Objekt der Thermal Zone
         """
 
-        # TODO: EnergyADE LoD2 - ThermalZone
-        # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
-
         # XML-Struktur
         chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
         chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
+        linkTZ = "GML_" + str(uuid.uuid4())
+        chBldgTZ.set(QName(XmlNs.gml, "id"), linkTZ)
         chBldgTzBound = etree.SubElement(chBldgTZ, QName(XmlNs.gml, "boundedBy"))
 
         # contains: UsageZone
@@ -3736,13 +3735,54 @@ class Converter(QgsTask):
         chBldgTzIsHeated = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isHeated"))
         chBldgTzIsHeated.text = str(isHeated).lower()
 
+        # boundedBy: Envelope
+        self.convertBound(self.bldgGeom, chBldgTzBound)
+
+        # boundedBy: ThermalBoundary
+        for child in chBldg:
+            if "boundedBy" in child.tag:
+                chBldgTzBby = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "boundedBy"))
+                chBldgTb = etree.SubElement(chBldgTzBby, QName(XmlNs.energy, "ThermalBoundary"))
+                chBldgTb.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+
+                # thermalBoundaryType
+                chBldgTbType = etree.SubElement(chBldgTb, QName(XmlNs.energy, "thermalBoundaryType"))
+                # TODO: EnergyADE LoD2 - ThermalBoundary - thermalBoundaryType
+
+                # azimuth
+                chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
+                chBldgTbAz.set("uom", "deg")
+                # TODO: EnergyADE LoD2 - ThermalBoundary - azimuth
+
+                # inclination
+                chBldgTbIncl = etree.SubElement(chBldgTb, QName(XmlNs.energy, "inclination"))
+                chBldgTbIncl.set("uom", "deg")
+                # TODO: EnergyADE LoD2 - ThermalBoundary - inclination
+
+                # area
+                chBldgTbArea = etree.SubElement(chBldgTb, QName(XmlNs.energy, "area"))
+                chBldgTbArea.set("uom", "m2")
+                # TODO: EnergyADE LoD2 - ThermalBoundary - area
+
+                # surfaceGeometry
+                for childGeom in child[0]:
+                    if "lod2MultiSurface" in childGeom.tag:
+                        chGeom = childGeom
+                chBldgTbGeom = etree.SubElement(chBldgTb, QName(XmlNs.energy, "surfaceGeometry"))
+                chBldgTbGeom.append(deepcopy(chGeom[0]))
+
+                # construction
+                chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
+                # TODO: EnergyADE LoD2 - ThermalBoundary - construction
+
+                # delimits
+                chBldgTbDel = etree.SubElement(chBldgTb, QName(XmlNs.energy, "delimits"))
+                chBldgTbDel.set(QName(XmlNs.xlink, "href"), linkTZ)
+
         # volumeGeometry
         chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
         for child in chBldg:
-            if "lod1Solid" in child.tag:
+            if "lod2Solid" in child.tag:
                 chBldgTzVolGeom.append(deepcopy(child[0]))
-
-        # boundedBy: Envelope
-        self.convertBound(self.bldgGeom, chBldgTzBound)
 
         return linkUZ, chBldgTZ

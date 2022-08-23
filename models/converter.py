@@ -3741,12 +3741,12 @@ class Converter(QgsTask):
         # boundedBy: ThermalBoundary
         for child in chBldg:
             if "boundedBy" in child.tag:
+                # XML-Struktur
                 chBldgTzBby = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "boundedBy"))
                 chBldgTb = etree.SubElement(chBldgTzBby, QName(XmlNs.energy, "ThermalBoundary"))
                 chBldgTb.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
 
                 # thermalBoundaryType
-                # outerWall, groundSlab, roof
                 if "GroundSurface" in child[0].tag:
                     type = "groundSlab"
                 elif "RoofSurface" in child[0].tag:
@@ -3756,19 +3756,27 @@ class Converter(QgsTask):
                 chBldgTbType = etree.SubElement(chBldgTb, QName(XmlNs.energy, "thermalBoundaryType"))
                 chBldgTbType.text = type
 
+                for childGeom in child[0]:
+                    if "lod2MultiSurface" in childGeom.tag:
+                        geomGML = etree.tostring(childGeom[0][0][0]).decode('utf-8')
+                        geom = ogr.CreateGeometryFromGML(geomGML)
+
                 # azimuth
                 chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
                 chBldgTbAz.set("uom", "deg")
+                chBldgTbAz.text = ""
                 # TODO: EnergyADE LoD2 - ThermalBoundary - azimuth
 
                 # inclination
                 chBldgTbIncl = etree.SubElement(chBldgTb, QName(XmlNs.energy, "inclination"))
                 chBldgTbIncl.set("uom", "deg")
+                chBldgTbIncl.text = ""
                 # TODO: EnergyADE LoD2 - ThermalBoundary - inclination
 
                 # area
                 chBldgTbArea = etree.SubElement(chBldgTb, QName(XmlNs.energy, "area"))
                 chBldgTbArea.set("uom", "m2")
+                chBldgTbArea.text = str(geom.GetArea())
                 # TODO: EnergyADE LoD2 - ThermalBoundary - area
 
                 # surfaceGeometry

@@ -3746,8 +3746,15 @@ class Converter(QgsTask):
                 chBldgTb.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
 
                 # thermalBoundaryType
+                # outerWall, groundSlab, roof
+                if "GroundSurface" in child[0].tag:
+                    type = "groundSlab"
+                elif "RoofSurface" in child[0].tag:
+                    type = "roof"
+                elif "WallSurface" in child[0].tag:
+                    type = "outerWall"
                 chBldgTbType = etree.SubElement(chBldgTb, QName(XmlNs.energy, "thermalBoundaryType"))
-                # TODO: EnergyADE LoD2 - ThermalBoundary - thermalBoundaryType
+                chBldgTbType.text = type
 
                 # azimuth
                 chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
@@ -3773,6 +3780,7 @@ class Converter(QgsTask):
 
                 # construction
                 chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
+                chBldgTbConstr.set(QName(XmlNs.xlink, "href"), "")
                 # TODO: EnergyADE LoD2 - ThermalBoundary - construction
 
                 # delimits

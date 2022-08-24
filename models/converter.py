@@ -1918,7 +1918,7 @@ class Converter(QgsTask):
             chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
             for link in links:
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
-                chBldgSolidSM.set(QName(XmlNs.xlink, "href"), link)
+                chBldgSolidSM.set(QName(XmlNs.xlink, "href"), "#" + link)
 
     def convertLoD3BldgBound(self, ifcBuilding, chBldg):
         """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 3
@@ -3613,7 +3613,7 @@ class Converter(QgsTask):
         # contains: UsageZone
         chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
         linkUZ = "GML_" + str(uuid.uuid4())
-        chBldgTzContains.set(QName(XmlNs.xlink, "href"), linkUZ)
+        chBldgTzContains.set(QName(XmlNs.xlink, "href"), "#" + linkUZ)
 
         # floorArea & volume
         for child in chBldg:
@@ -3708,7 +3708,7 @@ class Converter(QgsTask):
         # contains: UsageZone
         chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
         linkUZ = "GML_" + str(uuid.uuid4())
-        chBldgTzContains.set(QName(XmlNs.xlink, "href"), linkUZ)
+        chBldgTzContains.set(QName(XmlNs.xlink, "href"), "#" + linkUZ)
 
         # floorArea & volume
         for child in chBldg:
@@ -3847,11 +3847,11 @@ class Converter(QgsTask):
                         constructions.append(constrNew)
 
                     chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
-                    chBldgTbConstr.set(QName(XmlNs.xlink, "href"), gmlIdConstr)
+                    chBldgTbConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
 
                 # delimits
                 chBldgTbDel = etree.SubElement(chBldgTb, QName(XmlNs.energy, "delimits"))
-                chBldgTbDel.set(QName(XmlNs.xlink, "href"), linkTZ)
+                chBldgTbDel.set(QName(XmlNs.xlink, "href"), "#" + linkTZ)
 
         # volumeGeometry
         chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
@@ -3861,7 +3861,18 @@ class Converter(QgsTask):
 
         return linkUZ, chBldgTZ, constructions
 
+    # noinspection PyMethodMayBeStatic
     def convertConstructions(self, root, constructions):
+        """ Berechnung der Konstruktionen der Begrenzung der thermalen Zone für die Energy ADE in LoD2
+
+        Args:
+            root: XML-Objekt, an das die Konstruktionen angehängt werden sollen
+            constructions: Liste der GML-IDs und zugehörigen IfcMaterialLayerSets
+
+        Returns
+            materials: Die zu erstellenden Materialien der Konstruktion, mit GML-ID und IfcElement
+        """
+        materials = []
         for constr in constructions:
             # XML-Struktur
             chFM = etree.SubElement(root, QName(XmlNs.gml, "featureMember"))
@@ -3890,4 +3901,32 @@ class Converter(QgsTask):
                 chConstrUV.text = str(thTransm)
 
             # Layer
-            # TODO: EnergyADE LoD2 - Construction - Layer
+            if constr[1].MaterialLayers is not None:
+                for matLayer in constr[1].MaterialLayers:
+
+                    # XML-Struktur
+                    chConstrlayer = etree.SubElement(chConstr, QName(XmlNs.energy, "layer"))
+                    chConstrLayer = etree.SubElement(chConstrlayer, QName(XmlNs.energy, "Layer"))
+                    chConstrLayer.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+                    chConstrLaycomp = etree.SubElement(chConstrLayer, QName(XmlNs.energy, "layerComponent"))
+                    chConstrLayComp = etree.SubElement(chConstrLaycomp, QName(XmlNs.energy, "LayerComponent"))
+
+                    # areaFraction
+                    chConstrLayFrac = etree.SubElement(chConstrLayComp, QName(XmlNs.energy, "areaFraction"))
+                    chConstrLayFrac.set("uom", "scale")
+                    chConstrLayFrac.text = "1"
+
+                    # thickness
+                    if matLayer.LayerThickness is not None:
+                        chConstrLayThick = etree.SubElement(chConstrLayComp, QName(XmlNs.energy, "thickness"))
+                        chConstrLayThick.set("uom", "m")
+                        chConstrLayThick.text = str(matLayer.LayerThickness)
+
+                    # material: Verweis auf Material
+                    if matLayer.Material is not None:
+                        chConstrLayMat = etree.SubElement(chConstrLayComp, QName(XmlNs.energy, "material"))
+                        gmlId = "GML_" + str(uuid.uuid4())
+                        chConstrLayMat.set(QName(XmlNs.xlink, "href"), "#" + gmlId)
+                    materials.append([gmlId, matLayer])
+
+        return materials

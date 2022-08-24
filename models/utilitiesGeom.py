@@ -146,10 +146,7 @@ class UtilitiesGeom:
         if sameHeight:
             return geom.GetArea()
 
-        mainRing = geom.GetGeometryRef(0)
-        plane = UtilitiesGeom.getPlane(mainRing.GetPoint(0), mainRing.GetPoint(1), mainRing.GetPoint(2))
-        plane2D = UtilitiesGeom.getPlane([0, 0, 0], [1, 0, 0], [0, 1, 0])
-        angle = float(plane2D.angle_between(plane))
+        angle = UtilitiesGeom.calcInclination(geom)
         if not 1.565 < angle < 1.575:
             area2D = geom.GetArea()
             area3D = abs(area2D * mpmath.sec(angle))
@@ -165,6 +162,14 @@ class UtilitiesGeom:
             ringNew.CloseRings()
             geomNew.AddGeometry(ringNew)
         return UtilitiesGeom.calcArea3D(geomNew)
+
+    @staticmethod
+    def calcInclination(geom):
+        mainRing = geom.GetGeometryRef(0)
+        plane = UtilitiesGeom.getPlane(mainRing.GetPoint(0), mainRing.GetPoint(1), mainRing.GetPoint(2))
+        plane2D = UtilitiesGeom.getPlane([0, 0, 0], [1, 0, 0], [0, 1, 0])
+        angle = float(plane2D.angle_between(plane))
+        return angle
 
     @staticmethod
     def simplify(geom, distTol, angTol, zd=False):

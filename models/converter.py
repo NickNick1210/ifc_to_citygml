@@ -3402,7 +3402,8 @@ class Converter(QgsTask):
             for ifcSpace in ifcSpaces:
                 if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "MechanicalVentilation") is not None and \
                         element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["MechanicalVentilation"] and \
-                        UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "MechanicalVentilationRate") is not None:
+                        UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign",
+                                              "MechanicalVentilationRate") is not None:
                     ventRateAll += element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["MechanicalVentilationRate"]
                     count += 1
             if count != 0:
@@ -3441,7 +3442,8 @@ class Converter(QgsTask):
                 for ifcSpace in ifcSpaces:
                     if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceOccupancyRequirements",
                                              "OccupancyTimePerDay") is not None:
-                        occRateAll += element.get_psets(ifcSpace)["Pset_SpaceOccupancyRequirements"]["OccupancyTimePerDay"]
+                        occRateAll += element.get_psets(ifcSpace)["Pset_SpaceOccupancyRequirements"][
+                            "OccupancyTimePerDay"]
                         count += 1
                 if count != 0:
                     occRate = occRateAll / count
@@ -3452,9 +3454,9 @@ class Converter(QgsTask):
                     for unit in units:
                         if unit.is_a('IfcSIUnit') and unit.UnitType == "TIMEUNIT":
                             if unit.Name == "MINUTE":
-                                occRate = occRate/60
+                                occRate = occRate / 60
                             elif unit.Name == "SECOND":
-                                occRate = occRate/60/60
+                                occRate = occRate / 60 / 60
 
                 chBldgUzOccRate = etree.SubElement(chBldgUzOcc, QName(XmlNs.energy, "occupancyRate"))
                 chBldgUzOccDVS = etree.SubElement(chBldgUzOccRate, QName(XmlNs.energy, "DualValueSchedule"))
@@ -3479,7 +3481,8 @@ class Converter(QgsTask):
             ifcElectricalAppl = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcAudioVisualAppliance", result=[])
             ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCommunicationAppliance", result=[])
             ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcElectricAppliance", result=[])
-            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcMobileTelecommunicationsAppliance", result=[])
+            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcMobileTelecommunicationsAppliance",
+                                                          result=[])
             if len(ifcElectricalAppl) != 0:
                 self.constructEquipSchedule(chBldgUZ, "ElectricalAppliances", ifcBuilding)
             ifcLightingFac = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcLamp", result=[])
@@ -3770,7 +3773,7 @@ class Converter(QgsTask):
                 # inclination
                 chBldgTbIncl = etree.SubElement(chBldgTb, QName(XmlNs.energy, "inclination"))
                 chBldgTbIncl.set("uom", "deg")
-                chBldgTbIncl.text = ""
+                chBldgTbIncl.text = str(UtilitiesGeom.calcInclination(geom) / math.pi * 180)
                 # TODO: EnergyADE LoD2 - ThermalBoundary - inclination
 
                 # area

@@ -137,34 +137,43 @@ class UtilitiesGeom:
 
     @staticmethod
     def calcArea3D(geom):
-        sameHeight = True
-        mainRing = geom.GetGeometryRef(0)
-        for i in range(1, mainRing.GetPointCount()):
-            if not mainRing.GetPoint(i-1)[2] - 0.0001 < mainRing.GetPoint(i)[2] < mainRing.GetPoint(i-1)[2] + 0.0001:
-                sameHeight = False
-                break
-        if sameHeight:
-            return geom.GetArea()
+        """ Berechnen der Fläche einer 3D-Geometrie
 
+        Args:
+            geom: Das Polygon, dessen Fläche berechnet werden soll
+
+        Returns:
+            Die berechnete Fläche
+        """
+        # 3D-Fläche = 2D-Fläche * Sec(Steigungswinkel)
         angle = UtilitiesGeom.calcInclination(geom)
         if not 1.565 < angle < 1.575:
             area2D = geom.GetArea()
             area3D = abs(area2D * mpmath.sec(angle))
             return area3D
 
+        # Wenn 2D-Fläche = 0: Achsen tauschen
         geomNew = ogr.Geometry(ogr.wkbPolygon)
         for i in range(0, geom.GetGeometryCount()):
             ring = geom.GetGeometryRef(i)
             ringNew = ogr.Geometry(ogr.wkbLinearRing)
             for j in range(0, ring.GetPointCount()-1):
-                pt = ring.GetPoint(j)
-                ringNew.AddPoint(pt[1], pt[2], pt[0])
+                ringNew.AddPoint(ring.GetPoint(j)[1], ring.GetPoint(j)[2], ring.GetPoint(j)[0])
             ringNew.CloseRings()
             geomNew.AddGeometry(ringNew)
         return UtilitiesGeom.calcArea3D(geomNew)
 
     @staticmethod
     def calcInclination(geom):
+        """ Berechnen des Höhenwinkels einer 3D-Geometrie
+
+        Args:
+            geom: Das Polygon, dessen Höhenwinkel berechnet werden soll
+
+        Returns:
+            Der berechnete Höhenwinkel im Bogenmaß
+        """
+        # Winkel zur X-Y-Ebene
         mainRing = geom.GetGeometryRef(0)
         plane = UtilitiesGeom.getPlane(mainRing.GetPoint(0), mainRing.GetPoint(1), mainRing.GetPoint(2))
         plane2D = UtilitiesGeom.getPlane([0, 0, 0], [1, 0, 0], [0, 1, 0])
@@ -173,12 +182,19 @@ class UtilitiesGeom:
 
     @staticmethod
     def calcAzimuth(geom):
+        """ Berechnen des Azimuts einer 3D-Geometrie
+
+        Args:
+            geom: Das Polygon, dessen Azimut berechnet werden soll
+
+        Returns:
+            Der berechnete Azimut in Grad
+        """
+        # Richtung des Normalenvektors
         mainRing = geom.GetGeometryRef(0)
         plane = UtilitiesGeom.getPlane(mainRing.GetPoint(0), mainRing.GetPoint(1), mainRing.GetPoint(2))
         nVector = plane.normal_vector
-        x = float(nVector[0])
-        y = float(nVector[1])
-
+        x, y = float(nVector[0]), float(nVector[1])
         if x == 0:
             if y > 0.001:
                 return 90
@@ -186,11 +202,12 @@ class UtilitiesGeom:
                 return 270
             else:
                 return 0
+
+        # Arctan
         angle = np.arctan2(y, x)
         angleDeg = angle / math.pi * 180
         if angleDeg < 0:
             angleDeg += 360
-
         return angleDeg
 
     @staticmethod

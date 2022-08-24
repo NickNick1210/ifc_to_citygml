@@ -336,7 +336,7 @@ class Converter(QgsTask):
             # EnergyADE
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
-                # TODO: EnergyADE
+                # TODO: EnergyADE LoD3
                 # weatherData
                 #   --> wie LoD0/1/2
                 # Gebäudeattribute
@@ -389,7 +389,7 @@ class Converter(QgsTask):
             # EnergyADE
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
-                # TODO: EnergyADE
+                # TODO: EnergyADE LoD4
                 # weatherData
                 #   --> wie LoD0/1/2/3
                 # Gebäudeattribute
@@ -3008,7 +3008,7 @@ class Converter(QgsTask):
             ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
         """
-        # TODO: LoD4-Interieur
+        # TODO: LoD4 - Interieur
 
         # IFC-Elemente der Grundfläche
         ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])

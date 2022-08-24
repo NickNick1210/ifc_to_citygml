@@ -293,10 +293,9 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
-                self.convertConstructions(root, constructions)
+                materials = self.convertConstructions(root, constructions)
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
-                # TODO: EnergyADE LoD2 - Material
-                # AbstractMaterial: SolidMaterial/Gas (Attribute)
+                self.convertMaterials(root, materials)
 
         return root
 
@@ -3927,6 +3926,72 @@ class Converter(QgsTask):
                         chConstrLayMat = etree.SubElement(chConstrLayComp, QName(XmlNs.energy, "material"))
                         gmlId = "GML_" + str(uuid.uuid4())
                         chConstrLayMat.set(QName(XmlNs.xlink, "href"), "#" + gmlId)
-                    materials.append([gmlId, matLayer])
+                    materials.append([gmlId, matLayer.Material])
 
         return materials
+
+    # noinspection PyMethodMayBeStatic
+    def convertMaterials(self, root, materials):
+        """ Berechnung der Materialien der Konstruktionen der Begrenzung der thermalen Zone für die Energy ADE in LoD2
+
+        Args:
+            root: XML-Objekt, an das die Materialien angehängt werden sollen
+            materials: Liste der GML-IDs und zugehörigen IfcMaterials
+        """
+        for mat in materials:
+
+            # XML-Struktur
+            chFM = etree.SubElement(root, QName(XmlNs.gml, "featureMember"))
+            chMat = etree.SubElement(chFM, QName(XmlNs.energy, "SolidMaterial"))
+            chMat.set(QName(XmlNs.gml, "id"), mat[0])
+
+            # Name & Beschreibung
+            if mat[1].Name is not None:
+                chMatName = etree.SubElement(chMat, QName(XmlNs.gml, "name"))
+                chMatName.text = mat[1].Name
+            if mat[1].Description is not None:
+                chMatDescr = etree.SubElement(chMat, QName(XmlNs.gml, "description"))
+                chMatDescr.text = mat[1].Description
+
+            # Eigenschaften heraussuchen
+            cond, density, perm, spHeat = None, None, None, None
+            matProps = mat[1].HasProperties
+            for matProp in matProps:
+                if matProp.Name == "Pset_MaterialCommon":
+                    for prop in matProp.Properties:
+                        if prop.Name == "MassDensity":
+                            density = prop.NominalValue.wrappedValue
+                if matProp.Name == "Pset_MaterialThermal":
+                    for prop in matProp.Properties:
+                        if prop.Name == "ThermalConductivity":
+                            cond = prop.NominalValue.wrappedValue
+                        if prop.Name == "SpecificHeatCapacity":
+                            spHeat = prop.NominalValue.wrappedValue
+                if matProp.Name == "Pset_MaterialHygroscopic":
+                    for prop in matProp.Properties:
+                        if prop.Name == "VaporPermeability":
+                            perm = prop.NominalValue.wrappedValue
+
+            # Conductivity
+            if cond is not None:
+                chMatCond = etree.SubElement(chMat, QName(XmlNs.energy, "conductivity"))
+                chMatCond.set("uom", "W/K*m")
+                chMatCond.text = str(cond)
+
+            # Density
+            if density is not None:
+                chMatDensity = etree.SubElement(chMat, QName(XmlNs.energy, "density"))
+                chMatDensity.set("uom", "kg/m3")
+                chMatDensity.text = str(density)
+
+            # Permeance
+            if perm is not None:
+                chMatPerm = etree.SubElement(chMat, QName(XmlNs.energy, "permeance"))
+                chMatPerm.set("uom", "kg/s*m*Pa")
+                chMatPerm.text = str(perm)
+
+            # SpecificHeat
+            if spHeat is not None:
+                chMatSpHeat = etree.SubElement(chMat, QName(XmlNs.energy, "specificHeat"))
+                chMatSpHeat.set("uom", "W/K*m")
+                chMatSpHeat.text = str(spHeat)

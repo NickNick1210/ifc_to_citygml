@@ -293,12 +293,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
-                # TODO: EnergyADE LoD2 - Construction
-                # Construction (Attribute, Layer)
-                # description
-                # name
-                # uValue: Property "ThermalTransmittance" in Pset "Pset_WallCommon"
-                # Layer: IfcRelAssociatesMaterial
+                self.convertConstructions(root, constructions)
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
                 # TODO: EnergyADE LoD2 - Material
                 # AbstractMaterial: SolidMaterial/Gas (Attribute)
@@ -3700,6 +3695,7 @@ class Converter(QgsTask):
         Returns
             linkUZ: GML-ID der anzufügenden Nutzungszone
             chBldgTZ: XML-Objekt der Thermal Zone
+            constructions: Die zu erstellenden Constructions der Boundary, mit GML-ID, IfcElement und Referenzen
         """
 
         # XML-Struktur
@@ -3864,3 +3860,34 @@ class Converter(QgsTask):
                 chBldgTzVolGeom.append(deepcopy(child[0]))
 
         return linkUZ, chBldgTZ, constructions
+
+    def convertConstructions(self, root, constructions):
+        for constr in constructions:
+            # XML-Struktur
+            chFM = etree.SubElement(root, QName(XmlNs.gml, "featureMember"))
+            chConstr = etree.SubElement(chFM, QName(XmlNs.energy, "Construction"))
+            chConstr.set(QName(XmlNs.gml, "id"), constr[0])
+
+            # Name & Beschreibung
+            if constr[1].LayerSetName is not None:
+                chConstrName = etree.SubElement(chConstr, QName(XmlNs.gml, "name"))
+                chConstrName.text = constr[1].LayerSetName
+            if constr[1].Description is not None:
+                chConstrDescr = etree.SubElement(chConstr, QName(XmlNs.gml, "description"))
+                chConstrDescr.text = constr[1].Description
+
+            # U-Wert
+            thTransm = None
+            if UtilitiesIfc.findPset(constr[2][0], "Pset_WallCommon", "ThermalTransmittance") is not None:
+                thTransm = element.get_psets(constr[2][0])["Pset_WallCommon"]["ThermalTransmittance"]
+            if UtilitiesIfc.findPset(constr[2][0], "Pset_RoofCommon", "ThermalTransmittance") is not None:
+                thTransm = element.get_psets(constr[2][0])["Pset_RoofCommon"]["ThermalTransmittance"]
+            if UtilitiesIfc.findPset(constr[2][0], "Pset_SlabCommon", "ThermalTransmittance") is not None:
+                thTransm = element.get_psets(constr[2][0])["Pset_SlabCommon"]["ThermalTransmittance"]
+            if thTransm is not None:
+                chConstrUV = etree.SubElement(chConstr, QName(XmlNs.energy, "uValue"))
+                chConstrUV.set("uom", "W/K*m2")
+                chConstrUV.text = str(thTransm)
+
+            # Layer
+            # TODO: EnergyADE LoD2 - Construction - Layer

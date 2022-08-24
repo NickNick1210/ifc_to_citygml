@@ -13,6 +13,8 @@
 # Standard-Bibliotheken
 import sys
 import numpy as np
+import math
+import mpmath
 
 # XML-Bibliotheken
 from lxml import etree
@@ -132,6 +134,37 @@ class UtilitiesGeom:
             Die erstellte Ebene
         """
         return Plane(Point3D(pt1[0], pt1[1], pt1[2]), Point3D(pt2[0], pt2[1], pt2[2]), Point3D(pt3[0], pt3[1], pt3[2]))
+
+    @staticmethod
+    def calcArea3D(geom):
+        sameHeight = True
+        mainRing = geom.GetGeometryRef(0)
+        for i in range(1, mainRing.GetPointCount()):
+            if not mainRing.GetPoint(i-1)[2] - 0.0001 < mainRing.GetPoint(i)[2] < mainRing.GetPoint(i-1)[2] + 0.0001:
+                sameHeight = False
+                break
+        if sameHeight:
+            return geom.GetArea()
+
+        mainRing = geom.GetGeometryRef(0)
+        plane = UtilitiesGeom.getPlane(mainRing.GetPoint(0), mainRing.GetPoint(1), mainRing.GetPoint(2))
+        plane2D = UtilitiesGeom.getPlane([0, 0, 0], [1, 0, 0], [0, 1, 0])
+        angle = float(plane2D.angle_between(plane))
+        if not 1.565 < angle < 1.575:
+            area2D = geom.GetArea()
+            area3D = abs(area2D * mpmath.sec(angle))
+            return area3D
+
+        geomNew = ogr.Geometry(ogr.wkbPolygon)
+        for i in range(0, geom.GetGeometryCount()):
+            ring = geom.GetGeometryRef(i)
+            ringNew = ogr.Geometry(ogr.wkbLinearRing)
+            for j in range(0, ring.GetPointCount()-1):
+                pt = ring.GetPoint(j)
+                ringNew.AddPoint(pt[1], pt[2], pt[0])
+            ringNew.CloseRings()
+            geomNew.AddGeometry(ringNew)
+        return UtilitiesGeom.calcArea3D(geomNew)
 
     @staticmethod
     def simplify(geom, distTol, angTol, zd=False):

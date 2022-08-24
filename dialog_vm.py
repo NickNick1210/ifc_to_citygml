@@ -59,7 +59,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         self.log(QCoreApplication.translate('DialogVM', u'Tool started'))
 
         # Deaktivieren von Funktionalität
-        #self.radioButton_lod4.setDisabled(True)
+        self.radioButton_lod4.setDisabled(True)
 
     def getInputPath(self):
         """ Gibt den Eingabepfad zurück.

@@ -3776,8 +3776,7 @@ class Converter(QgsTask):
                 # area
                 chBldgTbArea = etree.SubElement(chBldgTb, QName(XmlNs.energy, "area"))
                 chBldgTbArea.set("uom", "m2")
-                chBldgTbArea.text = str(geom.GetArea())
-                # TODO: EnergyADE LoD2 - ThermalBoundary - area
+                chBldgTbArea.text = str(UtilitiesGeom.calcArea3D(geom))
 
                 # surfaceGeometry
                 for childGeom in child[0]:

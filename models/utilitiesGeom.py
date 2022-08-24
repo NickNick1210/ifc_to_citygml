@@ -172,6 +172,28 @@ class UtilitiesGeom:
         return angle
 
     @staticmethod
+    def calcAzimuth(geom):
+        mainRing = geom.GetGeometryRef(0)
+        plane = UtilitiesGeom.getPlane(mainRing.GetPoint(0), mainRing.GetPoint(1), mainRing.GetPoint(2))
+        nVector = plane.normal_vector
+        x = float(nVector[0])
+        y = float(nVector[1])
+
+        if x == 0:
+            if y > 0.001:
+                return 90
+            elif y < -0.001:
+                return 270
+            else:
+                return 0
+        angle = np.arctan2(y, x)
+        angleDeg = angle / math.pi * 180
+        if angleDeg < 0:
+            angleDeg += 360
+
+        return angleDeg
+
+    @staticmethod
     def simplify(geom, distTol, angTol, zd=False):
         """ Vereinfachen von OGR-Geometrien (Polygone und LineStrings)
 

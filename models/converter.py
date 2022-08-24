@@ -3767,19 +3767,17 @@ class Converter(QgsTask):
                 # azimuth
                 chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
                 chBldgTbAz.set("uom", "deg")
-                chBldgTbAz.text = ""
-                # TODO: EnergyADE LoD2 - ThermalBoundary - azimuth
+                chBldgTbAz.text = str(round(UtilitiesGeom.calcAzimuth(geom), 5))
 
                 # inclination
                 chBldgTbIncl = etree.SubElement(chBldgTb, QName(XmlNs.energy, "inclination"))
                 chBldgTbIncl.set("uom", "deg")
-                chBldgTbIncl.text = str(UtilitiesGeom.calcInclination(geom) / math.pi * 180)
-                # TODO: EnergyADE LoD2 - ThermalBoundary - inclination
+                chBldgTbIncl.text = str(round(UtilitiesGeom.calcInclination(geom) / math.pi * 180, 5))
 
                 # area
                 chBldgTbArea = etree.SubElement(chBldgTb, QName(XmlNs.energy, "area"))
                 chBldgTbArea.set("uom", "m2")
-                chBldgTbArea.text = str(UtilitiesGeom.calcArea3D(geom))
+                chBldgTbArea.text = str(round(UtilitiesGeom.calcArea3D(geom), 5))
 
                 # surfaceGeometry
                 for childGeom in child[0]:

@@ -274,7 +274,7 @@ class Converter(QgsTask):
             # Konvertierung
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             height = self.convertBldgAttr(ifcBuilding, chBldg)
-            links, footPrint = self.convertLoD2BldgBound(ifcBuilding, chBldg, height)
+            links, footPrint, surfaces = self.convertLoD2BldgBound(ifcBuilding, chBldg, height)
             self.convertLoDSolid(chBldg, links, 2)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
@@ -289,12 +289,16 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ = self.calcLoD2ThermalZone(ifcBuilding, chBldg)
+                linkUZ, chBldgTZ, constructions = self.calcLoD2ThermalZone(ifcBuilding, chBldg, surfaces)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
                 # TODO: EnergyADE LoD2 - Construction
-                # Construction (Attribute, Layer, OpticalProperties)
+                # Construction (Attribute, Layer)
+                # description
+                # name
+                # uValue: Property "ThermalTransmittance" in Pset "Pset_WallCommon"
+                # Layer: IfcRelAssociatesMaterial
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
                 # TODO: EnergyADE LoD2 - Material
                 # AbstractMaterial: SolidMaterial/Gas (Attribute)
@@ -833,10 +837,12 @@ class Converter(QgsTask):
             ifcElements: Elemente, aus denen die Fläche berechnet werden soll
 
         Returns:
-            Erzeugte GML-Geometrie
+            Erzeugte GML-Geometrie mit zugehörigem IFC-Element
         """
         # Vertizes aus den Elementen entnehmen und georeferenzieren
         grVertsList = []
+        ifcBase = None
+        height = sys.maxsize
         for ifcElement in ifcElements:
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -855,14 +861,10 @@ class Converter(QgsTask):
                 for facePoint in facePoints:
                     point = self.trans.georeferencePoint(facePoint)
                     points.append(point)
+                    if point[2] < height:
+                        height = point[2]
+                        ifcBase = ifcElement
                 grVertsList.append(points)
-
-        # Minimalhöhe berechnen
-        height = sys.maxsize
-        for grVerts in grVertsList:
-            for grVert in grVerts:
-                if grVert[2] < height:
-                    height = grVert[2]
 
         # Geometrien erstellen
         geometry = None
@@ -921,7 +923,7 @@ class Converter(QgsTask):
                     geometry = UtilitiesGeom.buffer2D(geometry, -bufferList[i])
 
         geometry = UtilitiesGeom.simplify(geometry, 0.1, 0.05)
-        return geometry
+        return [ifcBase, geometry]
 
     def convertLoD1Solid(self, ifcBuilding, chBldg, height):
         """ Konvertieren des Gebäudeumrisses von IFC zu CityGML
@@ -1033,6 +1035,7 @@ class Converter(QgsTask):
         Returns:
             GML-IDs der Bestandteile des erweiterten Gebäudeumrisses als Liste
             Die Grundflächengeometrie
+            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen als Liste
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
@@ -1049,8 +1052,8 @@ class Converter(QgsTask):
 
         # Berechnung Grundfläche
         self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
-        geomBase = self.calcPlane(ifcSlabs)
-        if geomBase is None:
+        base = self.calcPlane(ifcSlabs)
+        if base is None:
             return []
 
         # IFC-Elemente des Daches
@@ -1063,29 +1066,51 @@ class Converter(QgsTask):
 
         # Berechnung
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are extracted'))
-        geomRoofs = self.extractRoofs(ifcRoofs)
+        roofs = self.extractRoofs(ifcRoofs)
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
-        geomWalls, geomRoofsNew = self.calcLoD2Walls(geomBase, geomRoofs, height)
+        geomWalls, roofsNew = self.calcLoD2Walls(base, roofs, height)
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces between roofs are calculated'))
-        geomWallsR, geomRoofs = self.calcLoD2RoofWalls(geomRoofs + geomRoofsNew)
+        geomWallsR, roofs = self.calcLoD2RoofWalls(roofs + roofsNew)
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
-        geomRoofs = self.calcLoD2Roofs(geomRoofs, geomBase)
+        roofs = self.calcLoD2Roofs(roofs, base)
         self.parent.dlg.log(self.tr(u'Building geometry: roof and wall surfaces are adjusted'))
-        geomWalls += self.checkLoD2RoofWalls(geomWallsR, geomRoofs)
-        geomRoofs = UtilitiesGeom.simplify(geomRoofs, 0.01, 0.05)
+        geomWalls += self.checkLoD2RoofWalls(geomWallsR, roofs)
+        for roof in roofs:
+            roof[1] = UtilitiesGeom.simplify(roof[1], 0.01, 0.05)
 
         # Geometrie
-        links = []
-        if geomWalls is not None and len(geomRoofs) > 0 and geomRoofs is not None and len(geomRoofs) > 0:
-            link = self.setElement(chBldg, geomBase, "GroundSurface", 2)
+        links, surfaces = [], []
+        if geomWalls is not None and len(geomWalls) > 0 and roofs[1] is not None and len(roofs) > 0:
+            link, gmlId = self.setElement(chBldg, base[1], "GroundSurface", 2)
             links.append(link)
-            for geomRoof in geomRoofs:
-                link = self.setElement(chBldg, geomRoof, "RoofSurface", 2)
+            surfaces.append([gmlId, base[0]])
+            for roof in roofs:
+                link, gmlId = self.setElement(chBldg, roof[1], "RoofSurface", 2)
                 links.append(link)
+                surfaces.append([gmlId, roof[0]])
             for geomWall in geomWalls:
-                link = self.setElement(chBldg, geomWall, "WallSurface", 2)
+                link, gmlId = self.setElement(chBldg, geomWall, "WallSurface", 2)
                 links.append(link)
-        return links, geomBase
+
+                # Zufällige IfcWall
+                ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
+                ifcRelSpaceBound = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
+                randomWall = None
+                for ifcWall in ifcWalls:
+                    extCt, intCt = 0, 0
+                    for ifcRelSpaceBoundary in ifcRelSpaceBound:
+                        relElem = ifcRelSpaceBoundary.RelatedBuildingElement
+                        if relElem == ifcWall:
+                            if ifcRelSpaceBoundary.InternalOrExternalBoundary == "EXTERNAL":
+                                extCt += 1
+                            elif ifcRelSpaceBoundary.InternalOrExternalBoundary == "INTERNAL":
+                                intCt += 1
+                    if extCt > 0 or (intCt == 0 and UtilitiesIfc.findPset(ifcWall, "Pset_WallCommon", "IsExternal")):
+                        randomWall = ifcWall
+                        break
+
+                surfaces.append([gmlId, randomWall])
+        return links, base[1], surfaces
 
     def setElement(self, chBldg, geometry, type, lod):
         """ Setzen eines CityGML-Objekts
@@ -1095,13 +1120,18 @@ class Converter(QgsTask):
             geometry: Die Geometrie des Objekts
             type: Der Typ des Objekts
             lod: Level of Detail (LoD)
+
+        Returns:
+            Die Poly-ID der Geometrie
+            Die GML-ID des Objekts
         """
         self.geom.AddGeometry(geometry)
 
         # XML-Struktur
         chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
         chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
-        chBldgS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+        gmlId = "GML_" + str(uuid.uuid4())
+        chBldgS.set(QName(XmlNs.gml, "id"), gmlId)
         chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
         chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
         chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
@@ -1112,10 +1142,10 @@ class Converter(QgsTask):
 
         # GML-ID
         chBldgPol = chBldgSM[0]
-        gmlId = "PolyID" + str(uuid.uuid4())
-        chBldgPol.set(QName(XmlNs.gml, "id"), gmlId)
+        polyId = "PolyID" + str(uuid.uuid4())
+        chBldgPol.set(QName(XmlNs.gml, "id"), polyId)
 
-        return gmlId
+        return polyId, gmlId
 
     def extractRoofs(self, ifcRoofs):
         """ Extrahieren der Geometrien von Dächern aus IFC
@@ -1124,7 +1154,7 @@ class Converter(QgsTask):
             ifcRoofs: Die IFC-Dächer
 
         Returns:
-            Dächer-Geometrien als Liste
+            Dächer-Geometrien mit den zugehörigen IFC-Elementen als Liste
         """
         roofs = []
         for ifcRoof in ifcRoofs:
@@ -1231,7 +1261,7 @@ class Converter(QgsTask):
             for i in range(0, len(areas)):
                 if areas[i] > 0.9 * max(areas) and round(heights[i], 2) >= round(max(heights) - 0.01, 2):
                     finalRoof = geometriesRefUnionList[i]
-            roofs.append(finalRoof)
+            roofs.append([ifcRoof, finalRoof])
 
         return roofs
 
@@ -1239,18 +1269,18 @@ class Converter(QgsTask):
         """ Berechnen der Grundwände in Level of Detail (LoD) 2
 
         Args:
-            base: Die Geometrie der Grundfläche
-            roofs: Die Geometrien der Dächer als Liste
+            base: Die Geometrie der Grundfläche mit den zugehörigen IFC-Elementen als Liste
+            roofs: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen als Liste
             height: Die Gebäudehöhe
 
         Returns:
             Die berechneten Wand-Geometrien als Liste
-            Neu erstellte Dach-Geometrien als Liste
+            Neu erstellte Dach-Geometrien mit den zugehörigen IFC-Elementen als Liste
         """
         walls, roofPoints, wallsWORoof, missingRoof = [], [], [], []
 
         # Über die Eckpunkte der Grundfläche Wände hochziehen
-        ringBase = base.GetGeometryRef(0)
+        ringBase = base[1].GetGeometryRef(0)
         for i in range(0, ringBase.GetPointCount() - 1):
 
             # Wand ohne Dachbegrenzung
@@ -1267,14 +1297,14 @@ class Converter(QgsTask):
             # Schnitt von Dächern mit der Wand
             intPoints, intLines = [], []
             for roof in roofs:
-
+                roofGeom = roof[1]
                 # 2D-Schnitt
-                intersect = geomWall.Intersection(roof)
+                intersect = geomWall.Intersection(roofGeom)
                 if not intersect.IsEmpty():
                     ipt1, ipt2 = intersect.GetPoint(0), intersect.GetPoint(1)
 
                     # Schnittgerade über Ebenenschnitt (damit die Höhen korrekt sind)
-                    rring = roof.GetGeometryRef(0)
+                    rring = roofGeom.GetGeometryRef(0)
                     wPlane = Plane(Point3D(pt1[0], pt1[1], pt1[2]), Point3D(pt1[0], pt1[1], pt1[2] + 1),
                                    Point3D(pt2[0], pt2[1], pt2[2]))
                     rPlane = Plane(Point3D(rring.GetPoint(0)[0], rring.GetPoint(0)[1], rring.GetPoint(0)[2]),
@@ -1486,7 +1516,7 @@ class Converter(QgsTask):
                     ringRoof.CloseRings()
                     geomRoof.AddGeometry(ringRoof)
                     if not geomRoof.IsEmpty() and geomRoof.GetGeometryName() == "POLYGON":
-                        roofsNew.append(geomRoof)
+                        roofsNew.append([None, geomRoof])
 
         return walls, roofsNew
 
@@ -1495,21 +1525,22 @@ class Converter(QgsTask):
         """ Anpassen der Dächer, u.a. auf die Grundfläche und überschneidende Dächer in Level of Detail (LoD) 2
 
         Args:
-            roofsIn: Die Geometrien der Dächer als Liste
-            base: Die Geometrie der Grundfläche
+            roofsIn: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen als Liste
+            base: Die Geometrie der Grundfläche mit dem zugehörigen IFC-Element
 
         Returns:
-            Die berechneten Wände als Liste
+            Die berechneten Dächer als Liste
         """
         roofs = []
 
         # Alle Dächer überprüfen
-        for roofIn in roofsIn:
+        for roofInElem in roofsIn:
+            roofIn = roofInElem[1]
             if roofIn is None:
                 continue
 
             # Mit Grundfläche verschneiden
-            intersection = roofIn.Intersection(base)
+            intersection = roofIn.Intersection(base[1])
             for intGeometry in intersection:
                 if intersection.GetGeometryCount() == 1:
                     ringInt = intersection.GetGeometryRef(0)
@@ -1540,7 +1571,7 @@ class Converter(QgsTask):
                 ringRoof.CloseRings()
                 geomRoof.AddGeometry(ringRoof)
                 if geomRoof is not None:
-                    roofs.append(geomRoof)
+                    roofs.append([roofInElem[0], geomRoof])
         return roofs
 
     # noinspection PyMethodMayBeStatic
@@ -1559,9 +1590,9 @@ class Converter(QgsTask):
 
         # Alle Dächer miteinander auf Schnitt prüfen
         for i in range(0, len(roofs)):
-            roof1 = roofs[i]
+            roof1 = roofs[i][1]
             for j in range(i + 1, len(roofs)):
-                roof2 = roofs[j]
+                roof2 = roofs[j][1]
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
                     if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not intersect.IsEmpty():
@@ -1679,9 +1710,9 @@ class Converter(QgsTask):
 
                         # ANPASSUNG DER DÄCHER #
                         if z1 <= z2:
-                            geomRoof = roofsOut[j]
+                            geomRoof = roofsOut[j][1]
                         else:
-                            geomRoof = roofsOut[i]
+                            geomRoof = roofsOut[i][1]
 
                         roofInt = geomRoof.Difference(intersect).Simplify(0.0)
                         ringInt = roofInt.GetGeometryRef(0)
@@ -1712,9 +1743,9 @@ class Converter(QgsTask):
                         ringRoofOut.CloseRings()
                         geomRoofOut.AddGeometry(ringRoofOut)
                         if z1 <= z2:
-                            roofsOut[j] = geomRoofOut
+                            roofsOut[j][1] = geomRoofOut
                         else:
-                            roofsOut[i] = geomRoofOut
+                            roofsOut[i][1] = geomRoofOut
 
         # ÜBERPRÜFUNG DER WÄNDE #
         walls += wallsLine
@@ -1833,7 +1864,7 @@ class Converter(QgsTask):
 
         Args:
             wallsIn: Die Wand-Geometrien, die überprüft werden sollen, als Liste
-            roofs: Die Dach-Geometrien als Liste
+            roofs: Die Dach-Geometrien mit den zugehörigen IFC-Elementen als Liste
 
         Returns:
             Die überprüften Wand-Geometrien als Liste
@@ -1844,7 +1875,8 @@ class Converter(QgsTask):
         for wall in wallsIn:
             anyInt = False
             for roof in roofs:
-                intersect = wall.Intersection(roof)
+                roofGeom = roof[1]
+                intersect = wall.Intersection(roofGeom)
                 if not intersect.IsEmpty():
 
                     # Wenn MultiPolygon/MultiLineString als Schnitt: Zusammenführen
@@ -3657,12 +3689,13 @@ class Converter(QgsTask):
         return linkUZ, chBldgTZ
 
     # noinspection PyMethodMayBeStatic
-    def calcLoD2ThermalZone(self, ifcBuilding, chBldg):
+    def calcLoD2ThermalZone(self, ifcBuilding, chBldg, surfaces):
         """ Berechnung der thermischen Zone für die Energy ADE in LoD2
 
         Args:
             ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
             chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
+            surfaces: Die GML-IDs und zugehörigen GML-IDs der Oberflächen
 
         Returns
             linkUZ: GML-ID der anzufügenden Nutzungszone
@@ -3742,6 +3775,7 @@ class Converter(QgsTask):
         self.convertBound(self.bldgGeom, chBldgTzBound)
 
         # boundedBy: ThermalBoundary
+        constructions = []
         for child in chBldg:
             if "boundedBy" in child.tag:
                 # XML-Struktur
@@ -3787,9 +3821,37 @@ class Converter(QgsTask):
                 chBldgTbGeom.append(deepcopy(chGeom[0]))
 
                 # construction
-                chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
-                chBldgTbConstr.set(QName(XmlNs.xlink, "href"), "")
-                # TODO: EnergyADE LoD2 - ThermalBoundary - construction
+                ifcElem = None
+                for surface in surfaces:
+                    if child[0].attrib['{http://www.opengis.net/gml}id'] == surface[0]:
+                        ifcElem = surface[1]
+                        break
+
+                ifcMLS = None
+                rels = self.ifc.get_inverse(ifcElem)
+                for rel in rels:
+                    if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
+                        if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a("IfcMaterialLayerSetUsage"):
+                            ifcMLSU = rel.RelatingMaterial
+                            if ifcMLSU.ForLayerSet is not None:
+                                ifcMLS = ifcMLSU.ForLayerSet
+
+                if ifcMLS is not None:
+                    sameMLS = False
+                    for constr in constructions:
+                        if constr[1] == ifcMLS:
+                            sameMLS = True
+                            break
+                    if sameMLS:
+                        gmlIdConstr = constr[0]
+                        constr[2].append(ifcElem)
+                    else:
+                        gmlIdConstr = "GML_" + str(uuid.uuid4())
+                        constrNew = [gmlIdConstr, ifcMLS, [ifcElem]]
+                        constructions.append(constrNew)
+
+                    chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
+                    chBldgTbConstr.set(QName(XmlNs.xlink, "href"), gmlIdConstr)
 
                 # delimits
                 chBldgTbDel = etree.SubElement(chBldgTb, QName(XmlNs.energy, "delimits"))
@@ -3801,4 +3863,4 @@ class Converter(QgsTask):
             if "lod2Solid" in child.tag:
                 chBldgTzVolGeom.append(deepcopy(child[0]))
 
-        return linkUZ, chBldgTZ
+        return linkUZ, chBldgTZ, constructions

@@ -1075,17 +1075,28 @@ class Converter(QgsTask):
         # Geometrie
         links, surfaces = [], []
         if geomWalls is not None and len(geomWalls) > 0 and roofs[1] is not None and len(roofs) > 0:
+
+            # Base
             link, gmlId = self.setElement(chBldg, base[1], "GroundSurface", 2)
             links.append(link)
             surfaces.append([gmlId, base[0]])
+
+            # Roofs
             for roof in roofs:
-                link, gmlId = self.setElement(chBldg, roof[1], "RoofSurface", 2)
-                links.append(link)
-                surfaces.append([gmlId, roof[0]])
+                if roof[1].GetGeometryName() == "POLYGON":
+                    link, gmlId = self.setElement(chBldg, roof[1], "RoofSurface", 2)
+                    links.append(link)
+                    if roof[0] is not None:
+                        surfaces.append([gmlId, roof[0]])
+                    else:
+                        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+                        ifcRoofs += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+                        surfaces.append([gmlId, ifcRoofs[0]])
+
+            # Walls
             for geomWall in geomWalls:
                 link, gmlId = self.setElement(chBldg, geomWall, "WallSurface", 2)
                 links.append(link)
-
                 # Zufällige IfcWall
                 ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
                 ifcRelSpaceBound = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
@@ -1102,8 +1113,8 @@ class Converter(QgsTask):
                     if extCt > 0 or (intCt == 0 and UtilitiesIfc.findPset(ifcWall, "Pset_WallCommon", "IsExternal")):
                         randomWall = ifcWall
                         break
-
                 surfaces.append([gmlId, randomWall])
+
         return links, base[1], surfaces
 
     def setElement(self, chBldg, geometry, type, lod):
@@ -3792,6 +3803,9 @@ class Converter(QgsTask):
                     if "lod2MultiSurface" in childGeom.tag:
                         geomGML = etree.tostring(childGeom[0][0][0]).decode('utf-8')
                         geom = ogr.CreateGeometryFromGML(geomGML)
+                #print(childGeom[0][0][0])
+                #print(geomGML)
+                #print(geom)
 
                 # azimuth
                 chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
@@ -3924,9 +3938,14 @@ class Converter(QgsTask):
                     # material: Verweis auf Material
                     if matLayer.Material is not None:
                         chConstrLayMat = etree.SubElement(chConstrLayComp, QName(XmlNs.energy, "material"))
-                        gmlId = "GML_" + str(uuid.uuid4())
+                        gmlId = None
+                        for mat in materials:
+                            if mat[1] == matLayer.Material:
+                                gmlId = mat[0]
+                        if gmlId is None:
+                            gmlId = "GML_" + str(uuid.uuid4())
+                            materials.append([gmlId, matLayer.Material])
                         chConstrLayMat.set(QName(XmlNs.xlink, "href"), "#" + gmlId)
-                    materials.append([gmlId, matLayer.Material])
 
         return materials
 
@@ -3957,20 +3976,24 @@ class Converter(QgsTask):
             cond, density, perm, spHeat = None, None, None, None
             matProps = mat[1].HasProperties
             for matProp in matProps:
-                if matProp.Name == "Pset_MaterialCommon":
-                    for prop in matProp.Properties:
-                        if prop.Name == "MassDensity":
-                            density = prop.NominalValue.wrappedValue
-                if matProp.Name == "Pset_MaterialThermal":
-                    for prop in matProp.Properties:
-                        if prop.Name == "ThermalConductivity":
-                            cond = prop.NominalValue.wrappedValue
-                        if prop.Name == "SpecificHeatCapacity":
-                            spHeat = prop.NominalValue.wrappedValue
-                if matProp.Name == "Pset_MaterialHygroscopic":
-                    for prop in matProp.Properties:
-                        if prop.Name == "VaporPermeability":
-                            perm = prop.NominalValue.wrappedValue
+                # noinspection PyBroadException
+                try:
+                    if matProp.Name == "Pset_MaterialCommon":
+                        for prop in matProp.Properties:
+                            if prop.Name == "MassDensity":
+                                density = prop.NominalValue.wrappedValue
+                    if matProp.Name == "Pset_MaterialThermal":
+                        for prop in matProp.Properties:
+                            if prop.Name == "ThermalConductivity":
+                                cond = prop.NominalValue.wrappedValue
+                            if prop.Name == "SpecificHeatCapacity":
+                                spHeat = prop.NominalValue.wrappedValue
+                    if matProp.Name == "Pset_MaterialHygroscopic":
+                        for prop in matProp.Properties:
+                            if prop.Name == "VaporPermeability":
+                                perm = prop.NominalValue.wrappedValue
+                except Exception:
+                    pass
 
             # Conductivity
             if cond is not None:

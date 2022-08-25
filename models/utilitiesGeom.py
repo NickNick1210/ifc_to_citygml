@@ -136,32 +136,36 @@ class UtilitiesGeom:
         return Plane(Point3D(pt1[0], pt1[1], pt1[2]), Point3D(pt2[0], pt2[1], pt2[2]), Point3D(pt3[0], pt3[1], pt3[2]))
 
     @staticmethod
-    def calcArea3D(geom):
+    def calcArea3D(geoms):
         """ Berechnen der Fläche einer 3D-Geometrie
 
         Args:
-            geom: Das Polygon, dessen Fläche berechnet werden soll
+            geoms: Die Polygon, dessen Fläche berechnet werden sollen, als Liste
 
         Returns:
             Die berechnete Fläche
         """
-        # 3D-Fläche = 2D-Fläche * Sec(Steigungswinkel)
-        angle = UtilitiesGeom.calcInclination(geom)
-        if not 1.565 < angle < 1.575:
-            area2D = geom.GetArea()
-            area3D = abs(area2D * mpmath.sec(angle))
-            return area3D
+        areaAll = 0
+        for geom in geoms:
+            # 3D-Fläche = 2D-Fläche * Sec(Steigungswinkel)
+            angle = UtilitiesGeom.calcInclination(geom)
+            if not 1.565 < angle < 1.575:
+                area2D = geom.GetArea()
+                area3D = abs(area2D * mpmath.sec(angle))
+                areaAll += area3D
+                continue
 
-        # Wenn 2D-Fläche = 0: Achsen tauschen
-        geomNew = ogr.Geometry(ogr.wkbPolygon)
-        for i in range(0, geom.GetGeometryCount()):
-            ring = geom.GetGeometryRef(i)
-            ringNew = ogr.Geometry(ogr.wkbLinearRing)
-            for j in range(0, ring.GetPointCount()-1):
-                ringNew.AddPoint(ring.GetPoint(j)[1], ring.GetPoint(j)[2], ring.GetPoint(j)[0])
-            ringNew.CloseRings()
-            geomNew.AddGeometry(ringNew)
-        return UtilitiesGeom.calcArea3D(geomNew)
+            # Wenn 2D-Fläche = 0: Achsen tauschen
+            geomNew = ogr.Geometry(ogr.wkbPolygon)
+            for i in range(0, geom.GetGeometryCount()):
+                ring = geom.GetGeometryRef(i)
+                ringNew = ogr.Geometry(ogr.wkbLinearRing)
+                for j in range(0, ring.GetPointCount()-1):
+                    ringNew.AddPoint(ring.GetPoint(j)[1], ring.GetPoint(j)[2], ring.GetPoint(j)[0])
+                ringNew.CloseRings()
+                geomNew.AddGeometry(ringNew)
+            areaAll += UtilitiesGeom.calcArea3D([geomNew])
+        return areaAll
 
     @staticmethod
     def calcInclination(geom):

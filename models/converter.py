@@ -324,28 +324,29 @@ class Converter(QgsTask):
             # Konvertierung
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             self.convertBldgAttr(ifcBuilding, chBldg)
-            links = self.convertLoD3BldgBound(ifcBuilding, chBldg)
+            links, footPrint = self.convertLoD3BldgBound(ifcBuilding, chBldg)
             self.convertLoDSolid(chBldg, links, 3)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
-            self.convertBound(self.geom, chBound)
+            bbox = self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
+                self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
+                self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
+                self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
+                #self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
+                #linkUZ, chBldgTZ, constructions = self.calcLoD3ThermalZone(ifcBuilding, chBldg, surfaces)
                 # TODO: EnergyADE LoD3
-                # weatherData
-                #   --> wie LoD0/1/2
-                # Gebäudeattribute
-                #   --> wie LoD0/1/2
                 # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
                 # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
                 # thermalOpening (Attribute, surfaceGeometry, construction)
                 # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventilationSchedule
-                # Construction (Attribute, Layer, OptivalProperties)
+                # Construction (Attribute, Layer, OpticalProperties)
                 # AbstractMaterial: SolidMaterial/Gas (Attribute)
-                pass
 
         return root
 
@@ -389,10 +390,13 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 # TODO: EnergyADE LoD4
                 # weatherData
-                #   --> wie LoD0/1/2/3
                 # Gebäudeattribute
-                #   --> wie LoD0/1/2/3
-                pass
+                # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
+                # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
+                # thermalOpening (Attribute, surfaceGeometry, construction)
+                # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventilationSchedule
+                # Construction (Attribute, Layer, OpticalProperties)
+                # AbstractMaterial: SolidMaterial/Gas (Attribute)
 
         return root
 
@@ -1966,7 +1970,7 @@ class Converter(QgsTask):
             links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
         for wall in walls:
             links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
-        return links
+        return links, bases[0][0][0]
 
     def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
         """ Setzen eines CityGML-Objekts, bestehend aus mehreren Geometrien

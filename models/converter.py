@@ -1944,7 +1944,9 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
 
         Returns:
-            Die GUIDs der Geometrien
+            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses als Liste
+            Die Grundflächengeometrie
+            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen als Liste
         """
         # Berechnung
         self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
@@ -1995,9 +1997,7 @@ class Converter(QgsTask):
             type: Der Typ des Objekts
             lod: Level of Detail (LoD)
             name: Name der Oberfläche
-                default: None
             openings: Öffnungen des Objektes
-                default: []
 
         Returns:
             Die Poly-IDs der Geometrien
@@ -4296,6 +4296,7 @@ class Converter(QgsTask):
                                 ifcElem = surface[1]
                                 break
 
+                        # Material, falls vorhanden
                         ifcMLS = None
                         rels = self.ifc.get_inverse(ifcElem)
                         for rel in rels:
@@ -4320,6 +4321,10 @@ class Converter(QgsTask):
                                 constrNew = [gmlIdConstr, ifcMLS, [ifcElem], "layer"]
                                 constructions.append(constrNew)
 
+                            chBldgToConstr = etree.SubElement(chBldgTo, QName(XmlNs.energy, "construction"))
+                            chBldgToConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
+
+                        # OpticalProperties, falls vorhanden
                         else:
                             thTransm, glazing = None, None
                             solRefl, visRefl, solTransm, visTransm = None, None, None, None
@@ -4393,7 +4398,7 @@ class Converter(QgsTask):
         # volumeGeometry
         chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
         for child in chBldg:
-            if "lod2Solid" in child.tag:
+            if "lod3Solid" in child.tag:
                 chBldgTzVolGeom.append(deepcopy(child[0]))
 
         return linkUZ, chBldgTZ, constructions

@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -33,31 +33,30 @@ from .converter_eade import EADEConverter
 
 
 class LoD0Converter:
-    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD0 """
 
     def __init__(self, parent, ifc, name, trans, eade):
-        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD0
 
         Args:
             parent: Die zugrunde liegende zentrale Converter-Klasse
             ifc: IFC-Datei
             name: Name des Modells
-            trans: Transformer-Objekt
-            eade: Ob die EnergyADE gewählt wurde als Boolean
+            trans: Transformer-Klasse
+            eade: Ob die EnergyADE gewählt wurde, als Boolean
         """
 
         # Initialisierung von Attributen
         self.parent = parent
-        self.eade = eade
         self.ifc = ifc
-        self.trans = trans
-        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
-        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
         self.name = name
+        self.trans = trans
+        self.eade = eade
+        self.geom, self.bldgGeom  = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -68,7 +67,7 @@ class LoD0Converter:
         return QCoreApplication.translate('LoD0Converter', msg)
 
     def convert(self, root):
-        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 0
+        """ Konvertiert von IFC zu CityGML im Level of Detail (LoD) 0
 
         Args:
             root: Das vorbereitete XML-Schema
@@ -112,11 +111,11 @@ class LoD0Converter:
         return root
 
     def convertFootPrint(self, ifcBuilding, chBldg):
-        """ Konvertieren der Grundfläche von IFC zu CityGML
+        """ Konvertiert die Grundfläche von IFC zu CityGML
 
         Args:
             ifcBuilding: Das Gebäude, aus dem die Grundfläche entnommen werden soll
-            chBldg: XML-Element an dem die Grundfläche angefügt werden soll
+            chBldg: XML-Element, an dem die Grundfläche angefügt werden soll
         """
         # IFC-Elemente
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -142,11 +141,11 @@ class LoD0Converter:
         return geometry
 
     def convertRoofEdge(self, ifcBuilding, chBldg):
-        """ Konvertieren der Dachkantenfläche von IFC zu CityGML
+        """ Konvertiert die Dachkantenfläche von IFC zu CityGML
 
         Args:
             ifcBuilding: Das Gebäude, aus dem die Dachkantenfläche entnommen werden soll
-            chBldg: XML-Element an dem die Dachkantenfläche angefügt werden soll
+            chBldg: XML-Element, an dem die Dachkantenfläche angefügt werden soll
         """
 
         # IFC-Elemente

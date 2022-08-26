@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -45,10 +45,10 @@ from .converter_eade import EADEConverter
 
 
 class LoD3Converter:
-    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD3 """
 
     def __init__(self, parent, ifc, name, trans, eade):
-        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD3
 
         Args:
             parent: Die zugrunde liegende zentrale Converter-Klasse
@@ -60,16 +60,15 @@ class LoD3Converter:
 
         # Initialisierung von Attributen
         self.parent = parent
-        self.eade = eade
         self.ifc = ifc
-        self.trans = trans
-        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
-        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
         self.name = name
+        self.trans = trans
+        self.eade = eade
+        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -80,7 +79,7 @@ class LoD3Converter:
         return QCoreApplication.translate('LoD3Converter', msg)
 
     def convert(self, root):
-        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 3
+        """ Konvertiert von IFC zu CityGML im Level of Detail (LoD) 3
 
         Args:
             root: Das vorbereitete XML-Schema
@@ -130,16 +129,16 @@ class LoD3Converter:
         return root
 
     def convertBldgBound(self, ifcBuilding, chBldg):
-        """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 3
+        """ Konvertiert den erweiterten Gebäudeumriss von IFC zu CityGML in Level of Detail (LoD) 3
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
-            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+            ifcBuilding: Das IFC-Gebäude, aus dem der Gebäudeumriss entnommen werden soll
+            chBldg: XML-Element, an dem der Gebäudeumriss angefügt werden soll
 
         Returns:
-            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses als Liste
+            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses, als Liste
             Die Grundflächengeometrie
-            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen als Liste
+            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen, als Liste
         """
         # Berechnung
         self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
@@ -179,13 +178,13 @@ class LoD3Converter:
         return links, bases[0][0][0], surfaces
 
     def calcBases(self, ifcBuilding):
-        """ Berechnen der Grundfläche in Level of Detail (LoD) 3
+        """ Berechnet die Grundfläche in Level of Detail (LoD) 3
 
         Args:
             ifcBuilding: Das Gebäude, aus dem die Grundflächen entnommen werden sollen
 
         Returns:
-            Die berechneten Grundflächen-Geometrien als Liste
+            Die berechneten Grundflächen-Geometrien, als Liste
         """
         bases, baseNames, basesOrig = [], [], []
 
@@ -336,13 +335,13 @@ class LoD3Converter:
         return finalBases, basesOrig, floors
 
     def calcRoofs(self, ifcBuilding):
-        """ Berechnen der Dächer in Level of Detail (LoD) 3
+        """ Berechnet die Dächer in Level of Detail (LoD) 3
 
         Args:
             ifcBuilding: Das Gebäude, aus dem die Dächer entnommen werden sollen
 
         Returns:
-            Die berechneten Dächer als Liste
+            Die berechneten Dächer, als Liste
         """
         roofs, roofNames, roofsOrig = [], [], []
 
@@ -430,16 +429,15 @@ class LoD3Converter:
         return roofs, roofsOrig
 
     def calcWalls(self, ifcBuilding):
-        """ Berechnen der Außenwände in Level of Detail (LoD) 3
+        """ Berechnet die Außenwände in Level of Detail (LoD) 3
 
         Args:
             ifcBuilding: Das Gebäude, aus dem die Wände entnommen werden sollen
 
         Returns:
-            Die berechneten Wand-Geometrien als Liste
+            Die berechneten Wand-Geometrien, als Liste
         """
-        walls = []
-        wallNames = []
+        walls, wallNames = [], []
 
         # IFC-Elemente der Wände
         ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
@@ -468,7 +466,6 @@ class LoD3Converter:
         for ifcWall in ifcWallsExt:
             wallNames.append(ifcWall.Name)
 
-        # ifcWallsExt = ifcWallsExt[0:3]
         # Geometrie
         for i in range(0, len(ifcWallsExt)):
             ifcWall = ifcWallsExt[i]
@@ -513,14 +510,14 @@ class LoD3Converter:
         return walls
 
     def calcOpenings(self, ifcBuilding, type):
-        """ Berechnen der Öffnungen (Türen und Fenster) in Level of Detail (LoD) 3
+        """ Berechnet die Öffnungen (Türen und Fenster) in Level of Detail (LoD) 3
 
         Args:
             ifcBuilding: Das Gebäude, aus dem die Öffnungen entnommen werden sollen
             type: Öffnungs-Typ (ifcDoor oder IfcWindow)
 
         Returns:
-            Die berechneten Öffnungen mit Geometrie, Name, Typ und Ifc-Element als Liste
+            Die berechneten Öffnungen mit Geometrie, Name, Typ und Ifc-Element, als Liste
         """
         openings, openingNames = [], []
 
@@ -578,14 +575,14 @@ class LoD3Converter:
 
     @staticmethod
     def assignOpenings(openings, walls):
-        """ Anfügen der Öffnungen (Fenster & Türen) an die zugehörigen Wände in Level of Detail (LoD) 3
+        """ Fügt die Öffnungen (Fenster & Türen) an die zugehörigen Wände in Level of Detail (LoD) 3 an
 
         Args:
-            openings: Die anzufügenden Öffnungen (Fenster & Türen) als Liste
+            openings: Die anzufügenden Öffnungen (Fenster & Türen), als Liste
             walls: Die Wände, an die die Öffnungen angefügt werden sollen, als Liste
 
         Returns:
-            Die angepassten Wände als Liste
+            Die angepassten Wände, als Liste
         """
         for opening in openings:
             ptOp = opening[0][0]
@@ -609,13 +606,13 @@ class LoD3Converter:
 
     @staticmethod
     def adjustWallOpenings(walls):
-        """ Anpassen der Wände auf Grundlage der Dächer, Grundflächen und Öffnungen in Level of Detail (LoD) 3
+        """ Passt die Wände auf Grundlage der Dächer, Grundflächen und Öffnungen in Level of Detail (LoD) 3 an
 
         Args:
-            walls: Die anzupassenden Wände als Liste
+            walls: Die anzupassenden Wände, als Liste
 
         Returns:
-            Die angepassten Wände als Liste
+            Die angepassten Wände, als Liste
             Die Anzahl an Hauptflächen pro Wand, als Liste
         """
         wallMainCounts = []
@@ -926,10 +923,10 @@ class LoD3Converter:
 
     @staticmethod
     def adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig, wallMainCounts):
-        """ Anpassen der Wände in Bezug auf die veränderten Grundflächen und Dächer in Level of Detail (LoD) 3
+        """ Passt die Wände in Bezug auf die veränderten Grundflächen und Dächer in Level of Detail (LoD) 3 an
 
         Args:
-            walls: Die anzupassenden Wände als Liste
+            walls: Die anzupassenden Wände, als Liste
             bases: Die Grundflächen, an die die Wände angepasst werden sollen, als Liste
             roofs: Die Dächer, an die die Wände angepasst werden sollen, als Liste
             basesOrig: Die originalen Grundflächen als Liste
@@ -937,7 +934,7 @@ class LoD3Converter:
             wallMainCounts: Die Anzahl an Hauptflächen pro Wand, als Liste
 
         Returns:
-            Die angepassten Wände als Liste
+            Die angepassten Wände, als Liste
         """
 
         # Alle Wände durchgehen
@@ -1140,18 +1137,18 @@ class LoD3Converter:
         return walls
 
     def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
-        """ Setzen eines CityGML-Objekts, bestehend aus mehreren Geometrien
+        """ Setzt ein CityGML-Objekt, bestehend aus mehreren Geometrien
 
         Args:
-            chBldg: XML-Element an dem das Objekt angefügt werden soll
-            geometries: Die Geometrien des Objekts
+            chBldg: XML-Element, an dem das Objekt angefügt werden soll
+            geometries: Die Geometrien des Objekts, als Liste
             type: Der Typ des Objekts
             lod: Level of Detail (LoD)
             name: Name der Oberfläche
             openings: Öffnungen des Objektes
 
         Returns:
-            Die Poly-IDs der Geometrien
+            Die Poly-IDs der Geometrien, als Liste
             Die GML-ID des Objekts
         """
         for geometry in geometries:

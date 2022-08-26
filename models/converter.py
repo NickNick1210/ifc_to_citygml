@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -46,9 +46,9 @@ class Converter(QgsTask):
             parent: Die zugrunde liegende zentrale Model-Klasse
             inPath: Pfad zur IFC-Datei
             outPath: Pfad zur CityGML-Datei
-            lod: Gewähltes Level of Detail (LoD) als Integer
-            eade: Ob die EnergyADE gewählt wurde als Boolean
-            integr: Ob die QGIS-Integration gewählt wurde als Boolean
+            lod: Gewähltes Level of Detail (LoD), als Integer
+            eade: Ob die EnergyADE gewählt wurde, als Boolean
+            integr: Ob die QGIS-Integration gewählt wurde, als Boolean
         """
         super().__init__(description, QgsTask.CanCancel)
 
@@ -61,7 +61,7 @@ class Converter(QgsTask):
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -72,7 +72,7 @@ class Converter(QgsTask):
         return QCoreApplication.translate('Converter', msg)
 
     def run(self):
-        """ Ausführen der Konvertierung """
+        """ Führt die Konvertierung aus """
         # Initialisieren von IFC und CityGML
         ifc = self.readIfc(self.inPath)
         root = self.createSchema()
@@ -112,7 +112,7 @@ class Converter(QgsTask):
 
     @staticmethod
     def readIfc(path):
-        """ Einlesen einer IFC-Datei
+        """ Liest eine IFC-Datei ein
 
         Args:
             path: Pfad zur IFC-Datei
@@ -124,10 +124,10 @@ class Converter(QgsTask):
 
     @staticmethod
     def createSchema():
-        """ Vorbereiten der CityGML-Struktur
+        """ Bereitet die CityGML-Struktur vor
 
         Returns:
-            XML-Element
+            XML-Element der CityGML-Struktur
         """
         return etree.Element(QName(XmlNs.core, "CityModel"),
                              nsmap={'core': XmlNs.core, None: XmlNs.xmlns, 'bldg': XmlNs.bldg, 'gen': XmlNs.gen,
@@ -135,7 +135,7 @@ class Converter(QgsTask):
                                     'xlink': XmlNs.xlink, 'xsi': XmlNs.xsi, 'energy': XmlNs.energy})
 
     def writeCGML(self, root):
-        """ Schreiben der XML-Struktur in eine GML-Datei
+        """ Schreibt die XML-Struktur in eine GML-Datei
 
         Args:
             root: XML-Element

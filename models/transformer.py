@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -55,7 +55,7 @@ class Transformer:
         return epsg
 
     def getOriginShift(self):
-        """ Berechnung der Datumsverschiebung zwischen Urpsrungs- und Zielkoordinatensystem
+        """ Berechnet die Datumsverschiebung zwischen Urpsrungs- und Zielkoordinatensystem
 
         Returns:
             Die Datumsverschiebung als Vektor
@@ -80,13 +80,13 @@ class Transformer:
 
     @staticmethod
     def mergeDegrees(degrees):
-        """ Konvertierung von geographischen Koordinaten aus dem Sexagesimalformat in das Dezimalformat
+        """ Konvertiert geographische Koordinaten aus dem Sexagesimalformat in das Dezimalformat
 
         Args:
-            degrees: Geographische Koordinate im Sexagesimalformat als Array
+            degrees: Geographische Koordinate im Sexagesimalformat, als Array
 
         Returns:
-            Geographische Koordinate im Dezimalformat als float
+            Geographische Koordinate im Dezimalformat, als float
         """
         if len(degrees) == 4:
             degree = degrees[0] + degrees[1] / 60.0 + (degrees[2] + degrees[3] / 1000000.0) / 3600.0
@@ -97,7 +97,7 @@ class Transformer:
         return degree
 
     def getTransformMatrix(self):
-        """ Berechnungs der Transformationsmatrix zwischen dem lokalen und dem übergeordneten Koordinatensystem
+        """ Berechnet die Transformationsmatrix zwischen dem lokalen und dem übergeordneten Koordinatensystem
 
         Returns:
             Die Transformationsmatrix
@@ -120,10 +120,10 @@ class Transformer:
         """ Georeferenziert einen Punkt
 
         Args:
-            point: Der zu georeferenzierende Punkt als Vektor
+            point: Der zu georeferenzierende Punkt, als Vektor
 
         Returns:
-            Der georeferenzierte Punkt als Vektor
+            Der georeferenzierte Punkt, als Vektor
         """
         result = np.mat(point) * np.mat(self.trans) + np.mat(self.originShift)
         return np.array(result)[0]

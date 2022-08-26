@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -42,14 +42,14 @@ from .utilitiesIfc import UtilitiesIfc
 
 
 class GenConverter(QgsTask):
-    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+    """ Model-Klasse mit Werkzeugen zum Konvertieren von IFC-Dateien zu CityGML-Dateien in allen LoD """
 
     @staticmethod
     def convertBound(geometry, chBound, trans):
-        """ Konvertierung der Bounding Box
+        """ Konvertiert die Bounding Box
 
         Args:
-            geometry: Die konvertierten Geometrien
+            geometry: Die konvertierten Geometrien, als GeometryCollection
             chBound: XML-Objekt, an das die Bounding Box angehängt werden soll
             trans: Transformer-Objekt
 
@@ -78,12 +78,12 @@ class GenConverter(QgsTask):
 
     @staticmethod
     def convertBldgAttr(ifc, ifcBuilding, chBldg):
-        """ Konvertierung der Gebäudeattribute
+        """ Konvertiert die Gebäudeattribute
 
         Args:
             ifc: IFC-Datei
             ifcBuilding: IFC-Gebäude, aus dem die Attribute entnommen werden sollen
-            chBldg: XML-Objekt, an das die Gebäudeattribute angehängt werden soll
+            chBldg: XML-Objekt, an das die Gebäudeattribute angehängt werden sollen
         """
         # ID
         chBldg.set(QName(XmlNs.gml, "id"), "UUID_" + str(uuid.uuid4()))
@@ -266,7 +266,7 @@ class GenConverter(QgsTask):
 
     @staticmethod
     def convertFunctionUsage(typeIn):
-        """ Konvertieren den Eingabetypen in einen standardisierten Code
+        """ Konvertiert den Eingabetypen in einen standardisierten Code
 
         Args:
             typeIn: Bezeichnung eines Typen, der konvertiert werden soll
@@ -306,7 +306,7 @@ class GenConverter(QgsTask):
 
     @staticmethod
     def calcHeight(ifc, ifcBuilding):
-        """ Berechnung der Gebäudehöhe als Differenz zwischen tiefstem und höchstem Punkt
+        """ Berechnet die Gebäudehöhe als Differenz zwischen tiefstem und höchstem Punkt
 
         Args:
             ifc: IFC-Datei
@@ -359,12 +359,15 @@ class GenConverter(QgsTask):
 
     @staticmethod
     def convertAddress(ifcBuilding, ifcSite, chBldg):
-        """ Konvertieren der Adresse von IFC zu CityGML
+        """ Konvertiert die Adresse von IFC zu CityGML
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem die Adresse entnommen werden soll
-            ifcSite: Das Grundstück, auf dem das Gebäude steht
-            chBldg: XML-Element an dem die Adresse angefügt werden soll
+            ifcBuilding: Das IFC-Gebäude, aus dem die Adresse entnommen werden soll
+            ifcSite: Das IFC-Grundstück, auf dem das Gebäude steht
+            chBldg: XML-Element, an dem die Adresse angefügt werden soll
+
+        Returns:
+            Ob die Konvertierung der Adresse erfolgreich war, als Boolean
         """
         # Prüfen, wo Addresse vorhanden
         if ifcBuilding.BuildingAddress is not None:
@@ -423,30 +426,11 @@ class GenConverter(QgsTask):
         return True
 
     @staticmethod
-    def convertLoDSolid(chBldg, links, lod):
-        """ Angabe der Gebäudegeometrie als XLinks zu den Bounds
-
-        Args:
-            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
-            links: Zu nutzende XLinks
-            lod: Level of Detail (LoD)
-        """
-        if links is not None and len(links) > 0:
-            # XML-Struktur
-            chBldgSolid = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod" + str(lod) + "Solid"))
-            chBldgSolidSol = etree.SubElement(chBldgSolid, QName(XmlNs.gml, "Solid"))
-            chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
-            chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
-            for link in links:
-                chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
-                chBldgSolidSM.set(QName(XmlNs.xlink, "href"), "#" + link)
-
-    @staticmethod
     def calcPlane(ifcElements, trans):
-        """ Berechnung einer planen Flächengeometrie
+        """ Berechnet die plane Flächengeometrie
 
         Args:
-            ifcElements: Elemente, aus denen die Fläche berechnet werden soll
+            ifcElements: IFC-Elemente, aus denen die Fläche berechnet werden soll
             trans: Transformer-Objekt
 
         Returns:
@@ -537,3 +521,22 @@ class GenConverter(QgsTask):
 
         geometry = UtilitiesGeom.simplify(geometry, 0.1, 0.05)
         return [ifcBase, geometry]
+
+    @staticmethod
+    def convertLoDSolid(chBldg, links, lod):
+        """ Gibt die Gebäudegeometrie als XLinks zu den Bounds an
+
+        Args:
+            chBldg: XML-Element, an dem der Gebäudeumriss angefügt werden soll
+            links: Zu nutzende XLinks, als Liste
+            lod: Level of Detail (LoD)
+        """
+        if links is not None and len(links) > 0:
+            # XML-Struktur
+            chBldgSolid = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod" + str(lod) + "Solid"))
+            chBldgSolidSol = etree.SubElement(chBldgSolid, QName(XmlNs.gml, "Solid"))
+            chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
+            chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
+            for link in links:
+                chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
+                chBldgSolidSM.set(QName(XmlNs.xlink, "href"), "#" + link)

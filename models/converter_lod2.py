@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -45,10 +45,10 @@ from .converter_eade import EADEConverter
 
 
 class LoD2Converter:
-    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD2 """
 
     def __init__(self, parent, ifc, name, trans, eade):
-        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD2
 
         Args:
             parent: Die zugrunde liegende zentrale Converter-Klasse
@@ -60,16 +60,15 @@ class LoD2Converter:
 
         # Initialisierung von Attributen
         self.parent = parent
-        self.eade = eade
         self.ifc = ifc
-        self.trans = trans
-        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
-        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
         self.name = name
+        self.trans = trans
+        self.eade = eade
+        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -80,7 +79,7 @@ class LoD2Converter:
         return QCoreApplication.translate('LoD2Converter', msg)
 
     def convert(self, root):
-        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 2
+        """ Konvertiert von IFC zu CityGML im Level of Detail (LoD) 2
 
         Args:
             root: Das vorbereitete XML-Schema
@@ -119,7 +118,7 @@ class LoD2Converter:
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
-                                                                                   surfaces, 2)
+                                                                                surfaces, 2)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
@@ -130,17 +129,17 @@ class LoD2Converter:
         return root
 
     def convertBldgBound(self, ifcBuilding, chBldg, height):
-        """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 2
+        """ Konvertiert den erweiterten Gebäudeumriss von IFC zu CityGML in Level of Detail (LoD) 2
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
-            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
-            height: Gebäudehöhe
+            ifcBuilding: Das IFC-Gebäude, aus dem der Gebäudeumriss entnommen werden soll
+            chBldg: XML-Element, an dem der Gebäudeumriss angefügt werden soll
+            height: Die Gebäudehöhe, als float
 
         Returns:
-            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses als Liste
+            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses, als Liste
             Die Grundflächengeometrie
-            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen als Liste
+            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen, als Liste
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
@@ -228,17 +227,137 @@ class LoD2Converter:
 
         return links, base[1], surfaces
 
-    def calcWalls(self, base, roofs, height):
-        """ Berechnen der Grundwände in Level of Detail (LoD) 2
+    def extractRoofs(self, ifcRoofs):
+        """ Extrahiert die Geometrien von Dächern aus IFC
 
         Args:
-            base: Die Geometrie der Grundfläche mit den zugehörigen IFC-Elementen als Liste
-            roofs: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen als Liste
-            height: Die Gebäudehöhe
+            ifcRoofs: Die IFC-Dächer, aus denen extrahiert werden soll
 
         Returns:
-            Die berechneten Wand-Geometrien als Liste
-            Neu erstellte Dach-Geometrien mit den zugehörigen IFC-Elementen als Liste
+            Dächer-Geometrien mit den zugehörigen IFC-Elementen, als Liste
+        """
+        roofs = []
+        for ifcRoof in ifcRoofs:
+            # noinspection PyUnresolvedReferences
+            settings = ifcopenshell.geom.settings()
+            settings.set(settings.USE_WORLD_COORDS, True)
+            # noinspection PyUnresolvedReferences
+            shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
+            # Vertizes
+            verts = shape.geometry.verts
+            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
+                           range(0, len(verts), 3)]
+            # Flächen
+            faces = shape.geometry.faces
+            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
+            # Vertizes der Flächen
+            grVertsList = []
+            for face in grFacesCurr:
+                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
+                if not ((facePoints[0][0] == facePoints[1][0] and facePoints[0][1] == facePoints[1][1]) or (
+                        facePoints[0][0] == facePoints[2][0] and facePoints[0][1] == facePoints[2][1]) or (
+                                facePoints[1][0] == facePoints[2][0] and facePoints[1][1] == facePoints[2][1])):
+                    points = []
+                    for facePoint in facePoints:
+                        point = self.trans.georeferencePoint(facePoint)
+                        points.append(point)
+                    grVertsList.append(points)
+
+            # Geometrien erstellen
+            geometries = ogr.Geometry(ogr.wkbMultiPolygon)
+            for grVerts in grVertsList:
+                # Polygon aus Ring aus Punkten erstellen
+                geometry = ogr.Geometry(ogr.wkbPolygon)
+                ring = ogr.Geometry(ogr.wkbLinearRing)
+                for grVert in grVerts:
+                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
+                ring.CloseRings()
+                geometry.AddGeometry(ring)
+                if geometry.IsSimple():
+                    geometries.AddGeometry(geometry)
+
+            # Alle Flächen in der gleichen Ebene vereinigen
+            checkList, heights, areas, geometriesRefUnionList = [], [], [], []
+            for i in range(0, geometries.GetGeometryCount()):
+                if i not in checkList:
+                    # Geometrie
+                    geometry = geometries.GetGeometryRef(i)
+                    ring = geometry.GetGeometryRef(0)
+
+                    # Multipolygon
+                    geometriesRef = ogr.Geometry(ogr.wkbMultiPolygon)
+                    geometriesRef.AddGeometry(geometry)
+
+                    # Ebeneneigenschaften
+                    apv = np.array(ring.GetPoint(0))
+                    r1 = np.array(ring.GetPoint(1)) - np.array(ring.GetPoint(0))
+                    r2 = np.array(ring.GetPoint(2)) - np.array(ring.GetPoint(0))
+                    nv = np.cross(r1, r2)
+                    checkList.append(i)
+
+                    for j in range(i + 1, geometries.GetGeometryCount()):
+                        # Geometrie
+                        ogeometry = geometries.GetGeometryRef(j)
+                        oring = ogeometry.GetGeometryRef(0)
+
+                        # Ebeneneigenschaften
+                        oapv = np.array(oring.GetPoint(0))
+                        or1 = np.array(oring.GetPoint(1)) - np.array(oring.GetPoint(0))
+                        or2 = np.array(oring.GetPoint(2)) - np.array(oring.GetPoint(0))
+                        onv = np.cross(or1, or2)
+
+                        # Schnittwinkel
+                        angle = np.arccos(np.linalg.norm(np.dot(nv, onv)) / (np.linalg.norm(nv) * np.linalg.norm(onv)))
+                        if math.isnan(angle) or angle < 0.001:
+
+                            # Distanz zwischen den Ebenen
+                            dist = (np.linalg.norm(np.dot(oapv - apv, nv))) / (np.linalg.norm(nv))
+                            if dist < 0.001:
+                                geometriesRef.AddGeometry(ogeometry)
+                                checkList.append(j)
+
+                    # Vereinigen
+                    geometriesRefUnion = geometriesRef.UnionCascaded()
+                    ring = geometriesRefUnion.GetGeometryRef(0)
+
+                    # Höhe herausfinden
+                    minHeight, maxHeight = sys.maxsize, -sys.maxsize
+                    for k in range(0, ring.GetPointCount()):
+                        point = ring.GetPoint(k)
+                        if point[2] > maxHeight:
+                            maxHeight = point[2]
+                        if point[2] < minHeight:
+                            minHeight = point[2]
+                    height = maxHeight - minHeight
+                    heights.append(maxHeight)
+
+                    # Ungefähre Fläche
+                    area = geometriesRefUnion.GetArea()
+                    area3d = height * height + area
+                    areas.append(area3d)
+
+                    geometriesRefUnionList.append(geometriesRefUnion)
+
+            # Aus den vorhandenen Flächen die Außenfläche heraussuchen
+            finalRoof = None
+            for i in range(0, len(areas)):
+                if areas[i] > 0.9 * max(areas) and round(heights[i], 2) >= round(max(heights) - 0.01, 2):
+                    finalRoof = geometriesRefUnionList[i]
+            roofs.append([ifcRoof, finalRoof])
+
+        return roofs
+
+    def calcWalls(self, base, roofs, height):
+        """ Berechnt die Grundwände in Level of Detail (LoD) 2
+
+        Args:
+            base: Die Geometrie der Grundfläche mit den zugehörigen IFC-Elementen, als Liste
+            roofs: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen ,als Liste
+            height: Die Gebäudehöhe, als float
+
+        Returns:
+            Die berechneten Wand-Geometrien, als Liste
+            Neu erstellte Dach-Geometrien mit den zugehörigen IFC-Elementen, als Liste
         """
         walls, roofPoints, wallsWORoof, missingRoof = [], [], [], []
 
@@ -484,69 +603,15 @@ class LoD2Converter:
         return walls, roofsNew
 
     @staticmethod
-    def calcRoofs(roofsIn, base):
-        """ Anpassen der Dächer, u.a. auf die Grundfläche und überschneidende Dächer in Level of Detail (LoD) 2
-
-        Args:
-            roofsIn: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen als Liste
-            base: Die Geometrie der Grundfläche mit dem zugehörigen IFC-Element
-
-        Returns:
-            Die berechneten Dächer als Liste
-        """
-        roofs = []
-
-        # Alle Dächer überprüfen
-        for roofInElem in roofsIn:
-            roofIn = roofInElem[1]
-            if roofIn is None:
-                continue
-
-            # Mit Grundfläche verschneiden
-            intersection = roofIn.Intersection(base[1])
-            for intGeometry in intersection:
-                if intersection.GetGeometryCount() == 1:
-                    ringInt = intersection.GetGeometryRef(0)
-                else:
-                    ringInt = intGeometry.GetGeometryRef(0)
-                    if ringInt is None:
-                        continue
-
-                # Neue Dach-Geometrie
-                geomRoof = ogr.Geometry(ogr.wkbPolygon)
-                ringRoof = ogr.Geometry(ogr.wkbLinearRing)
-
-                # Schnittgeometrie nehmen und mit Z-Koordinaten versehen
-                for i in range(ringInt.GetPointCount() - 1, -1, -1):
-                    # Z-Koordinate über Ebenenschnitt
-                    ptInt = ringInt.GetPoint(i)
-                    ringIn = roofIn.GetGeometryRef(0)
-                    rPlane = Plane(Point3D(ringIn.GetPoint(0)[0], ringIn.GetPoint(0)[1], ringIn.GetPoint(0)[2]),
-                                   Point3D(ringIn.GetPoint(1)[0], ringIn.GetPoint(1)[1], ringIn.GetPoint(1)[2]),
-                                   Point3D(ringIn.GetPoint(2)[0], ringIn.GetPoint(2)[1], ringIn.GetPoint(2)[2]))
-                    wLine = Line(Point3D(ptInt[0], ptInt[1], 0), Point3D(ptInt[0], ptInt[1], 100))
-                    sPoint = rPlane.intersection(wLine)[0]
-                    z = float(sPoint[2])
-
-                    ringRoof.AddPoint(ptInt[0], ptInt[1], z)
-
-                # Abschließen und Hinzufügen der Geometrie
-                ringRoof.CloseRings()
-                geomRoof.AddGeometry(ringRoof)
-                if geomRoof is not None:
-                    roofs.append([roofInElem[0], geomRoof])
-        return roofs
-
-    @staticmethod
     def calcRoofWalls(roofs):
-        """ Berechnen von Wänden zwischen zwei Dächern, die nicht bereits über die Grundfläche erstellt wurden
+        """ Berechnet die Wände zwischen zwei Dächern, die nicht bereits über die Grundfläche erstellt wurden
 
         Args:
-            roofs: Die Geometrien der Dächer als Liste
+            roofs: Die Geometrien der Dächer, als Liste
 
         Returns:
-            Die berechneten neuen Wände als Liste
-            Die angepassten Dächer als Liste
+            Die berechneten neuen Wände, als Liste
+            Die angepassten Dächer, als Liste
         """
         roofsOut = roofs.copy()
         walls, wallsLine = [], []
@@ -824,15 +889,69 @@ class LoD2Converter:
         return walls, roofsOut
 
     @staticmethod
+    def calcRoofs(roofsIn, base):
+        """ Passt die Dächer, u.a. auf die Grundfläche und überschneidende Dächer, in Level of Detail (LoD) 2 an
+
+        Args:
+            roofsIn: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen, als Liste
+            base: Die Geometrie der Grundfläche mit dem zugehörigen IFC-Element
+
+        Returns:
+            Die berechneten Dächer, als Liste
+        """
+        roofs = []
+
+        # Alle Dächer überprüfen
+        for roofInElem in roofsIn:
+            roofIn = roofInElem[1]
+            if roofIn is None:
+                continue
+
+            # Mit Grundfläche verschneiden
+            intersection = roofIn.Intersection(base[1])
+            for intGeometry in intersection:
+                if intersection.GetGeometryCount() == 1:
+                    ringInt = intersection.GetGeometryRef(0)
+                else:
+                    ringInt = intGeometry.GetGeometryRef(0)
+                    if ringInt is None:
+                        continue
+
+                # Neue Dach-Geometrie
+                geomRoof = ogr.Geometry(ogr.wkbPolygon)
+                ringRoof = ogr.Geometry(ogr.wkbLinearRing)
+
+                # Schnittgeometrie nehmen und mit Z-Koordinaten versehen
+                for i in range(ringInt.GetPointCount() - 1, -1, -1):
+                    # Z-Koordinate über Ebenenschnitt
+                    ptInt = ringInt.GetPoint(i)
+                    ringIn = roofIn.GetGeometryRef(0)
+                    rPlane = Plane(Point3D(ringIn.GetPoint(0)[0], ringIn.GetPoint(0)[1], ringIn.GetPoint(0)[2]),
+                                   Point3D(ringIn.GetPoint(1)[0], ringIn.GetPoint(1)[1], ringIn.GetPoint(1)[2]),
+                                   Point3D(ringIn.GetPoint(2)[0], ringIn.GetPoint(2)[1], ringIn.GetPoint(2)[2]))
+                    wLine = Line(Point3D(ptInt[0], ptInt[1], 0), Point3D(ptInt[0], ptInt[1], 100))
+                    sPoint = rPlane.intersection(wLine)[0]
+                    z = float(sPoint[2])
+
+                    ringRoof.AddPoint(ptInt[0], ptInt[1], z)
+
+                # Abschließen und Hinzufügen der Geometrie
+                ringRoof.CloseRings()
+                geomRoof.AddGeometry(ringRoof)
+                if geomRoof is not None:
+                    roofs.append([roofInElem[0], geomRoof])
+        return roofs
+
+    @staticmethod
     def checkRoofWalls(wallsIn, roofs):
-        """ Überprüfen und ggf. Aussortieren der neu erstellten Wand-Geometrien
+        """ Überprüft die neu erstellten Wand-Geometrien und sortiert sie ggf. aus
 
         Args:
             wallsIn: Die Wand-Geometrien, die überprüft werden sollen, als Liste
-            roofs: Die Dach-Geometrien mit den zugehörigen IFC-Elementen als Liste
+            roofs: Die Dach-Geometrien mit den zugehörigen IFC-Elementen, als Liste
 
         Returns:
-            Die überprüften Wand-Geometrien als Liste
+            Die überprüften Wand-Geometrien, als Liste
         """
         wallsChecked = []
 
@@ -871,131 +990,11 @@ class LoD2Converter:
         wallsOut = UtilitiesGeom.union3D(wallsChecked)
         return wallsOut
 
-    def extractRoofs(self, ifcRoofs):
-        """ Extrahieren der Geometrien von Dächern aus IFC
-
-        Args:
-            ifcRoofs: Die IFC-Dächer
-
-        Returns:
-            Dächer-Geometrien mit den zugehörigen IFC-Elementen als Liste
-        """
-        roofs = []
-        for ifcRoof in ifcRoofs:
-            # noinspection PyUnresolvedReferences
-            settings = ifcopenshell.geom.settings()
-            settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
-            shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
-            # Vertizes
-            verts = shape.geometry.verts
-            grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
-                           range(0, len(verts), 3)]
-            # Flächen
-            faces = shape.geometry.faces
-            grFacesCurr = [[faces[i], faces[i + 1], faces[i + 2]] for i in range(0, len(faces), 3)]
-            # Vertizes der Flächen
-            grVertsList = []
-            for face in grFacesCurr:
-                facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
-                if not ((facePoints[0][0] == facePoints[1][0] and facePoints[0][1] == facePoints[1][1]) or (
-                        facePoints[0][0] == facePoints[2][0] and facePoints[0][1] == facePoints[2][1]) or (
-                                facePoints[1][0] == facePoints[2][0] and facePoints[1][1] == facePoints[2][1])):
-                    points = []
-                    for facePoint in facePoints:
-                        point = self.trans.georeferencePoint(facePoint)
-                        points.append(point)
-                    grVertsList.append(points)
-
-            # Geometrien erstellen
-            geometries = ogr.Geometry(ogr.wkbMultiPolygon)
-            for grVerts in grVertsList:
-                # Polygon aus Ring aus Punkten erstellen
-                geometry = ogr.Geometry(ogr.wkbPolygon)
-                ring = ogr.Geometry(ogr.wkbLinearRing)
-                for grVert in grVerts:
-                    ring.AddPoint(grVert[0], grVert[1], grVert[2])
-                ring.CloseRings()
-                geometry.AddGeometry(ring)
-                if geometry.IsSimple():
-                    geometries.AddGeometry(geometry)
-
-            # Alle Flächen in der gleichen Ebene vereinigen
-            checkList, heights, areas, geometriesRefUnionList = [], [], [], []
-            for i in range(0, geometries.GetGeometryCount()):
-                if i not in checkList:
-                    # Geometrie
-                    geometry = geometries.GetGeometryRef(i)
-                    ring = geometry.GetGeometryRef(0)
-
-                    # Multipolygon
-                    geometriesRef = ogr.Geometry(ogr.wkbMultiPolygon)
-                    geometriesRef.AddGeometry(geometry)
-
-                    # Ebeneneigenschaften
-                    apv = np.array(ring.GetPoint(0))
-                    r1 = np.array(ring.GetPoint(1)) - np.array(ring.GetPoint(0))
-                    r2 = np.array(ring.GetPoint(2)) - np.array(ring.GetPoint(0))
-                    nv = np.cross(r1, r2)
-                    checkList.append(i)
-
-                    for j in range(i + 1, geometries.GetGeometryCount()):
-                        # Geometrie
-                        ogeometry = geometries.GetGeometryRef(j)
-                        oring = ogeometry.GetGeometryRef(0)
-
-                        # Ebeneneigenschaften
-                        oapv = np.array(oring.GetPoint(0))
-                        or1 = np.array(oring.GetPoint(1)) - np.array(oring.GetPoint(0))
-                        or2 = np.array(oring.GetPoint(2)) - np.array(oring.GetPoint(0))
-                        onv = np.cross(or1, or2)
-
-                        # Schnittwinkel
-                        angle = np.arccos(np.linalg.norm(np.dot(nv, onv)) / (np.linalg.norm(nv) * np.linalg.norm(onv)))
-                        if math.isnan(angle) or angle < 0.001:
-
-                            # Distanz zwischen den Ebenen
-                            dist = (np.linalg.norm(np.dot(oapv - apv, nv))) / (np.linalg.norm(nv))
-                            if dist < 0.001:
-                                geometriesRef.AddGeometry(ogeometry)
-                                checkList.append(j)
-
-                    # Vereinigen
-                    geometriesRefUnion = geometriesRef.UnionCascaded()
-                    ring = geometriesRefUnion.GetGeometryRef(0)
-
-                    # Höhe herausfinden
-                    minHeight, maxHeight = sys.maxsize, -sys.maxsize
-                    for k in range(0, ring.GetPointCount()):
-                        point = ring.GetPoint(k)
-                        if point[2] > maxHeight:
-                            maxHeight = point[2]
-                        if point[2] < minHeight:
-                            minHeight = point[2]
-                    height = maxHeight - minHeight
-                    heights.append(maxHeight)
-
-                    # Ungefähre Fläche
-                    area = geometriesRefUnion.GetArea()
-                    area3d = height * height + area
-                    areas.append(area3d)
-
-                    geometriesRefUnionList.append(geometriesRefUnion)
-
-            # Aus den vorhandenen Flächen die Außenfläche heraussuchen
-            finalRoof = None
-            for i in range(0, len(areas)):
-                if areas[i] > 0.9 * max(areas) and round(heights[i], 2) >= round(max(heights) - 0.01, 2):
-                    finalRoof = geometriesRefUnionList[i]
-            roofs.append([ifcRoof, finalRoof])
-
-        return roofs
-
     def setElement(self, chBldg, geometry, type, lod):
-        """ Setzen eines CityGML-Objekts
+        """ Setzt ein CityGML-Objekts
 
         Args:
-            chBldg: XML-Element an dem das Objekt angefügt werden soll
+            chBldg: XML-Element, an dem das Objekt angefügt werden soll
             geometry: Die Geometrie des Objekts
             type: Der Typ des Objekts
             lod: Level of Detail (LoD)

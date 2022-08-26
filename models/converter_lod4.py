@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 #####
@@ -38,10 +38,10 @@ from .converter_lod3 import LoD3Converter
 
 
 class LoD4Converter:
-    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD4 """
 
     def __init__(self, parent, ifc, name, trans, eade):
-        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD4
 
         Args:
             parent: Die zugrunde liegende zentrale Converter-Klasse
@@ -53,16 +53,15 @@ class LoD4Converter:
 
         # Initialisierung von Attributen
         self.parent = parent
-        self.eade = eade
         self.ifc = ifc
-        self.trans = trans
-        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
-        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
         self.name = name
+        self.trans = trans
+        self.eade = eade
+        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -72,12 +71,11 @@ class LoD4Converter:
         """
         return QCoreApplication.translate('LoD4Converter', msg)
 
-    def convert(self, root, eade):
-        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 4
+    def convert(self, root):
+        """ Konvertiert von IFC zu CityGML im Level of Detail (LoD) 4
 
         Args:
             root: Das vorbereitete XML-Schema
-            eade: Ob die EnergyADE gewählt wurde als Boolean
         """
 
         # IFC-Grundelemente
@@ -108,7 +106,7 @@ class LoD4Converter:
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
 
             # EnergyADE
-            if eade:
+            if self.eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
@@ -127,16 +125,16 @@ class LoD4Converter:
         return root
 
     def convertBldgBound(self, ifcBuilding, chBldg):
-        """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 4
+        """ Konvertiert den erweiterten Gebäudeumriss von IFC zu CityGML in Level of Detail (LoD) 4
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
-            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+            ifcBuilding: Das IFC-Gebäude, aus dem der Gebäudeumriss entnommen werden soll
+            chBldg: XML-Element, an dem der Gebäudeumriss angefügt werden soll
 
         Returns:
-            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses als Liste
+            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses, als Liste
             Die Grundflächengeometrie
-            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen als Liste
+            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen, als Liste
         """
         # Berechnung
         self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
@@ -175,96 +173,14 @@ class LoD4Converter:
             surfaces += openSurf
         return links, bases[0][0][0], surfaces
 
-    def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
-        """ Setzen eines CityGML-Objekts, bestehend aus mehreren Geometrien
-
-        Args:
-            chBldg: XML-Element an dem das Objekt angefügt werden soll
-            geometries: Die Geometrien des Objekts
-            type: Der Typ des Objekts
-            lod: Level of Detail (LoD)
-            name: Name der Oberfläche
-            openings: Öffnungen des Objektes
-
-        Returns:
-            Die Poly-IDs der Geometrien
-            Die GML-ID des Objekts
-        """
-        for geometry in geometries:
-            self.geom.AddGeometry(geometry)
-            self.bldgGeom.AddGeometry(geometry)
-
-        # XML-Struktur
-        chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
-        chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
-        gmlIdMain = "GML_" + str(uuid.uuid4())
-        chBldgS.set(QName(XmlNs.gml, "id"), gmlIdMain)
-
-        # Name
-        if name is not None:
-            chBldgSName = etree.SubElement(chBldgS, QName(XmlNs.gml, "name"))
-            chBldgSName.text = name
-
-        # MultiSurface
-        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
-        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.gml, "MultiSurface"))
-        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.gml, "surfaceMember"))
-        chBldgCS = etree.SubElement(chBldgSM, QName(XmlNs.gml, "CompositeSurface"))
-        polyId = "PolyID" + str(uuid.uuid4())
-        chBldgCS.set(QName(XmlNs.gml, "id"), polyId)
-        polyIds = [polyId]
-
-        # Geometrie
-        for geometry in geometries:
-            chBldgCSSM = etree.SubElement(chBldgCS, QName(XmlNs.gml, "surfaceMember"))
-            geomXML = UtilitiesGeom.geomToGml(geometry)
-            chBldgCSSM.append(geomXML)
-
-            # GML-ID
-            chBldgPol = chBldgCSSM[0]
-            gmlIdPoly = "PolyID" + str(uuid.uuid4())
-            chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
-
-        # Öffnungen
-        openSurf = []
-        for opening in openings:
-            chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
-            name = "Door" if opening[2] == "ifcDoor" else "Window"
-            chBldgSurfSOE = etree.SubElement(chBldgSurfSO, QName(XmlNs.bldg, name))
-            gmlId = "GML_" + str(uuid.uuid4())
-            chBldgSurfSOE.set(QName(XmlNs.gml, "id"), gmlId)
-            if opening[1] is not None:
-                chBldgSurfSOName = etree.SubElement(chBldgSurfSOE, QName(XmlNs.gml, "name"))
-                chBldgSurfSOName.text = opening[1]
-            chBldgSurfSOMS = etree.SubElement(chBldgSurfSOE, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
-            chBldgOMS = etree.SubElement(chBldgSurfSOMS, QName(XmlNs.gml, "MultiSurface"))
-            chBldgOSM = etree.SubElement(chBldgOMS, QName(XmlNs.gml, "surfaceMember"))
-            chBldgOCS = etree.SubElement(chBldgOSM, QName(XmlNs.gml, "CompositeSurface"))
-            polyId = "GML_" + str(uuid.uuid4())
-            chBldgOCS.set(QName(XmlNs.gml, "id"), polyId)
-            polyIds.append(polyId)
-            for geometry in opening[0]:
-                chBldgOCSSM = etree.SubElement(chBldgOCS, QName(XmlNs.gml, "surfaceMember"))
-                geomXML = UtilitiesGeom.geomToGml(geometry)
-                chBldgOCSSM.append(geomXML)
-
-                # GML-ID
-                chBldgPol = chBldgOCSSM[0]
-                gmlIdPoly = "PolyID" + str(uuid.uuid4())
-                chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
-
-            openSurf.append([gmlId, opening[3]])
-
-        return polyIds, gmlIdMain, openSurf
-
     def calcBases(self, ifcBuilding):
-        """ Berechnen der Grundfläche in Level of Detail (LoD) 3
+        """ Berechnet die Grundfläche in Level of Detail (LoD) 3
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem die Grundflächen entnommen werden sollen
+            ifcBuilding: Das IFC-Gebäude, aus dem die Grundflächen entnommen werden sollen
 
         Returns:
-            Die berechneten Grundflächen-Geometrien als Liste
+            Die berechneten Grundflächen-Geometrien, als Liste
         """
         bases, baseNames, basesOrig = [], [], []
 
@@ -415,13 +331,13 @@ class LoD4Converter:
         return finalBases, basesOrig, floors
 
     def calcRoofs(self, ifcBuilding):
-        """ Berechnen der Dächer in Level of Detail (LoD) 3
+        """ Berechnet die Dächer in Level of Detail (LoD) 3
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem die Dächer entnommen werden sollen
+            ifcBuilding: Das IFC-Gebäude, aus dem die Dächer entnommen werden sollen
 
         Returns:
-            Die berechneten Dächer als Liste
+            Die berechneten Dächer, als Liste
         """
         roofs, roofNames, roofsOrig = [], [], []
 
@@ -509,16 +425,15 @@ class LoD4Converter:
         return roofs, roofsOrig
 
     def calcWalls(self, ifcBuilding):
-        """ Berechnen der Außenwände in Level of Detail (LoD) 3
+        """ Berechnet die Außenwände in Level of Detail (LoD) 3
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem die Wände entnommen werden sollen
+            ifcBuilding: Das IFC-Gebäude, aus dem die Wände entnommen werden sollen
 
         Returns:
-            Die berechneten Wand-Geometrien als Liste
+            Die berechneten Wand-Geometrien, als Liste
         """
-        walls = []
-        wallNames = []
+        walls, wallNames = [], []
 
         # IFC-Elemente der Wände
         ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
@@ -592,14 +507,14 @@ class LoD4Converter:
         return walls
 
     def calcOpenings(self, ifcBuilding, type):
-        """ Berechnen der Öffnungen (Türen und Fenster) in Level of Detail (LoD) 3
+        """ Berechnet die Öffnungen (Türen und Fenster) in Level of Detail (LoD) 3
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem die Öffnungen entnommen werden sollen
+            ifcBuilding: Das IFC-Gebäude, aus dem die Öffnungen entnommen werden sollen
             type: Öffnungs-Typ (ifcDoor oder IfcWindow)
 
         Returns:
-            Die berechneten Öffnungen mit Geometrie, Name, Typ und Ifc-Element als Liste
+            Die berechneten Öffnungen mit Geometrie, Name, Typ und Ifc-Element, als Liste
         """
         openings, openingNames = [], []
 
@@ -655,12 +570,94 @@ class LoD4Converter:
 
         return openings
 
-    def convertInterior(self, ifcBuilding, chBldg):
-        """ Konvertieren des Gebäudeinneren von IFC zu CityGML in Level of Detail (LoD) 4
+    def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
+        """ Setzt ein CityGML-Objekt, bestehend aus mehreren Geometrien
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
-            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
+            chBldg: XML-Element, an dem das Objekt angefügt werden soll
+            geometries: Die Geometrien des Objekts
+            type: Der Typ des Objekts
+            lod: Level of Detail (LoD)
+            name: Name der Oberfläche
+            openings: Öffnungen des Objektes
+
+        Returns:
+            Die Poly-IDs der Geometrien, als Liste
+            Die GML-ID des Objekts
+        """
+        for geometry in geometries:
+            self.geom.AddGeometry(geometry)
+            self.bldgGeom.AddGeometry(geometry)
+
+        # XML-Struktur
+        chBldgBB = etree.SubElement(chBldg, QName(XmlNs.bldg, "boundedBy"))
+        chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
+        gmlIdMain = "GML_" + str(uuid.uuid4())
+        chBldgS.set(QName(XmlNs.gml, "id"), gmlIdMain)
+
+        # Name
+        if name is not None:
+            chBldgSName = etree.SubElement(chBldgS, QName(XmlNs.gml, "name"))
+            chBldgSName.text = name
+
+        # MultiSurface
+        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
+        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.gml, "MultiSurface"))
+        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.gml, "surfaceMember"))
+        chBldgCS = etree.SubElement(chBldgSM, QName(XmlNs.gml, "CompositeSurface"))
+        polyId = "PolyID" + str(uuid.uuid4())
+        chBldgCS.set(QName(XmlNs.gml, "id"), polyId)
+        polyIds = [polyId]
+
+        # Geometrie
+        for geometry in geometries:
+            chBldgCSSM = etree.SubElement(chBldgCS, QName(XmlNs.gml, "surfaceMember"))
+            geomXML = UtilitiesGeom.geomToGml(geometry)
+            chBldgCSSM.append(geomXML)
+
+            # GML-ID
+            chBldgPol = chBldgCSSM[0]
+            gmlIdPoly = "PolyID" + str(uuid.uuid4())
+            chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
+
+        # Öffnungen
+        openSurf = []
+        for opening in openings:
+            chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
+            name = "Door" if opening[2] == "ifcDoor" else "Window"
+            chBldgSurfSOE = etree.SubElement(chBldgSurfSO, QName(XmlNs.bldg, name))
+            gmlId = "GML_" + str(uuid.uuid4())
+            chBldgSurfSOE.set(QName(XmlNs.gml, "id"), gmlId)
+            if opening[1] is not None:
+                chBldgSurfSOName = etree.SubElement(chBldgSurfSOE, QName(XmlNs.gml, "name"))
+                chBldgSurfSOName.text = opening[1]
+            chBldgSurfSOMS = etree.SubElement(chBldgSurfSOE, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
+            chBldgOMS = etree.SubElement(chBldgSurfSOMS, QName(XmlNs.gml, "MultiSurface"))
+            chBldgOSM = etree.SubElement(chBldgOMS, QName(XmlNs.gml, "surfaceMember"))
+            chBldgOCS = etree.SubElement(chBldgOSM, QName(XmlNs.gml, "CompositeSurface"))
+            polyId = "GML_" + str(uuid.uuid4())
+            chBldgOCS.set(QName(XmlNs.gml, "id"), polyId)
+            polyIds.append(polyId)
+            for geometry in opening[0]:
+                chBldgOCSSM = etree.SubElement(chBldgOCS, QName(XmlNs.gml, "surfaceMember"))
+                geomXML = UtilitiesGeom.geomToGml(geometry)
+                chBldgOCSSM.append(geomXML)
+
+                # GML-ID
+                chBldgPol = chBldgOCSSM[0]
+                gmlIdPoly = "PolyID" + str(uuid.uuid4())
+                chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
+
+            openSurf.append([gmlId, opening[3]])
+
+        return polyIds, gmlIdMain, openSurf
+
+    def convertInterior(self, ifcBuilding, chBldg):
+        """ Konvertiert das Gebäudeinnere von IFC zu CityGML in Level of Detail (LoD) 4
+
+        Args:
+            ifcBuilding: Das IFC-Gebäude, aus dem das Gebäudeinnere entnommen werden soll
+            chBldg: XML-Element, an dem das Gebäudeinnere angefügt werden soll
         """
         # TODO: LoD4 - Interieur
 
@@ -696,11 +693,11 @@ class LoD4Converter:
     # noinspection PyUnusedLocal
     @staticmethod
     def convertRoomBound(ifcSpace, chRoom):
-        """ Konvertieren des Raumes von IFC zu CityGML in Level of Detail (LoD) 4
+        """ Konvertiert einen Raum von IFC zu CityGML in Level of Detail (LoD) 4
 
         Args:
-            ifcSpace: Der Raum, aus dem der Raumumriss entnommen werden soll
-            chRoom: XML-Element an dem der Raumumriss angefügt werden soll
+            ifcSpace: Der IFC-Raum, aus dem der Raumumriss entnommen werden soll
+            chRoom: XML-Element, an dem der Raumumriss angefügt werden soll
         """
         # Heraussuchen von Böden/Decken (IfcSlab), Wänden (IfcWall/IfcCurtainWall) und Öffnungen (IfcDoor/IfcWindow)
         #   aus dem IfcSpace (über IfcRelAggregates)
@@ -712,11 +709,11 @@ class LoD4Converter:
 
     @staticmethod
     def convertFurniture(ifcSpace, chRoom):
-        """ Konvertieren der Möblierung eines Raumes von IFC zu CityGML in Level of Detail (LoD) 4
+        """ Konvertiert die Möblierung eines Raumes von IFC zu CityGML in Level of Detail (LoD) 4
 
         Args:
-            ifcSpace: Der Raum, aus dem die Möbel entnommen werden sollen
-            chRoom: XML-Element an dem die Möbel angefügt werden sollen
+            ifcSpace: Der IFC-Raum, aus dem die Möbel entnommen werden sollen
+            chRoom: XML-Element, an dem die Möbel angefügt werden sollen
         """
         # Heraussuchen von Möbeln (ifcFurniture/IfcSystemFurnitureElemen)
         #   aus dem IfcSpace (über IfcRelContainedInSpatialStructure)
@@ -727,11 +724,11 @@ class LoD4Converter:
 
     @staticmethod
     def convertInstallation(ifcSpace, chRoom):
-        """ Konvertieren der Installationen eines Raumes von IFC zu CityGML in Level of Detail (LoD) 4
+        """ Konvertiert die Installationen eines Raumes von IFC zu CityGML in Level of Detail (LoD) 4
 
         Args:
-            ifcSpace: Der Raum, aus dem die Installationen entnommen werden sollen
-            chRoom: XML-Element an dem die Installationen angefügt werden sollen
+            ifcSpace: Der IFC-Raum, aus dem die Installationen entnommen werden sollen
+            chRoom: XML-Element, an dem die Installationen angefügt werden sollen
         """
         # Heraussuchen von Installationen (IfcStair, IfcRamp, IfcRailing, IfcColumn, IfcBeam, IfcChimney, ...)
         #   aus dem IfcSpace (über IfcRelConrtainedInSpatialStructure)

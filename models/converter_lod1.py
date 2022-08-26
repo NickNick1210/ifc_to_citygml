@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -33,10 +33,10 @@ from .converter_eade import EADEConverter
 
 
 class LoD1Converter:
-    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+    """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD1 """
 
     def __init__(self, parent, ifc, name, trans, eade):
-        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD1
 
         Args:
             parent: Die zugrunde liegende zentrale Converter-Klasse
@@ -48,16 +48,15 @@ class LoD1Converter:
 
         # Initialisierung von Attributen
         self.parent = parent
-        self.eade = eade
         self.ifc = ifc
-        self.trans = trans
-        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
-        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
         self.name = name
+        self.trans = trans
+        self.eade = eade
+        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -68,7 +67,7 @@ class LoD1Converter:
         return QCoreApplication.translate('LoD1Converter', msg)
 
     def convert(self, root):
-        """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 1
+        """ Konvertiert von IFC zu CityGML im Level of Detail (LoD) 1
 
         Args:
             root: Das vorbereitete XML-Schema
@@ -113,12 +112,12 @@ class LoD1Converter:
         return root
 
     def convertSolid(self, ifcBuilding, chBldg, height):
-        """ Konvertieren des Gebäudeumrisses von IFC zu CityGML
+        """ Konvertiert den Gebäudeumriss von IFC zu CityGML
 
         Args:
-            ifcBuilding: Das Gebäude, aus dem der Gebäudeumriss entnommen werden soll
-            chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
-            height: Die Gebäudehöhe
+            ifcBuilding: Das IFC-Gebäude, aus dem der Gebäudeumriss entnommen werden soll
+            chBldg: XML-Element, an dem der Gebäudeumriss angefügt werden soll
+            height: Die Gebäudehöhe, als float
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
@@ -159,21 +158,20 @@ class LoD1Converter:
 
     @staticmethod
     def calcRoof(geomBase, height):
-        """ Berechnung des Daches als Anhebung der Grundfläche
+        """ Berechnet das Dach als Anhebung der Grundfläche
 
         Args:
-            geomBase: Grundfläche des Gebäudes als Polygon-Geometrie
-            height: Höhe der Anhebung als float
+            geomBase: Grundfläche des Gebäudes, als Polygon-Geometrie
+            height: Höhe der Anhebung, als float
 
         Returns:
-            Das erzeugte Dach als Geometrie
+            Das erzeugte Dach, als Geometrie
         """
         # Grundfläche
         ringBase = geomBase.GetGeometryRef(0)
 
         # Dachfläche
-        geomRoof = ogr.Geometry(ogr.wkbPolygon)
-        ringRoof = ogr.Geometry(ogr.wkbLinearRing)
+        geomRoof, ringRoof = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
         for i in range(ringBase.GetPointCount() - 1, -1, -1):
             pt = ringBase.GetPoint(i)
             ringRoof.AddPoint(pt[0], pt[1], pt[2] + height)
@@ -183,14 +181,14 @@ class LoD1Converter:
 
     @staticmethod
     def calcWalls(geomBase, height):
-        """ Berechnung der Wände als Extrusion der Grundfläche
+        """ Berechnet die Wände als Extrusion der Grundfläche
 
         Args:
-            geomBase: Grundfläche des Körpers als Polygon
-            height: Höhe der Extrusion als float
+            geomBase: Grundfläche des Körpers, als Polygon
+            height: Höhe der Extrusion, als float
 
         Returns:
-            Liste der erzeugten Wand-Geometrien
+            Die erzeugten Wand-Geometrien, als Liste
         """
         # Grundfläche
         ringBase = geomBase.GetGeometryRef(0)
@@ -198,10 +196,8 @@ class LoD1Converter:
         # Wandflächen
         geomWalls = []
         for i in range(0, ringBase.GetPointCount() - 1):
-            geomWall = ogr.Geometry(ogr.wkbPolygon)
-            ringWall = ogr.Geometry(ogr.wkbLinearRing)
-            pt1 = ringBase.GetPoint(i)
-            pt2 = ringBase.GetPoint(i + 1)
+            geomWall, ringWall = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
+            pt1, pt2 = ringBase.GetPoint(i), ringBase.GetPoint(i + 1)
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2])
             ringWall.AddPoint(pt1[0], pt1[1], pt1[2] + height)
             ringWall.AddPoint(pt2[0], pt2[1], pt2[2] + height)

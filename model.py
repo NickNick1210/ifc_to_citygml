@@ -17,6 +17,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from .models.ifc_analyzer import IfcAnalyzer
 from .models.converter import Converter
 
+
 #####
 
 
@@ -98,9 +99,11 @@ class Model:
             lod) + ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
-        #self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade, integr)
-        #QgsApplication.taskManager().addTask(self.task)
-        conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade, integr)
+        # self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade,
+        #   integr)
+        # QgsApplication.taskManager().addTask(self.task)
+        conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade,
+                         integr)
         conv.run()
 
     def completed(self, result):

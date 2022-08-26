@@ -21,6 +21,7 @@ from qgis.PyQt.QtWidgets import QAction
 from qgis.PyQt.QtGui import QIcon
 
 # Plugin
+# noinspection PyUnresolvedReferences
 from .resources import resources
 from .model import Model
 from .dialog_vm import DialogVM

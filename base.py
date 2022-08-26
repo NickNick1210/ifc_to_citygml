@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -37,14 +37,12 @@ class Base:
         """ Konstruktor der Starter-Klasse.
 
         Args:
-            iface: Eine Interface-Instanz, an die sich das Plugin bindet
+            iface: Die QGIS-Interface-Instanz, an die sich das Plugin bindet
         """
 
         # Initialisierung von Attributen
         self.model = None
-        self.dlg = None
-        self.gis = None
-
+        self.dlg, self.gis = None, None
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
 
@@ -56,6 +54,7 @@ class Base:
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
+        # GUI
         self.actions = []
         self.menu = 'IFC-to-CityGML'
 
@@ -66,9 +65,8 @@ class Base:
         except Exception:
             self.install()
 
-    # noinspection PyMethodMayBeStatic
     def install(self):
-        """ Installation von IfcOpenShell """
+        """ Installiert IfcOpenShell """
 
         # Überprüfung, ob pip installiert ist. Ansonsten über Skript installieren
         try:
@@ -144,9 +142,7 @@ class Base:
     def unload(self):
         """ Entfernt die Menü-Einträge und Tools von der QGIS-GUI """
         for action in self.actions:
-            self.iface.removePluginMenu(
-                'IFC-to-CityGML',
-                action)
+            self.iface.removePluginMenu('IFC-to-CityGML', action)
             self.iface.removeToolBarIcon(action)
 
     def run(self):

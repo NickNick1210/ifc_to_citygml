@@ -4,13 +4,13 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
 
 class XmlNs:
-    """ Klasse zum Speichern von Namespaces """
+    """ Klasse zum Speichern von XML-Namespaces """
     schemaLocation = "http://www.opengis.net/citygml/2.0 http://schemas.opengis.net/citygml/2.0/cityGMLBase.xsd  " + \
                      "http://www.opengis.net/citygml/appearance/2.0 http://schemas.opengis.net/citygml/appearance/" + \
                      "2.0/appearance.xsd http://www.opengis.net/citygml/building/2.0 http://schemas.opengis.net/" + \

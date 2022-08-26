@@ -4,18 +4,21 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
 
 class Mapper:
     """ Klasse zum Speichern Zuordnungen über Dictionaries """
+
+    # Dachtyp
     roofTypeDict = {
         "BARREL_ROOF": 1100, "BUTTERFLY_ROOF": 1010, "DOME_ROOF": 1090, "FLAT_ROOF": 1000, "FREEFORM": 1130,
         "GABLE_ROOF": 1030, "GAMBREL_ROOF": 1030, "HIPPED_GABLE_ROOF": 1050, "HIP_ROOF": 1040, "MASARD_ROOF": 1060,
         "PAVILION_ROOF": 1070, "RAINBOW_ROOF": 1100, "SHED_ROOF": 1010, "USERDEFINED": 1130}
 
+    # Gebäudeklasse
     classDict = {
         "habitation": 1000, "sanitation": 1010, "administration": 1020, "business": 1030, "trade": 1030,
         "catering": 1040, "recreation": 1050, "sport": 1060, "culture": 1070, "church": 1080, "agriculture": 1090,
@@ -29,6 +32,7 @@ class Mapper:
         "Lagerung": 1150, "Industrie": 1160, "Verkehr": 1170, "Funktion": 1180, "Sanitaer": 1010, "Geschaeft": 1030
     }
 
+    # Gebäudenutzung aus Gebäudeklasse
     classFunctionUsage = {
         1000: 1000, 1010: 1000, 1020: 1030, 1030: 1020, 1040: 1030, 1050: 1030, 1060: 1090, 1070: 1090, 1080: 1060,
         1090: 1070, 1100: 1050, 1110: 1050, 1120: 1030, 1130: 1030, 1140: 1030, 1150: 1030, 1160: 1030, 1170: 1030,
@@ -51,6 +55,7 @@ class Mapper:
         2620: 1050, 2630: 1050, 2640: 1050, 2650: 1050
     }
 
+    # Gebäudenutzung aus Gebäudefunktion
     functionUsageDict = {
         "res": 1000, "family": 1000, "townhome": 1000, "residential": 1000, "tenement": 1010, "hostel": 1020,
         "residential and administration": 1030, "residential and office": 1040, "residential and business": 1050,
@@ -124,6 +129,7 @@ class Mapper:
         "bürogebäude": 1120, "buerogebaeude": 1120
     }
 
+    # Gebäudetyp aus Freitext
     bldgTypeDict = {
         "Apartment": "Apartment Block", "Block": "Apartment Block", "Multi": "Multi Family House",
         "Single": "Single Family House", "Terraced": "Terraced House", "Wohnung": "Apartment Block",
@@ -132,15 +138,18 @@ class Mapper:
         "Doppelhaus": "Terraced House"
     }
 
+    # Konstruktionswichtung aus Material
     layerCatDict = {
         "concrete": 1, "steel": 3.27, "aluminium": 1.13, "block": 1, "brick": 0.71, "stone": 1.17, "glass": 1.04,
         "gypsum": 0.96, "plastic": 0.96, "earth": 2.3
     }
 
+    # Konstruktionsgewicht aus Materialdicke
     thicknessCatDict = {
         0.0: "veryLight", 0.1: "light", 0.25: "medium", 0.4: "heavy"
     }
 
+    # Nutzungstyp aus Gebäudeklasse
     usageZoneTypeDict = {
         1000: "residential", 1010: "ancillary", 1020: "commerceAndServices", 1030: "commerceAndServices",
         1040: "commerceAndServices", 1050: "commerceAndServices", 1060: "commerceAndServices",

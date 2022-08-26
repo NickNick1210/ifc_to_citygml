@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -22,6 +22,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 # GUI-Datei
 FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'dialog.ui'))
 
+
 #####
 
 
@@ -35,7 +36,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
             parent: Die zugrunde liegende Base-Klasse
             model: Die zugehörige Model-Klasse, die sich um die Logik kümmert
         """
-
+        # Oberklassenkonstruktor
         super(DialogVM, self).__init__(None)
 
         # Initialisierung von Attributen
@@ -165,7 +166,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         """ Aktiviert oder deaktiviert den Ausführen-Button.
 
         Args:
-            enable: Ob aktiviert oder deaktiviert werden soll
+            enable: Ob aktiviert werden soll, als Boolean
         """
         self.button_run.setEnabled(enable)
 
@@ -173,7 +174,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         """ Aktiviert oder deaktiviert die Einstellungsmöglichkeiten.
 
         Args:
-            enable: Ob aktiviert oder deaktiviert werden soll
+            enable: Ob aktiviert werden soll, als Boolean
         """
         # GroupBoxen
         self.groupBox_ifc.setEnabled(enable)

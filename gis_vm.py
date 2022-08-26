@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -33,11 +33,12 @@ class GisVM:
         Args:
             model: Die zugrunde liegende zentrale Model-Klasse
         """
+        # Initialisierung von Attributen
         self.model = model
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -48,10 +49,10 @@ class GisVM:
         return QCoreApplication.translate('GisVM', msg)
 
     def loadIntoGIS(self, path):
-        """ Laden des Datensatzes als Layer in QGIS
+        """ Lädt den Datensatzes als Layer in QGIS
 
         Args:
-            path: Pfad zum Datensatz
+            path: Pfad zum CityGML-Datensatz
         """
 
         # Erstellen des Vektorlayers
@@ -69,7 +70,7 @@ class GisVM:
             self.model.dlg.log(self.tr(u'CityGML bulding model could not be added to QGIS'))
 
     def set3dProperties(self, layer):
-        """ Setzen der 3D-Einstellungen, damit der Layer dreidimensional angezeigt werden kann
+        """ Setzt die 3D-Einstellungen, damit der Layer dreidimensional angezeigt werden kann
 
         Args:
             layer: Layer, dessen Einstellungen geändert werden sollen
@@ -99,4 +100,5 @@ class GisVM:
         layer.loadNamedStyle(stylePath)
         layer.triggerRepaint()
 
+        # Meldung
         self.model.dlg.log(self.tr(u'3D properties adjusted to display the building model'))

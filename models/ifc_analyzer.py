@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -42,7 +42,7 @@ class IfcAnalyzer:
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den angegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -53,17 +53,17 @@ class IfcAnalyzer:
         return QCoreApplication.translate('IfcAnalyzer', msg)
 
     def run(self, val):
-        """ Ausführen der Analyse
+        """ Führt die Analyse aus
 
         Args:
-            val: Angabe, ob eine Validierung durchgeführt werden soll
+            val: Angabe, ob eine Validierung durchgeführt werden soll, als Boolean
         """
         self.printInfo(self.ifc)
         self.check(self.ifc, val)
 
     @staticmethod
     def read(path):
-        """ Einlesen einer IFC-Datei
+        """ Liest eine IFC-Datei ein
 
         Args:
             path: Pfad zur IFC-Datei
@@ -74,7 +74,7 @@ class IfcAnalyzer:
         return ifcopenshell.open(path)
 
     def printInfo(self, ifc):
-        """ Einlesen einer IFC-Datei
+        """ Stell die grundlegenden Informationen der IFC-Datei dar
 
         Args:
             ifc: Auszulesende IFC-Datei
@@ -93,11 +93,11 @@ class IfcAnalyzer:
         self.parent.dlg.setIfcInfo(schema + "<br>" + name + "<br>" + descr + "<br>" + anzBldg)
 
     def check(self, ifc, val):
-        """ Überprüfung der IFC-Datei
+        """ Überprüft die IFC-Datei
 
         Args:
             ifc: Zu überprüfende IFC-Datei
-            val: Angabe, ob eine Validierung durchgeführt werden soll
+            val: Angabe, ob eine Validierung durchgeführt werden soll, als Boolean
         """
         # Prüfung, ob Gebäude vorhanden
         if len(ifc.by_type("IfcBuilding")) == 0:
@@ -116,7 +116,7 @@ class IfcAnalyzer:
             self.parent.dlg.log(self.tr(u'There is no georeferencing in the IFC file!'))
             return
 
-        # Prüfung, ob Northing vorhanden
+        # Prüfung, ob Nordrichtung vorhanden
         project = self.ifc.by_type("IfcProject")[0]
         for context in project.RepresentationContexts:
             if context.ContextType == "Model":
@@ -142,7 +142,7 @@ class IfcAnalyzer:
 
     # noinspection PyUnusedLocal
     def validate(self, task):
-        """ Validierung der IFC-Datei
+        """ Validiert die IFC-Datei
 
         Args:
             task: QgsTask-Objekt
@@ -166,16 +166,15 @@ class IfcAnalyzer:
         """ EventListener, wenn der Validierungs-Task erfolgt ist
 
         Args:
-            ex: ggf. Exception
+            ex: ggf. Fehlermeldung
                 Default: None
-            result: Ergebniss der Validierung
+            result: Gefundene Fehler, als Liste
                 Default: None
         """
         # Wenn Ergebnis vorhanden und nicht leer: Fehler vorhanden
         if result is not None and len(result.statements) != 0:
             # Mitteilen
-            self.parent.dlg.log(
-                str(len(result.statements)) + " " + self.tr(u'errors found'))
+            self.parent.dlg.log(str(len(result.statements)) + " " + self.tr(u'errors found'))
             self.parent.dlg.setIfcMsg("<p style='color:orange'>" + self.tr(u'conditionally valid') + "</p>")
 
             # Fehler in redundanzfreie Liste umformen und mitteilen

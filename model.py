@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -28,14 +28,12 @@ class Model:
         """ Konstruktor der zentralen Model-Klasse """
 
         # Initialisierung von Attributen
-        self.inputPath = None
-        self.outputPath = None
+        self.inPath, self.outPath = None, None
         self.valid = False
-        self.dlg = None
-        self.gis = None
+        self.dlg, self.gis = None, None
 
     def setVM(self, dlg, gis):
-        """ Setzen der ViewModels
+        """ Setzt die ViewModels
 
         Args:
             dlg: ViewModel zur GUI
@@ -46,7 +44,7 @@ class Model:
 
     @staticmethod
     def tr(msg):
-        """ Übersetzen
+        """ Übersetzt den gegebenen Text
 
         Args:
             msg: zu übersetzender Text
@@ -57,33 +55,31 @@ class Model:
         return QCoreApplication.translate('Model', msg)
 
     def ifcFileChanged(self):
-        """ EventListener, wenn eine (andere) IFC-Datei als Eingabe angegeben wurde """
+        """ EventListener, wenn eine IFC-Datei als Eingabe angegeben wurde """
         # Abruf des Pfades
-        self.inputPath = self.dlg.getInputPath()
+        self.inPath = self.dlg.getInputPath()
 
         # Analysieren der IFC-Datei
         self.valid = False
         self.checkEnable()
-        ifcAnalyzer = IfcAnalyzer(self, self.inputPath)
+        ifcAnalyzer = IfcAnalyzer(self, self.inPath)
         ifcAnalyzer.run(self.dlg.getOptionVal())
 
     def cgmlFileChanged(self):
-        """ EventListener, wenn eine (andere) CityGML-Datei als Ausgabe angegeben wurde """
+        """ EventListener, wenn eine CityGML-Datei als Ausgabe angegeben wurde """
         # Abruf des Pfades
-        self.outputPath = self.dlg.getOutputPath()
+        self.outPath = self.dlg.getOutputPath()
 
         # Prüfen auf Konvertierungsfreigabe
         self.checkEnable()
 
     def checkEnable(self):
-        """ Überprüfung, ob beide Dateien angegeben und valide, sowie ggf. Freigabe der Konvertierung """
-        if self.valid and self.outputPath is not None:
-            self.dlg.enableRun(True)
-        else:
-            self.dlg.enableRun(False)
+        """ Überprüft, ob beide Dateien angegeben und valide sind und gibt ggf. Konvertierung frei """
+        enable = True if self.valid and self.outPath is not None else False
+        self.dlg.enableRun(enable)
 
     def run(self):
-        """ Starten der Konvertierung """
+        """ Startet die Konvertierung """
         # Deaktivieren der GUI
         self.dlg.enableRun(False)
         self.dlg.enableDef(False)
@@ -94,22 +90,28 @@ class Model:
         lod = self.dlg.getLod()
         eade = self.dlg.getOptionEade()
         integr = self.dlg.getOptionIntegr()
-        self.dlg.log(self.tr(u'Input') + ": " + self.inputPath[self.inputPath.rindex("\\") + 1:] + ", " + self.tr(
-            u'Output') + ": " + self.outputPath[self.outputPath.rindex("\\") + 1:] + ", LoD: " + str(
-            lod) + ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
+        self.dlg.log(self.tr(u'Input') + ": " + self.inPath[self.inPath.rindex("\\") + 1:] + ", " + self.tr(
+            u'Output') + ": " + self.outPath[self.outPath.rindex("\\") + 1:] + ", LoD: " + str(lod) +
+            ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
-        # self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade,
+        # TODO: Multithreading
+        # self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade,
         #   integr)
         # QgsApplication.taskManager().addTask(self.task)
-        conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inputPath, self.outputPath, lod, eade,
-                         integr)
+        conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
         conv.run()
 
     def completed(self, result):
-        """ Beenden der Konvertierung """
+        """ Beendet die Konvertierung
+
+            Args:
+                result: Ob die Konvertierung erfolgreich war, als Boolean
+        """
+        # Ladebalken
         self.dlg.setProgress(100)
 
+        # Logging
         if result:
             self.dlg.log(self.tr(u'Conversion completed'))
         else:

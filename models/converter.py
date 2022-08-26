@@ -10,18 +10,9 @@
 
 #####
 
-# Standard-Bibliotheken
-import math
-import sys
-import uuid
-from copy import deepcopy
-from datetime import datetime
-import numpy as np
-
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
-from ifcopenshell.util import element
 
 # XML-Bibliotheken
 from lxml import etree
@@ -32,17 +23,9 @@ from lxml.etree import QName
 from qgis.core import QgsTask
 from qgis.PyQt.QtCore import QCoreApplication
 
-# Geo-Bibliotheken
-from osgeo import ogr
-import sympy
-from sympy import Point3D, Plane, Line
-
 # Plugin
 from .xmlns import XmlNs
-from .mapper import Mapper
 from .transformer import Transformer
-from .utilitiesGeom import UtilitiesGeom
-from .utilitiesIfc import UtilitiesIfc
 from .converter_lod0 import LoD0Converter
 from .converter_lod1 import LoD1Converter
 from .converter_lod2 import LoD2Converter
@@ -101,6 +84,7 @@ class Converter(QgsTask):
         name = self.outPath[self.outPath.rindex("\\") + 1:-4]
 
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
+        dedConv = None
         if self.lod == 0:
             dedConv = LoD0Converter(self.parent, ifc, name, trans, self.eade)
         elif self.lod == 1:

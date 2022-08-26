@@ -160,7 +160,7 @@ class UtilitiesGeom:
             for i in range(0, geom.GetGeometryCount()):
                 ring = geom.GetGeometryRef(i)
                 ringNew = ogr.Geometry(ogr.wkbLinearRing)
-                for j in range(0, ring.GetPointCount()-1):
+                for j in range(0, ring.GetPointCount() - 1):
                     ringNew.AddPoint(ring.GetPoint(j)[1], ring.GetPoint(j)[2], ring.GetPoint(j)[0])
                 ringNew.CloseRings()
                 geomNew.AddGeometry(ringNew)
@@ -241,8 +241,9 @@ class UtilitiesGeom:
             # POLYGON oder LINESTRING #
             elif geom.GetGeometryName() == "POLYGON" or geom.GetGeometryName() == "LINESTRING":
                 # Auslesen der Geometrie und Erstellen der neuen Geometrie
+                ring0 = None
+                geomNew = ogr.Geometry(ogr.wkbPolygon)
                 if geom.GetGeometryName() == "POLYGON":
-                    geomNew = ogr.Geometry(ogr.wkbPolygon)
                     ring0 = geom.GetGeometryRef(0)
                 ringCount = geom.GetGeometryCount() if geom.GetGeometryName() == "POLYGON" else 1
                 count = ring0.GetPointCount() if geom.GetGeometryName() == "POLYGON" else geom.GetPointCount()
@@ -424,9 +425,10 @@ class UtilitiesGeom:
                     ks, ms = [], []
                     for k in range(0, ring1.GetPointCount() - 1):
                         for m in range(0, ring2.GetPointCount() - 1):
-                            if ring1.GetPoint(k)[0] - 0.0001 < ring2.GetPoint(m)[0] < ring1.GetPoint(k)[0] + 0.0001 and \
-                                    ring1.GetPoint(k)[1] - 0.0001 < ring2.GetPoint(m)[1] < ring1.GetPoint(k)[
-                                1] + 0.0001 and ring1.GetPoint(k)[2] - 0.0001 < ring2.GetPoint(m)[2] < \
+                            if ring1.GetPoint(k)[0] - 0.0001 < ring2.GetPoint(m)[0] < \
+                                    ring1.GetPoint(k)[0] + 0.0001 and ring1.GetPoint(k)[1] - 0.0001 < \
+                                    ring2.GetPoint(m)[1] < ring1.GetPoint(k)[1] + 0.0001 and \
+                                    ring1.GetPoint(k)[2] - 0.0001 < ring2.GetPoint(m)[2] < \
                                     ring1.GetPoint(k)[2] + 0.0001:
                                 ks.append(k)
                                 if m not in ms:
@@ -510,18 +512,14 @@ class UtilitiesGeom:
                         elif len(samePts) > 3:
                             # Höhere Geometrie herausfinden, ggf. tauschen
                             maxHeightX, maxHeightY = -sys.maxsize, -sys.maxsize
-                            maxHeightXK, maxHeightYK = None, None
                             for x in range(0, ring1.GetPointCount() - 1):
                                 pt = ring1.GetPoint(x)
                                 if pt[2] > maxHeightX:
                                     maxHeightX = pt[2]
-                                    maxHeightXK = x
                             for y in range(0, ring2.GetPointCount() - 1):
                                 pt = ring2.GetPoint(y)
                                 if pt[2] > maxHeightY:
                                     maxHeightY = pt[2]
-                                    maxHeightYK = y
-                            maxHeightK = maxHeightXK if maxHeightX >= maxHeightY else maxHeightYK
                             if maxHeightX < maxHeightY:
                                 geom1, geom2 = geom2, geom1
                                 ring1, ring2 = ring2, ring1
@@ -625,7 +623,7 @@ class UtilitiesGeom:
                             # Alle Eckpunkte miteinander vergleichen und Gleichheit notieren
                             samePts, ks = [], []
                             allKs, allMs = [False] * (innerRing1.GetPointCount() - 1), [False] * (
-                                        ring2.GetPointCount() - 1)
+                                    ring2.GetPointCount() - 1)
                             for k in range(0, innerRing1.GetPointCount() - 1):
                                 for m in range(0, ring2.GetPointCount() - 1):
                                     if innerRing1.GetPoint(k) == ring2.GetPoint(m):
@@ -639,6 +637,7 @@ class UtilitiesGeom:
                                 newRings = []
 
                                 # Mehrere neue Löcher möglich: Iterieren, bis alle Punkte genutzt wurden
+                                start = None
                                 while False in allKs or False in allMs:
                                     newRing = ogr.Geometry(ogr.wkbLinearRing)
 
@@ -660,8 +659,6 @@ class UtilitiesGeom:
                                                         break
                                             if start is not None:
                                                 break
-                                            if k <= 0:
-                                                s, e = ring2.GetPointCount() - 1, mFalse
 
                                     # Geometrie erstellen
                                     n, end = start, innerRing1.GetPointCount() - 1
@@ -681,6 +678,7 @@ class UtilitiesGeom:
                                                     stop = False
 
                                                     # Über andere Wand gehen, bis gleicher Punkt zu Wand gefunden
+                                                    point3 = None
                                                     for p in range(o + 1, ring2.GetPointCount() - 1):
                                                         point3 = ring2.GetPoint(p)
                                                         newRing.AddPoint(point3[0], point3[1], point3[2])
@@ -823,5 +821,5 @@ class UtilitiesGeom:
         Returns:
             Ob die Punkte gleich sind oder nicht, als Boolean
         """
-        return pt1[0] - tol < pt2[0] < pt1[0] + tol and pt1[1] - tol < pt2[1] < pt1[1] + tol and \
-               pt1[2] - tol < pt2[2] < pt1[2] + tol
+        return pt1[0] - tol < pt2[0] < pt1[0] + tol and pt1[1] - tol < pt2[1] < pt1[1] + tol and pt1[2] - tol < pt2[2] \
+            < pt1[2] + tol

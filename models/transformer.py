@@ -104,6 +104,7 @@ class Transformer:
         """
         # Northing
         project = self.ifc.by_type("IfcProject")[0]
+        contextForModel = None
         for context in project.RepresentationContexts:
             if context.ContextType == "Model":
                 contextForModel = context

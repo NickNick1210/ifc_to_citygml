@@ -116,12 +116,12 @@ class LoD2Converter:
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
-                EADEConverter.convertEadeBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ, constructions = EADEConverter.calcLoDThermalZone(self.ifc, ifcBuilding, chBldg, root,
+                linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
                                                                                    surfaces, 2)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                EADEConverter.calcLoDUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
                 materials = EADEConverter.convertConstructions(root, constructions)
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))

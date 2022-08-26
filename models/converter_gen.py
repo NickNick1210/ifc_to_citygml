@@ -11,12 +11,9 @@
 #####
 
 # Standard-Bibliotheken
-import math
 import sys
 import uuid
-from copy import deepcopy
 from datetime import datetime
-import numpy as np
 
 # IFC-Bibliotheken
 import ifcopenshell
@@ -30,17 +27,13 @@ from lxml.etree import QName
 
 # QGIS-Bibliotheken
 from qgis.core import QgsTask
-from qgis.PyQt.QtCore import QCoreApplication
 
 # Geo-Bibliotheken
 from osgeo import ogr
-import sympy
-from sympy import Point3D, Plane, Line
 
 # Plugin
 from .xmlns import XmlNs
 from .mapper import Mapper
-from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
 
@@ -58,6 +51,7 @@ class GenConverter(QgsTask):
         Args:
             geometry: Die konvertierten Geometrien
             chBound: XML-Objekt, an das die Bounding Box angehängt werden soll
+            trans: Transformer-Objekt
 
         Returns:
             Die ergebene Bounding Box-Geometrie
@@ -87,6 +81,7 @@ class GenConverter(QgsTask):
         """ Konvertierung der Gebäudeattribute
 
         Args:
+            ifc: IFC-Datei
             ifcBuilding: IFC-Gebäude, aus dem die Attribute entnommen werden sollen
             chBldg: XML-Objekt, an das die Gebäudeattribute angehängt werden soll
         """
@@ -158,7 +153,8 @@ class GenConverter(QgsTask):
                 # XML-Struktur
                 chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
                 chBldgRoofType.set("codeSpace",
-                                   "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_roofType.xml")
+                                   "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/" +
+                                   "_AbstractBuilding_roofType.xml")
                 # Mapping
                 roofType = max(set(roofTypes), key=roofTypes.count)
                 roofCode = Mapper.roofTypeDict[roofType]
@@ -313,6 +309,7 @@ class GenConverter(QgsTask):
         """ Berechnung der Gebäudehöhe als Differenz zwischen tiefstem und höchstem Punkt
 
         Args:
+            ifc: IFC-Datei
             ifcBuilding: IFC-Gebäude, dessen Höhe berechnet werden soll
 
         Returns:
@@ -335,10 +332,12 @@ class GenConverter(QgsTask):
                 return None
 
         # Berechnung der Minimalhöhe
+        # noinspection PyUnresolvedReferences
         settings = ifcopenshell.geom.settings()
         settings.set(settings.USE_WORLD_COORDS, True)
         minHeight = sys.maxsize
         for ifcSlab in ifcSlabs:
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
             verts = shape.geometry.verts
             for i in range(2, len(verts), 3):
@@ -348,6 +347,7 @@ class GenConverter(QgsTask):
         # Berechnung der Maximalhöhe
         maxHeight = -sys.maxsize
         for ifcRoof in ifcRoofs:
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             verts = shape.geometry.verts
             for i in range(2, len(verts), 3):
@@ -447,6 +447,7 @@ class GenConverter(QgsTask):
 
         Args:
             ifcElements: Elemente, aus denen die Fläche berechnet werden soll
+            trans: Transformer-Objekt
 
         Returns:
             Erzeugte GML-Geometrie mit zugehörigem IFC-Element
@@ -456,8 +457,10 @@ class GenConverter(QgsTask):
         ifcBase = None
         height = sys.maxsize
         for ifcElement in ifcElements:
+            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcElement)
             # Vertizes
             verts = shape.geometry.verts

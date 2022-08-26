@@ -125,10 +125,11 @@ class EADEConverter(QgsTask):
             chWDPosPtPos.text = str(meanX) + " " + str(meanY) + " " + str(meanZ)
 
     @staticmethod
-    def convertEadeBldgAttr(ifc, ifcBuilding, chBldg, bbox, footPrint):
+    def convertBldgAttr(ifc, ifcBuilding, chBldg, bbox, footPrint):
         """ Konvertierung der Gebäudeattribute für die Energy ADE
 
         Args:
+            ifc: IFC-Datei
             ifcBuilding: IFC-Gebäude, aus dem die Attribute entnommen werden sollen
             chBldg: XML-Objekt, an das die Gebäudeattribute angehängt werden soll
             bbox: Die Bounding Box des Gebäudes
@@ -323,10 +324,11 @@ class EADEConverter(QgsTask):
         chBldgHeightAgVal.text = str(footPrint.GetGeometryRef(0).GetPoint(0)[2])
 
     @staticmethod
-    def calcLoDUsageZone(ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ):
+    def calcUsageZone(ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ):
         """ Berechnung der Nutzungszone für die Energy ADE
 
         Args:
+            ifc: IFC-Datei
             ifcProject: IFC-Projekt, aus dem die Zeiteinheit entnommen werden soll
             ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnet werden soll
             chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
@@ -466,6 +468,7 @@ class EADEConverter(QgsTask):
         """ Erstellung des Zeitplanes der Temperaturen für die Energy ADE in LoD1
 
         Args:
+            ifc: IFC-Datei
             ch: XML-Objekt, an das der Zeitplan angehängt werden soll
             mode: Modus (Heating oder Cooling)
             ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
@@ -534,12 +537,14 @@ class EADEConverter(QgsTask):
         chBldgUzHsIVal.text = "0"
 
     @staticmethod
-    def calcLoDThermalZone(ifc, ifcBuilding, chBldg, root, surfaces, lod):
+    def calcThermalZone(ifc, ifcBuilding, chBldg, root, surfaces, lod):
         """ Berechnung der thermischen Zone für die Energy ADE in LoD2
 
         Args:
+            ifc: IFC-Datei
             ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
             chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
+            root: XML-Objekt, aus dem die BoundingBox entnommen werden soll
             surfaces: Die GML-IDs und zugehörigen GML-IDs der Oberflächen
             lod: Level of Detail als Zahl
 
@@ -554,7 +559,6 @@ class EADEConverter(QgsTask):
         chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
         linkTZ = "GML_" + str(uuid.uuid4())
         chBldgTZ.set(QName(XmlNs.gml, "id"), linkTZ)
-        chBldgTzBound = etree.SubElement(chBldgTZ, QName(XmlNs.gml, "boundedBy"))
 
         # contains: UsageZone
         chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))

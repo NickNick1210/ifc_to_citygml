@@ -15,13 +15,10 @@ import math
 import sys
 import uuid
 from copy import deepcopy
-from datetime import datetime
-import numpy as np
 
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
-from ifcopenshell.util import element
 
 # XML-Bibliotheken
 from lxml import etree
@@ -29,27 +26,46 @@ from lxml import etree
 from lxml.etree import QName
 
 # QGIS-Bibliotheken
-from qgis.core import QgsTask
 from qgis.PyQt.QtCore import QCoreApplication
 
 # Geo-Bibliotheken
 from osgeo import ogr
 import sympy
-from sympy import Point3D, Plane, Line
+from sympy import Point3D, Line
 
 # Plugin
 from .xmlns import XmlNs
-from .mapper import Mapper
-from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+from .converter_gen import GenConverter
+from .converter_eade import EADEConverter
 
 
 #####
 
 
-class LoD3Converter(QgsTask):
+class LoD3Converter:
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+
+    def __init__(self, parent, ifc, name, trans, eade):
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+
+        Args:
+            parent: Die zugrunde liegende zentrale Converter-Klasse
+            ifc: IFC-Datei
+            name: Name des Modells
+            trans: Transformer-Objekt
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+        """
+
+        # Initialisierung von Attributen
+        self.parent = parent
+        self.eade = eade
+        self.ifc = ifc
+        self.trans = trans
+        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.name = name
 
     @staticmethod
     def tr(msg):
@@ -63,12 +79,11 @@ class LoD3Converter(QgsTask):
         """
         return QCoreApplication.translate('LoD3Converter', msg)
 
-    def convertLoD3(self, root, eade):
+    def convert(self, root):
         """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 3
 
         Args:
             root: Das vorbereitete XML-Schema
-            eade: Ob die EnergyADE gewählt wurde als Boolean
         """
         # IFC-Grundelemente
         ifcProject = self.ifc.by_type("IfcProject")[0]
@@ -77,7 +92,7 @@ class LoD3Converter(QgsTask):
 
         # XML-Struktur
         chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
-        chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        chName.text = self.name
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
 
         # Über alle enthaltenen Gebäude iterieren
@@ -87,33 +102,34 @@ class LoD3Converter(QgsTask):
 
             # Konvertierung
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
-            self.convertBldgAttr(ifcBuilding, chBldg)
-            links, footPrint, surfaces = self.convertLoD3BldgBound(ifcBuilding, chBldg)
-            self.convertLoDSolid(chBldg, links, 3)
+            GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg)
+            GenConverter.convertLoDSolid(chBldg, links, 3)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
-            self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
-            bbox = self.convertBound(self.geom, chBound)
+            bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
 
             # EnergyADE
-            if eade:
+            if self.eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
-                self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
-                self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
+                EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ, constructions = self.calcLoDThermalZone(ifcBuilding, chBldg, surfaces, 3)
+                linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
+                                                                                surfaces, 3)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
-                materials = self.convertConstructions(root, constructions)
+                materials = EADEConverter.convertConstructions(root, constructions)
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
-                self.convertMaterials(root, materials)
+                EADEConverter.convertMaterials(root, materials)
 
         return root
 
-    def convertLoD3BldgBound(self, ifcBuilding, chBldg):
+    def convertBldgBound(self, ifcBuilding, chBldg):
         """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 3
 
         Args:
@@ -127,15 +143,15 @@ class LoD3Converter(QgsTask):
         """
         # Berechnung
         self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
-        bases, basesOrig, floors = self.calcLoD3Bases(ifcBuilding)
+        bases, basesOrig, floors = self.calcBases(ifcBuilding)
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
-        roofs, roofsOrig = self.calcLoD3Roofs(ifcBuilding)
+        roofs, roofsOrig = self.calcRoofs(ifcBuilding)
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
-        walls = self.calcLoD3Walls(ifcBuilding)
+        walls = self.calcWalls(ifcBuilding)
         self.parent.dlg.log(self.tr(u'Building geometry: door surfaces are calculated'))
-        openings = self.calcLoD3Openings(ifcBuilding, "ifcDoor")
+        openings = self.calcOpenings(ifcBuilding, "ifcDoor")
         self.parent.dlg.log(self.tr(u'Building geometry: window surfaces are calculated'))
-        openings += self.calcLoD3Openings(ifcBuilding, "ifcWindow")
+        openings += self.calcOpenings(ifcBuilding, "ifcWindow")
         self.parent.dlg.log(self.tr(u'Building geometry: openings are assigned to walls'))
         walls = self.assignOpenings(openings, walls)
         self.parent.dlg.log(self.tr(u'Building geometry: wall and opening surfaces are adjusted to each other'))
@@ -165,8 +181,7 @@ class LoD3Converter(QgsTask):
             surfaces += openSurf
         return links, bases[0][0][0], surfaces
 
-    # noinspection PyMethodMayBeStatic
-    def calcLoD3Bases(self, ifcBuilding):
+    def calcBases(self, ifcBuilding):
         """ Berechnen der Grundfläche in Level of Detail (LoD) 3
 
         Args:
@@ -194,8 +209,10 @@ class LoD3Converter(QgsTask):
 
         for i in range(0, len(ifcSlabs)):
             ifcSlab = ifcSlabs[i]
+            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
             # Vertizes
             verts = shape.geometry.verts
@@ -321,8 +338,7 @@ class LoD3Converter(QgsTask):
 
         return finalBases, basesOrig, floors
 
-    # noinspection PyMethodMayBeStatic
-    def calcLoD3Roofs(self, ifcBuilding):
+    def calcRoofs(self, ifcBuilding):
         """ Berechnen der Dächer in Level of Detail (LoD) 3
 
         Args:
@@ -347,8 +363,10 @@ class LoD3Converter(QgsTask):
         # Geometrie
         for i in range(0, len(ifcRoofs)):
             ifcRoof = ifcRoofs[i]
+            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             # Vertizes
             verts = shape.geometry.verts
@@ -414,8 +432,7 @@ class LoD3Converter(QgsTask):
 
         return roofs, roofsOrig
 
-    # noinspection PyMethodMayBeStatic
-    def calcLoD3Walls(self, ifcBuilding):
+    def calcWalls(self, ifcBuilding):
         """ Berechnen der Außenwände in Level of Detail (LoD) 3
 
         Args:
@@ -458,8 +475,10 @@ class LoD3Converter(QgsTask):
         # Geometrie
         for i in range(0, len(ifcWallsExt)):
             ifcWall = ifcWallsExt[i]
+            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcWall)
             # Vertizes
             verts = shape.geometry.verts
@@ -496,7 +515,7 @@ class LoD3Converter(QgsTask):
             walls.append([wallGeom, wallNames[i], [], ifcWall])
         return walls
 
-    def calcLoD3Openings(self, ifcBuilding, type):
+    def calcOpenings(self, ifcBuilding, type):
         """ Berechnen der Öffnungen (Türen und Fenster) in Level of Detail (LoD) 3
 
         Args:
@@ -535,8 +554,10 @@ class LoD3Converter(QgsTask):
         # Geometrie
         for i in range(0, len(ifcOpeningsExt)):
             ifcOpening = ifcOpeningsExt[i]
+            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcOpening)
             # Vertizes
             verts = shape.geometry.verts
@@ -558,7 +579,8 @@ class LoD3Converter(QgsTask):
 
         return openings
 
-    def assignOpenings(self, openings, walls):
+    @staticmethod
+    def assignOpenings(openings, walls):
         """ Anfügen der Öffnungen (Fenster & Türen) an die zugehörigen Wände in Level of Detail (LoD) 3
 
         Args:
@@ -588,7 +610,8 @@ class LoD3Converter(QgsTask):
                 minDistElem[2].append(opening)
         return walls
 
-    def adjustWallOpenings(self, walls):
+    @staticmethod
+    def adjustWallOpenings(walls):
         """ Anpassen der Wände auf Grundlage der Dächer, Grundflächen und Öffnungen in Level of Detail (LoD) 3
 
         Args:
@@ -651,6 +674,7 @@ class LoD3Converter(QgsTask):
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
             if len(wall[2]) != 0:
+                # noinspection PyUnusedLocal
                 openBounds = [[] for x in range(len(wall[2]))]
                 for h in range(0, len(wall[0])):
                     wallGeom = wall[0][h]
@@ -769,9 +793,6 @@ class LoD3Converter(QgsTask):
                                     openBoundRing = openBound[1].GetGeometryRef(0)
                                     for o in range(0, openBoundRing.GetPointCount()):
                                         boundPt = openBoundRing.GetPoint(o)
-                                        dist = math.sqrt(
-                                            (boundPt[0] - wallPt[0]) ** 2 + (boundPt[1] - wallPt[1]) ** 2 + (
-                                                    boundPt[2] - wallPt[2]) ** 2)
                                         if wallPt[0] - tol < boundPt[0] < wallPt[0] + tol and wallPt[1] - tol < \
                                                 boundPt[1] < wallPt[1] + tol and wallPt[2] - tol < boundPt[2] < \
                                                 wallPt[2] + tol:
@@ -906,7 +927,8 @@ class LoD3Converter(QgsTask):
             wall[0] = finalWall
         return walls, wallMainCounts
 
-    def adjustWallSize(self, walls, bases, roofs, basesOrig, roofsOrig, wallMainCounts):
+    @staticmethod
+    def adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig, wallMainCounts):
         """ Anpassen der Wände in Bezug auf die veränderten Grundflächen und Dächer in Level of Detail (LoD) 3
 
         Args:
@@ -922,6 +944,8 @@ class LoD3Converter(QgsTask):
         """
 
         # Alle Wände durchgehen
+        newWallGeom, newWallRing = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
+        lastPt, height, lastHeight = [], None, None
         for i in range(0, len(walls)):
             for h in range(0, wallMainCounts[i]):
                 wallGeom = walls[i][0][h]
@@ -992,7 +1016,7 @@ class LoD3Converter(QgsTask):
                                 if not found:
                                     intersect = origGeom.Intersection(ptPolGeom)
                                     if intersect is not None and not intersect.IsEmpty():
-                                        # Prüfen, ob die Wandhöhe und Höhe der originalen Grundfläche/Dach in etwa gleich ist
+                                        # Prüfen, ob die Wandhöhe und Höhe der orig. Grundfläche/Dach etwa gleich ist
                                         origPlane = UtilitiesGeom.getPlane(origRing.GetPoint(0), origRing.GetPoint(1),
                                                                            origRing.GetPoint(2))
                                         ptLine = Line(Point3D(pt[0], pt[1], pt[2] - 100),
@@ -1014,7 +1038,7 @@ class LoD3Converter(QgsTask):
 
                         # ÖFFNUNGEN und GEOMETRIE #
                         # Über alle Nebenwände und dessen Eckpunkte gehen
-                        opBound, pts = False, []
+                        opBound, pts, nextPt = False, [], []
                         for m in range(wallMainCounts[i], len(walls[i][0])):
                             wallOpGeom = walls[i][0][m]
                             wallOpRing = wallOpGeom.GetGeometryRef(0)

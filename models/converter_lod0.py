@@ -107,7 +107,7 @@ class LoD0Converter:
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
-                EADEConverter.convertEadeBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
 
         return root
 

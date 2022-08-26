@@ -43,13 +43,35 @@ from .mapper import Mapper
 from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+from .converter_gen import GenConverter
+from .converter_eade import EADEConverter
 
 
 #####
 
 
-class LoD1Converter(QgsTask):
+class LoD1Converter:
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+
+    def __init__(self, parent, ifc, name, trans, eade):
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+
+        Args:
+            parent: Die zugrunde liegende zentrale Converter-Klasse
+            ifc: IFC-Datei
+            name: Name des Modells
+            trans: Transformer-Objekt
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+        """
+
+        # Initialisierung von Attributen
+        self.parent = parent
+        self.eade = eade
+        self.ifc = ifc
+        self.trans = trans
+        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.name = name
 
     @staticmethod
     def tr(msg):
@@ -63,12 +85,11 @@ class LoD1Converter(QgsTask):
         """
         return QCoreApplication.translate('LoD1Converter', msg)
 
-    def convertLoD1(self, root, eade):
+    def convert(self, root):
         """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 1
 
         Args:
             root: Das vorbereitete XML-Schema
-            eade: Ob die EnergyADE gewählt wurde als Boolean
         """
         # IFC-Grundelemente
         ifcProject = self.ifc.by_type("IfcProject")[0]
@@ -77,7 +98,7 @@ class LoD1Converter(QgsTask):
 
         # XML-Struktur
         chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
-        chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        chName.text = self.name
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
 
         # Über alle enthaltenen Gebäude iterieren
@@ -88,27 +109,28 @@ class LoD1Converter(QgsTask):
 
             # Konvertierung
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
-            height = self.convertBldgAttr(ifcBuilding, chBldg)
-            footPrint = self.convertLoD1Solid(ifcBuilding, chBldg, height)
+            height = GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            footPrint = self.convertSolid(ifcBuilding, chBldg, height)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
-            self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
-            bbox = self.convertBound(self.geom, chBound)
+            bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
 
             # EnergyADE
-            if eade:
+            if self.eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
-                self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
-                self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
+                EADEConverter.convertEadeBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ, constructions = self.calcLoDThermalZone(ifcBuilding, chBldg, [], 1)
+                linkUZ, chBldgTZ, constructions = EADEConverter.calcLoDThermalZone(self.ifc, ifcBuilding, chBldg, root,
+                                                                                   [], 1)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                EADEConverter.calcLoDUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
 
         return root
 
-    def convertLoD1Solid(self, ifcBuilding, chBldg, height):
+    def convertSolid(self, ifcBuilding, chBldg, height):
         """ Konvertieren des Gebäudeumrisses von IFC zu CityGML
 
         Args:
@@ -132,11 +154,11 @@ class LoD1Converter(QgsTask):
         # Berechnung der Geometrien
         geometries = []
         self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
-        geometries.append(self.calcPlane(ifcSlabs)[1])
+        geometries.append(GenConverter.calcPlane(ifcSlabs, self.trans)[1])
         self.parent.dlg.log(self.tr(u'Building geometry: roof surface is calculated'))
-        geometries.append(self.calcLoD1Roof(geometries[0], height))
+        geometries.append(self.calcRoof(geometries[0], height))
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
-        geometries += self.calcLoD1Walls(geometries[0], height)
+        geometries += self.calcWalls(geometries[0], height)
 
         # Geometrie
         if geometries is not None and len(geometries) > 0:
@@ -154,7 +176,7 @@ class LoD1Converter(QgsTask):
         return geometries[0]
 
     @staticmethod
-    def calcLoD1Roof(geomBase, height):
+    def calcRoof(geomBase, height):
         """ Berechnung des Daches als Anhebung der Grundfläche
 
         Args:
@@ -178,7 +200,7 @@ class LoD1Converter(QgsTask):
         return geomRoof
 
     @staticmethod
-    def calcLoD1Walls(geomBase, height):
+    def calcWalls(geomBase, height):
         """ Berechnung der Wände als Extrusion der Grundfläche
 
         Args:

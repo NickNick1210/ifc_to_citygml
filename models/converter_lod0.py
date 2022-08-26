@@ -35,18 +35,6 @@ from .converter_eade import EADEConverter
 class LoD0Converter:
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
 
-    @staticmethod
-    def tr(msg):
-        """ Übersetzen
-
-        Args:
-            msg: zu übersetzender Text
-
-        Returns:
-            Übersetzter Text
-        """
-        return QCoreApplication.translate('LoD0Converter', msg)
-
     def __init__(self, parent, ifc, name, trans, eade):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
 
@@ -66,6 +54,18 @@ class LoD0Converter:
         self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
         self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
         self.name = name
+
+    @staticmethod
+    def tr(msg):
+        """ Übersetzen
+
+        Args:
+            msg: zu übersetzender Text
+
+        Returns:
+            Übersetzter Text
+        """
+        return QCoreApplication.translate('LoD0Converter', msg)
 
     def convert(self, root):
         """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 0

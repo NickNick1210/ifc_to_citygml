@@ -103,15 +103,15 @@ class Converter(QgsTask):
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
         if self.lod == 0:
             dedConv = LoD0Converter(self.parent, ifc, name, trans, self.eade)
-            root = dedConv.convert(root)
         elif self.lod == 1:
-            root = self.convertLoD1(root, self.eade)
+            dedConv = LoD1Converter(self.parent, ifc, name, trans, self.eade)
         elif self.lod == 2:
             root = self.convertLoD2(root, self.eade)
         elif self.lod == 3:
             root = self.convertLoD3(root, self.eade)
         elif self.lod == 4:
             root = self.convertLoD4(root, self.eade)
+        root = dedConv.convert(root)
 
         # Schreiben der CityGML in eine Datei
         self.parent.dlg.log(self.tr(u'CityGML file is generated'))

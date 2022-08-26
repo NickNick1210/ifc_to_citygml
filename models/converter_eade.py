@@ -12,15 +12,10 @@
 
 # Standard-Bibliotheken
 import math
-import sys
 import uuid
 from copy import deepcopy
-from datetime import datetime
-import numpy as np
 
 # IFC-Bibliotheken
-import ifcopenshell
-import ifcopenshell.util.pset
 from ifcopenshell.util import element
 
 # XML-Bibliotheken
@@ -34,16 +29,12 @@ from qgis.PyQt.QtCore import QCoreApplication
 
 # Geo-Bibliotheken
 from osgeo import ogr
-import sympy
-from sympy import Point3D, Plane, Line
 
 # Plugin
 from .xmlns import XmlNs
 from .mapper import Mapper
-from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
-
 
 #####
 
@@ -63,8 +54,8 @@ class EADEConverter(QgsTask):
         """
         return QCoreApplication.translate('EADEConverter', msg)
 
-    # noinspection PyMethodMayBeStatic
-    def convertWeatherData(self, ifcProject, ifcSite, chBldg, bbox):
+    @staticmethod
+    def convertWeatherData(ifcProject, ifcSite, chBldg, bbox):
         """ Konvertieren der Wetterdaten eines Grundstücks von IFC zu CityGML als Teil der Energy ADE
 
         Args:
@@ -133,10 +124,8 @@ class EADEConverter(QgsTask):
             meanX, meanY, meanZ = (bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2, (bbox[4] + bbox[5]) / 2
             chWDPosPtPos.text = str(meanX) + " " + str(meanY) + " " + str(meanZ)
 
-        else:
-            self.parent.dlg.log(self.tr(u'Due to the missing weather data, it will also be missing in CityGML'))
-
-    def convertEadeBldgAttr(self, ifcBuilding, chBldg, bbox, footPrint):
+    @staticmethod
+    def convertEadeBldgAttr(ifc, ifcBuilding, chBldg, bbox, footPrint):
         """ Konvertierung der Gebäudeattribute für die Energy ADE
 
         Args:
@@ -184,9 +173,9 @@ class EADEConverter(QgsTask):
                 chBldgType.text = bldgTypeCode
 
         # ConstructionWeight
-        ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
+        ifcWalls = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcWall", result=[])
         ifcWallsExt = []
-        ifcRelSpaceBoundaries = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
+        ifcRelSpaceBoundaries = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcRelSpaceBoundary", result=[])
         for ifcWall in ifcWalls:
             extCount, intCount = 0, 0
             for ifcRelSpaceBoundary in ifcRelSpaceBoundaries:
@@ -203,7 +192,7 @@ class EADEConverter(QgsTask):
         if len(ifcWallsExt) != 0:
             thicknesses = []
             for ifcWall in ifcWallsExt:
-                rels = self.ifc.get_inverse(ifcWall)
+                rels = ifc.get_inverse(ifcWall)
                 for rel in rels:
                     if rel.is_a('IfcRelAssociatesMaterial') and ifcWall in rel.RelatedObjects:
                         if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a("IfcMaterialLayerSetUsage"):
@@ -225,7 +214,7 @@ class EADEConverter(QgsTask):
                                     thicknesses.append(thicknessAll)
 
             if len(thicknesses) != 0:
-                thickness = sum(thicknesses) / len(thicknesses)
+                thickness, thisKey = sum(thicknesses) / len(thicknesses), None
                 for key in Mapper.thicknessCatDict.keys():
                     if thickness > key:
                         thisKey = key
@@ -333,8 +322,8 @@ class EADEConverter(QgsTask):
         chBldgHeightAgVal.set("uom", "m")
         chBldgHeightAgVal.text = str(footPrint.GetGeometryRef(0).GetPoint(0)[2])
 
-    # noinspection PyMethodMayBeStatic
-    def calcLoDUsageZone(self, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ):
+    @staticmethod
+    def calcLoDUsageZone(ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ):
         """ Berechnung der Nutzungszone für die Energy ADE
 
         Args:
@@ -353,10 +342,10 @@ class EADEConverter(QgsTask):
         # heatingSchedule & coolingSchedule
         for child in chBldgTZ:
             if "isCooled" in child.tag and child.text == "true":
-                self.constructTempSchedule(chBldgUZ, "Cooling", ifcBuilding)
+                EADEConverter.constructTempSchedule(ifc, chBldgUZ, "Cooling", ifcBuilding)
         for child in chBldgTZ:
             if "isHeated" in child.tag and child.text == "true":
-                self.constructTempSchedule(chBldgUZ, "Heating", ifcBuilding)
+                EADEConverter.constructTempSchedule(ifc, chBldgUZ, "Heating", ifcBuilding)
 
         # usageZoneType
         classType = None
@@ -376,7 +365,7 @@ class EADEConverter(QgsTask):
             ventRate = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["MechanicalVentilationRate"]
         if ventRate is None:
             ventRateAll, count = 0, 0
-            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            ifcSpaces = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSpace", result=[])
             for ifcSpace in ifcSpaces:
                 if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "MechanicalVentilation") is not None and \
                         element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["MechanicalVentilation"] and \
@@ -398,7 +387,7 @@ class EADEConverter(QgsTask):
             occCount = element.get_psets(ifcBuilding)["Pset_SpaceOccupancyRequirements"]["OccupancyNumber"]
         if occCount is None:
             OccCountAll, count = 0, 0
-            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            ifcSpaces = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSpace", result=[])
             for ifcSpace in ifcSpaces:
                 if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceOccupancyRequirements", "OccupancyNumber") is not None:
                     OccCountAll += element.get_psets(ifcSpace)["Pset_SpaceOccupancyRequirements"]["OccupancyNumber"]
@@ -416,7 +405,7 @@ class EADEConverter(QgsTask):
                 occRate = element.get_psets(ifcBuilding)["Pset_SpaceOccupancyRequirements"]["OccupancyTimePerDay"]
             if occRate is None:
                 occRateAll, count = 0, 0
-                ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+                ifcSpaces = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSpace", result=[])
                 for ifcSpace in ifcSpaces:
                     if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceOccupancyRequirements",
                                              "OccupancyTimePerDay") is not None:
@@ -456,24 +445,24 @@ class EADEConverter(QgsTask):
             if "occupiedBy" in child.tag:
                 hasOccSchedule = True
         if hasOccSchedule:
-            ifcElectricalAppl = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcAudioVisualAppliance", result=[])
-            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCommunicationAppliance", result=[])
-            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcElectricAppliance", result=[])
-            ifcElectricalAppl += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcMobileTelecommunicationsAppliance",
+            ifcElectricalAppl = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcAudioVisualAppliance", result=[])
+            ifcElectricalAppl += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcCommunicationAppliance", result=[])
+            ifcElectricalAppl += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcElectricAppliance", result=[])
+            ifcElectricalAppl += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcMobileTelecommunicationsAppliance",
                                                           result=[])
             if len(ifcElectricalAppl) != 0:
-                self.constructEquipSchedule(chBldgUZ, "ElectricalAppliances", ifcBuilding)
-            ifcLightingFac = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcLamp", result=[])
-            ifcLightingFac += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcLightFixture", result=[])
+                EADEConverter.constructEquipSchedule(chBldgUZ, "ElectricalAppliances")
+            ifcLightingFac = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcLamp", result=[])
+            ifcLightingFac += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcLightFixture", result=[])
             if len(ifcLightingFac) != 0:
-                self.constructEquipSchedule(chBldgUZ, "LightingFacilities", ifcBuilding)
-            ifcDhwFac = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpaceHeater", result=[])
-            ifcDhwFac += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSanitaryTerminal", result=[])
+                EADEConverter.constructEquipSchedule(chBldgUZ, "LightingFacilities")
+            ifcDhwFac = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSpaceHeater", result=[])
+            ifcDhwFac += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSanitaryTerminal", result=[])
             if len(ifcDhwFac) != 0:
-                self.constructEquipSchedule(chBldgUZ, "DHWFacilities", ifcBuilding)
+                EADEConverter.constructEquipSchedule(chBldgUZ, "DHWFacilities")
 
-    # noinspection PyMethodMayBeStatic
-    def constructTempSchedule(self, ch, mode, ifcBuilding):
+    @staticmethod
+    def constructTempSchedule(ifc, ch, mode, ifcBuilding):
         """ Erstellung des Zeitplanes der Temperaturen für die Energy ADE in LoD1
 
         Args:
@@ -490,7 +479,7 @@ class EADEConverter(QgsTask):
             tempMin = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["TemperatureMin"]
         if tempMax is None or tempMin is None:
             tempMaxAll, tempMinAll, count = 0, 0, 0
-            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            ifcSpaces = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSpace", result=[])
             for ifcSpace in ifcSpaces:
                 if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "TemperatureMax") is not None and \
                         UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "TemperatureMin") is not None:
@@ -517,35 +506,35 @@ class EADEConverter(QgsTask):
             chBldgUzHsIVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "idleValue"))
             chBldgUzHsIVal.text = str(tempMin) if mode == "Heating" else str(tempMax)
 
-            # noinspection PyMethodMayBeStatic
-            def constructEquipSchedule(self, ch, mode):
-                """ Erstellung des Zeitplanes der Nutzung für die Energy ADE in LoD1
+    @staticmethod
+    def constructEquipSchedule(ch, mode):
+        """ Erstellung des Zeitplanes der Nutzung für die Energy ADE in LoD1
 
-                Args:
-                    ch: XML-Objekt, an das der Zeitplan angehängt werden soll
-                    mode: Modus (ElectricalAppliances, LightingFacilities oder DHWFacilities)
-                """
+        Args:
+            ch: XML-Objekt, an das der Zeitplan angehängt werden soll
+            mode: Modus (ElectricalAppliances, LightingFacilities oder DHWFacilities)
+        """
 
-                # XML-Struktur
-                chBldgUzEqW = etree.SubElement(ch, QName(XmlNs.energy, "equippedWith"))
-                chBldgUzEq = etree.SubElement(chBldgUzEqW, QName(XmlNs.energy, mode))
-                scheduleName = mode + "Schedule"
-                chBldgUzHeatSch = etree.SubElement(chBldgUzEq, QName(XmlNs.energy, scheduleName))
-                chBldgUzHsDVS = etree.SubElement(chBldgUzHeatSch, QName(XmlNs.energy, "DualValueSchedule"))
-                chBldgUzHsDVS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
-                chBldgUzHsName = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.gml, "name"))
-                chBldgUzHsName.text = mode
-                chBldgUzHsUH = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageHoursPerDay"))
-                chBldgUzHsUH.text = "3" if mode == "LightingFacilities" else "8"
-                chBldgUzHsUD = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageDaysPerYear"))
-                chBldgUzHsUD.text = "365"
-                chBldgUzHsUVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageValue"))
-                chBldgUzHsUVal.text = "1"
-                chBldgUzHsIVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "idleValue"))
-                chBldgUzHsIVal.text = "0"
+        # XML-Struktur
+        chBldgUzEqW = etree.SubElement(ch, QName(XmlNs.energy, "equippedWith"))
+        chBldgUzEq = etree.SubElement(chBldgUzEqW, QName(XmlNs.energy, mode))
+        scheduleName = mode + "Schedule"
+        chBldgUzHeatSch = etree.SubElement(chBldgUzEq, QName(XmlNs.energy, scheduleName))
+        chBldgUzHsDVS = etree.SubElement(chBldgUzHeatSch, QName(XmlNs.energy, "DualValueSchedule"))
+        chBldgUzHsDVS.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+        chBldgUzHsName = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.gml, "name"))
+        chBldgUzHsName.text = mode
+        chBldgUzHsUH = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageHoursPerDay"))
+        chBldgUzHsUH.text = "3" if mode == "LightingFacilities" else "8"
+        chBldgUzHsUD = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageDaysPerYear"))
+        chBldgUzHsUD.text = "365"
+        chBldgUzHsUVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "usageValue"))
+        chBldgUzHsUVal.text = "1"
+        chBldgUzHsIVal = etree.SubElement(chBldgUzHsDVS, QName(XmlNs.energy, "idleValue"))
+        chBldgUzHsIVal.text = "0"
 
-    # noinspection PyMethodMayBeStatic
-    def calcLoDThermalZone(self, ifcBuilding, chBldg, surfaces, lod):
+    @staticmethod
+    def calcLoDThermalZone(ifc, ifcBuilding, chBldg, root, surfaces, lod):
         """ Berechnung der thermischen Zone für die Energy ADE in LoD2
 
         Args:
@@ -606,33 +595,35 @@ class EADEConverter(QgsTask):
         if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "AirConditioning") is not None:
             isCooled = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["AirConditioning"]
         if isCooled is None:
-            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
+            ifcSpaces = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSpace", result=[])
             for ifcSpace in ifcSpaces:
                 if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "AirConditioning") is not None and \
                         element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["AirConditioning"]:
                     isCooled = True
         if isCooled is None:
-            ifcCooler = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcChiller", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCoolingTower", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCooledBeam", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
+            ifcCooler = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcChiller", result=[])
+            ifcCooler += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcCoolingTower", result=[])
+            ifcCooler += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcCooledBeam", result=[])
+            ifcCooler += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
             isCooled = True if len(ifcCooler) > 0 else False
         chBldgTzIsCooled = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isCooled"))
         chBldgTzIsCooled.text = str(isCooled).lower()
 
         # isHeated
-        if len(UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDistributionElement", result=[])) == 0:
+        if len(UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcDistributionElement", result=[])) == 0:
             isHeated = True
         else:
-            ifcHeater = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpaceHeater", result=[])
-            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcBurner", result=[])
-            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcHeatExchanger", result=[])
+            ifcHeater = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSpaceHeater", result=[])
+            ifcHeater += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcBurner", result=[])
+            ifcHeater += UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcHeatExchanger", result=[])
             isHeated = True if len(ifcHeater) > 0 else False
         chBldgTzIsHeated = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isHeated"))
         chBldgTzIsHeated.text = str(isHeated).lower()
 
         # boundedBy: Envelope
-        self.convertBound(self.bldgGeom, chBldgTzBound)
+        for child in root:
+            if "boundedBy" in child.tag:
+                chBldgTZ.append(deepcopy(child))
 
         # boundedBy: ThermalBoundary
         constructions = []
@@ -645,6 +636,7 @@ class EADEConverter(QgsTask):
                     chBldgTb.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
 
                     # thermalBoundaryType
+                    type = None
                     if "GroundSurface" in child[0].tag:
                         type = "groundSlab"
                     elif "RoofSurface" in child[0].tag:
@@ -654,12 +646,12 @@ class EADEConverter(QgsTask):
                     chBldgTbType = etree.SubElement(chBldgTb, QName(XmlNs.energy, "thermalBoundaryType"))
                     chBldgTbType.text = type
 
+                    geomR, geomAll = None, []
                     for childGeom in child[0]:
                         tag = "lod" + str(lod) + "MultiSurface"
                         if tag in childGeom.tag:
                             geomGML = etree.tostring(childGeom[0][0][0]).decode('utf-8')
                             geom = ogr.CreateGeometryFromGML(geomGML)
-                            geomAll = []
                             if geom.GetGeometryName() == "MULTIPOLYGON":
                                 geomR = geom.GetGeometryRef(0)
                                 for i in range(0, geom.GetGeometryCount()):
@@ -684,6 +676,7 @@ class EADEConverter(QgsTask):
                     chBldgTbArea.text = str(round(UtilitiesGeom.calcArea3D(geomAll), 5))
 
                     # surfaceGeometry
+                    chGeom = None
                     for childGeom in child[0]:
                         tag = "lod" + str(lod) + "MultiSurface"
                         if tag in childGeom.tag:
@@ -699,7 +692,7 @@ class EADEConverter(QgsTask):
                             break
 
                     ifcMLS = None
-                    rels = self.ifc.get_inverse(ifcElem)
+                    rels = ifc.get_inverse(ifcElem)
                     for rel in rels:
                         if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
                             if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a(
@@ -709,7 +702,7 @@ class EADEConverter(QgsTask):
                                     ifcMLS = ifcMLSU.ForLayerSet
 
                     if ifcMLS is not None:
-                        sameMLS = False
+                        sameMLS, constr = False, None
                         for constr in constructions:
                             if constr[1] == ifcMLS:
                                 sameMLS = True
@@ -737,6 +730,7 @@ class EADEConverter(QgsTask):
                                 chBldgTo.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
 
                                 # area
+                                geom = None
                                 for chGeom in chOpen:
                                     if "lod3MultiSurface" in chGeom.tag:
                                         geomGML = etree.tostring(chGeom[0][0][0]).decode('utf-8')
@@ -754,7 +748,7 @@ class EADEConverter(QgsTask):
 
                                 # Material, falls vorhanden
                                 ifcMLS = None
-                                rels = self.ifc.get_inverse(ifcElem)
+                                rels = ifc.get_inverse(ifcElem)
                                 for rel in rels:
                                     if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
                                         if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a(
@@ -764,7 +758,7 @@ class EADEConverter(QgsTask):
                                                 ifcMLS = ifcMLSU.ForLayerSet
 
                                 if ifcMLS is not None:
-                                    sameMLS = False
+                                    sameMLS, constr = False, None
                                     for constr in constructions:
                                         if constr[1] == ifcMLS:
                                             sameMLS = True
@@ -829,7 +823,7 @@ class EADEConverter(QgsTask):
                                     if not (
                                             thTransm is None and solRefl is None and visRefl is None and solTransm
                                             is None and visTransm is None and glazing is None):
-                                        sameOptProp = False
+                                        sameOptProp, constr = False, None
                                         for constr in constructions:
                                             if constr[3] == "optical" and constr[1][0] == thTransm and \
                                                     constr[1][

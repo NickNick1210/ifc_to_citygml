@@ -43,6 +43,11 @@ from .mapper import Mapper
 from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+from .converter_lod0 import LoD0Converter
+from .converter_lod1 import LoD1Converter
+from .converter_lod2 import LoD2Converter
+from .converter_lod3 import LoD3Converter
+from .converter_lod4 import LoD4Converter
 
 
 #####
@@ -69,10 +74,7 @@ class Converter(QgsTask):
         self.parent = parent
         self.inPath, self.outPath = inPath, outPath
         self.lod, self.eade, self.integr = lod, eade, integr
-        self.ifc = None
-        self.trans = None
-        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
-        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.dedConv = None
 
     @staticmethod
     def tr(msg):
@@ -89,15 +91,19 @@ class Converter(QgsTask):
     def run(self):
         """ Ausführen der Konvertierung """
         # Initialisieren von IFC und CityGML
-        self.ifc = self.readIfc(self.inPath)
+        ifc = self.readIfc(self.inPath)
         root = self.createSchema()
 
         # Initialisieren vom Transformer
-        self.trans = Transformer(self.ifc)
+        trans = Transformer(ifc)
+
+        # Name des Modells
+        name = self.outPath[self.outPath.rindex("\\") + 1:-4]
 
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
         if self.lod == 0:
-            root = self.convertLoD0(root, self.eade)
+            dedConv = LoD0Converter(self.parent, ifc, name, trans, self.eade)
+            root = dedConv.convert(root)
         elif self.lod == 1:
             root = self.convertLoD1(root, self.eade)
         elif self.lod == 2:
@@ -106,7 +112,6 @@ class Converter(QgsTask):
             root = self.convertLoD3(root, self.eade)
         elif self.lod == 4:
             root = self.convertLoD4(root, self.eade)
-            pass
 
         # Schreiben der CityGML in eine Datei
         self.parent.dlg.log(self.tr(u'CityGML file is generated'))

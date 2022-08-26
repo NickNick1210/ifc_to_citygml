@@ -48,10 +48,11 @@ from .utilitiesIfc import UtilitiesIfc
 #####
 
 
-class GeneralConverter(QgsTask):
+class GenConverter(QgsTask):
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
 
-    def convertBound(self, geometry, chBound):
+    @staticmethod
+    def convertBound(geometry, chBound, trans):
         """ Konvertierung der Bounding Box
 
         Args:
@@ -63,13 +64,12 @@ class GeneralConverter(QgsTask):
         """
         # Prüfung, ob Geometrien vorhanden
         if geometry.GetGeometryCount() == 0:
-            self.parent.dlg.log(self.tr(u'Due to the missing geometries, no bounding box can be calculated'))
             return
 
         # XML-Struktur
         chBoundEnv = etree.SubElement(chBound, QName(XmlNs.gml, "Envelope"))
         chBoundEnv.set("srsDimension", "3")
-        chBoundEnv.set("srsName", "EPSG:" + str(self.trans.epsg))
+        chBoundEnv.set("srsName", "EPSG:" + str(trans.epsg))
         chBoundEnvLC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "lowerCorner"))
         chBoundEnvLC.set("srsDimension", "3")
         chBoundEnvUC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "upperCorner"))
@@ -82,7 +82,8 @@ class GeneralConverter(QgsTask):
 
         return env
 
-    def convertBldgAttr(self, ifcBuilding, chBldg):
+    @staticmethod
+    def convertBldgAttr(ifc, ifcBuilding, chBldg):
         """ Konvertierung der Gebäudeattribute
 
         Args:
@@ -110,22 +111,22 @@ class GeneralConverter(QgsTask):
         type = None
         if UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingCommon", "OccupancyType") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["OccupancyType"]
-            type = self.convertFunctionUsage(occType)
+            type = GenConverter.convertFunctionUsage(occType)
         if type is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_BuildingUse", "MarketCategory") is not None:
             occType = element.get_psets(ifcBuilding)["Pset_BuildingUse"]["MarketCategory"]
-            type = self.convertFunctionUsage(occType)
+            type = GenConverter.convertFunctionUsage(occType)
         if type is None and ifcBuilding.ObjectType is not None:
             occType = ifcBuilding.ObjectType
-            type = self.convertFunctionUsage(occType)
+            type = GenConverter.convertFunctionUsage(occType)
         if type is None and ifcBuilding.Description is not None:
             occType = ifcBuilding.Description
-            type = self.convertFunctionUsage(occType)
+            type = GenConverter.convertFunctionUsage(occType)
         if type is None and ifcBuilding.LongName is not None:
             occType = ifcBuilding.LongName
-            type = self.convertFunctionUsage(occType)
+            type = GenConverter.convertFunctionUsage(occType)
         if type is None and ifcBuilding.Name is not None:
             occType = ifcBuilding.Name
-            type = self.convertFunctionUsage(occType)
+            type = GenConverter.convertFunctionUsage(occType)
         if type is not None:
             # XML-Struktur + Eintragen
             chBldgClass = etree.SubElement(chBldg, QName(XmlNs.bldg, "class"))
@@ -147,7 +148,7 @@ class GeneralConverter(QgsTask):
             chBldgYearConstr.text = element.get_psets(ifcBuilding)["Pset_BuildingCommon"]["YearOfConstruction"]
 
         # Dachtyp
-        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+        ifcRoofs = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcRoof", result=[])
         if ifcRoofs is not None:
             roofTypes = []
             for ifcRoof in ifcRoofs:
@@ -164,7 +165,7 @@ class GeneralConverter(QgsTask):
                 chBldgRoofType.text = str(roofCode)
 
         # Höhen und Geschosse
-        ifcBldgStoreys = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcBuildingStorey", result=[])
+        ifcBldgStoreys = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcBuildingStorey", result=[])
         storeysAG, storeysBG = 0, 0
         storeysHeightsAG, storeysHeightsBG = 0, 0
         missingAG, missingBG = 0, 0
@@ -223,7 +224,7 @@ class GeneralConverter(QgsTask):
             chBldgRelTerr.text = "substaintiallyBelowTerrain"
 
         # Gebäudehöhe
-        height = self.calcHeight(ifcBuilding)
+        height = GenConverter.calcHeight(ifc, ifcBuilding)
         if height is not None:
             pass
         elif UtilitiesIfc.findPset(ifcBuilding, "BaseQuantities", "GrossHeight") is not None:
@@ -307,7 +308,8 @@ class GeneralConverter(QgsTask):
                         type = Mapper.functionUsageDict[occTypeSub]
         return type
 
-    def calcHeight(self, ifcBuilding):
+    @staticmethod
+    def calcHeight(ifc, ifcBuilding):
         """ Berechnung der Gebäudehöhe als Differenz zwischen tiefstem und höchstem Punkt
 
         Args:
@@ -317,23 +319,19 @@ class GeneralConverter(QgsTask):
             Die Gebäudehöhe bzw. None, wenn sie nicht berechnet werden kann
         """
         # Grundfläche
-        ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
+        ifcSlabs = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
         if len(ifcSlabs) == 0:
-            ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
+            ifcSlabs = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             # Wenn Grundfläche nicht vorhanden
             if len(ifcSlabs) == 0:
-                self.parent.dlg.log(self.tr(
-                    u"Due to the missing baseslab and building/storeys attributes, no building height can be calculated"))
                 return None
 
         # Dächer
-        ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
+        ifcRoofs = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
         if len(ifcRoofs) == 0:
-            ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
+            ifcRoofs = UtilitiesIfc.findElement(ifc, ifcBuilding, "IfcRoof", result=[])
             # Wenn Dach nicht vorhanden
             if len(ifcRoofs) == 0:
-                self.parent.dlg.log(self.tr(
-                    u"Due to the missing roof and building/storeys attributes, no building height can be calculated"))
                 return None
 
         # Berechnung der Minimalhöhe
@@ -359,7 +357,8 @@ class GeneralConverter(QgsTask):
         height = maxHeight - minHeight
         return height
 
-    def convertAddress(self, ifcBuilding, ifcSite, chBldg):
+    @staticmethod
+    def convertAddress(ifcBuilding, ifcSite, chBldg):
         """ Konvertieren der Adresse von IFC zu CityGML
 
         Args:
@@ -377,8 +376,7 @@ class GeneralConverter(QgsTask):
         elif UtilitiesIfc.findPset(ifcSite, "Pset_Address") is not None:
             ifcAddress = UtilitiesIfc.findPset(ifcSite, "Pset_Address")
         else:
-            self.parent.dlg.log(self.tr(u'No address details existing'))
-            return
+            return False
 
         # XML-Struktur
         chBldgAdr = etree.SubElement(chBldg, QName(XmlNs.bldg, "address"))
@@ -422,8 +420,10 @@ class GeneralConverter(QgsTask):
             chBldgAdrLocPCNr = etree.SubElement(chBldgAdrLocPC, QName(XmlNs.xAL, "PostalCodeNumber"))
             chBldgAdrLocPCNr.text = ifcAddress.PostalCode
 
-    # noinspection PyMethodMayBeStatic
-    def convertLoDSolid(self, chBldg, links, lod):
+        return True
+
+    @staticmethod
+    def convertLoDSolid(chBldg, links, lod):
         """ Angabe der Gebäudegeometrie als XLinks zu den Bounds
 
         Args:
@@ -441,7 +441,8 @@ class GeneralConverter(QgsTask):
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
                 chBldgSolidSM.set(QName(XmlNs.xlink, "href"), "#" + link)
 
-    def calcPlane(self, ifcElements):
+    @staticmethod
+    def calcPlane(ifcElements, trans):
         """ Berechnung einer planen Flächengeometrie
 
         Args:
@@ -470,7 +471,7 @@ class GeneralConverter(QgsTask):
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
                 points = []
                 for facePoint in facePoints:
-                    point = self.trans.georeferencePoint(facePoint)
+                    point = trans.georeferencePoint(facePoint)
                     points.append(point)
                     if point[2] < height:
                         height = point[2]
@@ -520,8 +521,6 @@ class GeneralConverter(QgsTask):
 
                 # Wenn weiterhin mehr als eine Geometrie: Fehlermeldung und Abbruch
                 if geometry.GetGeometryCount() > 1 or geometry.GetGeometryName() != "POLYGON":
-                    self.parent.dlg.log(self.tr(
-                        u'Due to non-meter-metrics or the lack of topology, no lod0 geometry can be calculated'))
                     return None
 
                 # Wenn nur noch eine Geometrie: Höhe wieder hinzufügen

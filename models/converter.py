@@ -110,7 +110,7 @@ class Converter(QgsTask):
         elif self.lod == 3:
             dedConv = LoD3Converter(self.parent, ifc, name, trans, self.eade)
         elif self.lod == 4:
-            root = self.convertLoD4(root, self.eade)
+            dedConv = LoD4Converter(self.parent, ifc, name, trans, self.eade)
         root = dedConv.convert(root)
 
         # Schreiben der CityGML in eine Datei

@@ -162,20 +162,17 @@ class LoD3Converter:
         # Geometrie
         links, surfaces = [], []
         for base in bases:
-            linksBase, gmlId, openSurf = self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1],
-                                                              openings=base[2])
+            linksBase, gmlId, openSurf = self.setElementGroup(chBldg, base[0], "GroundSurface", 3, base[1], base[2])
             links += linksBase
             surfaces.append([gmlId, base[3]])
             surfaces += openSurf
         for roof in roofs:
-            linksRoof, gmlId, openSurf = self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1],
-                                                              openings=roof[2])
+            linksRoof, gmlId, openSurf = self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, roof[1], roof[2])
             links += linksRoof
             surfaces.append([gmlId, roof[3]])
             surfaces += openSurf
         for wall in walls:
-            linksWall, gmlId, openSurf = self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1],
-                                                              openings=wall[2])
+            linksWall, gmlId, openSurf = self.setElementGroup(chBldg, wall[0], "WallSurface", 3, wall[1], wall[2])
             links += linksWall
             surfaces.append([gmlId, wall[3]])
             surfaces += openSurf

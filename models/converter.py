@@ -243,7 +243,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ = self.calcLoD1ThermalZone(ifcBuilding, chBldg)
+                linkUZ, chBldgTZ, constructions = self.calcLoDThermalZone(ifcBuilding, chBldg, [], 1)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
 
@@ -289,7 +289,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ, constructions = self.calcLoD2ThermalZone(ifcBuilding, chBldg, surfaces)
+                linkUZ, chBldgTZ, constructions = self.calcLoDThermalZone(ifcBuilding, chBldg, surfaces, 2)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
@@ -339,7 +339,7 @@ class Converter(QgsTask):
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ, constructions = self.calcLoD3ThermalZone(ifcBuilding, chBldg, surfaces)
+                linkUZ, chBldgTZ, constructions = self.calcLoDThermalZone(ifcBuilding, chBldg, surfaces, 3)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
@@ -375,27 +375,30 @@ class Converter(QgsTask):
             # Konvertierung
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             self.convertBldgAttr(ifcBuilding, chBldg)
-            links = self.convertLoD4BldgBound(ifcBuilding, chBldg)
+            links, footPrint, surfaces = self.convertLoD4BldgBound(ifcBuilding, chBldg)
             self.convertLoDSolid(chBldg, links, 4)
             self.parent.dlg.log(self.tr(u'Rooms are calculated'))
             self.convertLoD4Interior(ifcBuilding, chBldg)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             self.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
-            self.convertBound(self.geom, chBound)
+            bbox = self.convertBound(self.geom, chBound)
 
             # EnergyADE
             if eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
-                # TODO: EnergyADE LoD4
-                # weatherData
-                # Gebäudeattribute
-                # thermalZone (Attribute, contains, floorArea, volume, volumeGeometry)
-                # thermalBoundary (Attribute, surfaceGeometry, construction, delimits)
-                # thermalOpening (Attribute, surfaceGeometry, construction)
-                # usageZone (Attribute, Occupants, Facilities, heatingSchedule, ventilationSchedule
-                # Construction (Attribute, Layer, OpticalProperties)
-                # AbstractMaterial: SolidMaterial/Gas (Attribute)
+                self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
+                self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
+                self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
+                self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
+                linkUZ, chBldgTZ, constructions = self.calcLoD3ThermalZone(ifcBuilding, chBldg, surfaces)
+                self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
+                self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
+                materials = self.convertConstructions(root, constructions)
+                self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
+                self.convertMaterials(root, materials)
 
         return root
 
@@ -787,7 +790,7 @@ class Converter(QgsTask):
                 return
 
         # Geometrie
-        geometry = self.calcPlane(ifcSlabs)
+        geometry = self.calcPlane(ifcSlabs)[1]
         if geometry is not None:
             self.geom.AddGeometry(geometry)
             self.bldgGeom.AddGeometry(geometry)
@@ -818,7 +821,7 @@ class Converter(QgsTask):
                 return
 
         # Geometrie
-        geometry = self.calcPlane(ifcRoofs)
+        geometry = self.calcPlane(ifcRoofs)[1]
         self.geom.AddGeometry(geometry)
         self.bldgGeom.AddGeometry(geometry)
         geomXML = UtilitiesGeom.geomToGml(geometry)
@@ -946,10 +949,11 @@ class Converter(QgsTask):
                 return
 
         # Berechnung der Geometrien
+        geometries = []
         self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
-        geometries = [self.calcPlane(ifcSlabs)]
+        geometries.append(self.calcPlane(ifcSlabs)[1])
         self.parent.dlg.log(self.tr(u'Building geometry: roof surface is calculated'))
-        geometries += [self.calcLoD1Roof(geometries[0], height)]
+        geometries.append(self.calcLoD1Roof(geometries[0], height))
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         geometries += self.calcLoD1Walls(geometries[0], height)
 
@@ -973,7 +977,7 @@ class Converter(QgsTask):
         """ Berechnung des Daches als Anhebung der Grundfläche
 
         Args:
-            geomBase: Grundfläche des Körpers als Polygon
+            geomBase: Grundfläche des Gebäudes als Polygon-Geometrie
             height: Höhe der Anhebung als float
 
         Returns:
@@ -3034,7 +3038,9 @@ class Converter(QgsTask):
             chBldg: XML-Element an dem der Gebäudeumriss angefügt werden soll
 
         Returns:
-            Die GUIDs der Geometrien
+            GML-IDs der Bestandteile des erweiterten Gebäudeumrisses als Liste
+            Die Grundflächengeometrie
+            Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen als Liste
         """
         # Berechnung
         self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
@@ -3055,14 +3061,26 @@ class Converter(QgsTask):
         walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig, wallMainCounts)
 
         # Geometrie
-        links = []
+        links, surfaces = [], []
         for base in bases:
-            links += self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1], openings=base[2])
+            linksBase, gmlId, openSurf = self.setElementGroup(chBldg, base[0], "GroundSurface", 3, name=base[1],
+                                                              openings=base[2])
+            links += linksBase
+            surfaces.append([gmlId, base[3]])
+            surfaces += openSurf
         for roof in roofs:
-            links += self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1], openings=roof[2])
+            linksRoof, gmlId, openSurf = self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, name=roof[1],
+                                                              openings=roof[2])
+            links += linksRoof
+            surfaces.append([gmlId, roof[3]])
+            surfaces += openSurf
         for wall in walls:
-            links += self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1], openings=wall[2])
-        return links
+            linksWall, gmlId, openSurf = self.setElementGroup(chBldg, wall[0], "WallSurface", 3, name=wall[1],
+                                                              openings=wall[2])
+            links += linksWall
+            surfaces.append([gmlId, wall[3]])
+            surfaces += openSurf
+        return links, bases[0][0][0], surfaces
 
     def convertLoD4Interior(self, ifcBuilding, chBldg):
         """ Konvertieren des Gebäudeinneren von IFC zu CityGML in Level of Detail (LoD) 4
@@ -3630,103 +3648,14 @@ class Converter(QgsTask):
         chBldgUzHsIVal.text = "0"
 
     # noinspection PyMethodMayBeStatic
-    def calcLoD1ThermalZone(self, ifcBuilding, chBldg):
-        """ Berechnung der thermischen Zone für die Energy ADE in LoD1
-
-        Args:
-            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
-            chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
-
-        Returns
-            linkUZ: GML-ID der anzufügenden Nutzungszone
-            chBldgTZ: XML-Objekt der Thermal Zone
-        """
-        # XML-Struktur
-        chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
-        chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
-        chBldgTzBound = etree.SubElement(chBldgTZ, QName(XmlNs.gml, "boundedBy"))
-
-        # contains: UsageZone
-        chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
-        linkUZ = "GML_" + str(uuid.uuid4())
-        chBldgTzContains.set(QName(XmlNs.xlink, "href"), "#" + linkUZ)
-
-        # floorArea & volume
-        for child in chBldg:
-            if "floorArea" in child.tag:
-                chBldgTZ.append(deepcopy(child))
-            if "volume" in child.tag:
-                chBldgTZ.append(deepcopy(child))
-
-        # infiltrationRate
-        infRateS, infRateW = None, None
-        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversitySummer") is not None:
-            infRateS = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversitySummer"]
-        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversityWinter") is not None:
-            infRateW = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversityWinter"]
-        if infRateS is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
-                                                      "InfiltrationDiversitySummer") is not None:
-            infRateS = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversitySummer"]
-        if infRateW is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
-                                                      "InfiltrationDiversityWinter") is not None:
-            infRateW = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversityWinter"]
-        if infRateS is not None or infRateW is not None:
-            chBldgTzInfRate = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "infiltrationRate"))
-            if infRateS is not None and infRateW is not None:
-                infRate = (infRateS + infRateW) / 2
-            else:
-                infRate = infRateS if infRateS is not None else infRateW
-            chBldgTzInfRate.text = infRate
-
-        # isCooled
-        isCooled = None
-        if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "AirConditioning") is not None:
-            isCooled = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["AirConditioning"]
-        if isCooled is None:
-            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
-            for ifcSpace in ifcSpaces:
-                if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "AirConditioning") is not None and \
-                        element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["AirConditioning"]:
-                    isCooled = True
-        if isCooled is None:
-            ifcCooler = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcChiller", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCoolingTower", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCooledBeam", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
-            isCooled = True if len(ifcCooler) > 0 else False
-        chBldgTzIsCooled = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isCooled"))
-        chBldgTzIsCooled.text = str(isCooled).lower()
-
-        # isHeated
-        if len(UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDistributionElement", result=[])) == 0:
-            isHeated = True
-        else:
-            ifcHeater = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpaceHeater", result=[])
-            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcBurner", result=[])
-            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcHeatExchanger", result=[])
-            isHeated = True if len(ifcHeater) > 0 else False
-        chBldgTzIsHeated = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isHeated"))
-        chBldgTzIsHeated.text = str(isHeated).lower()
-
-        # volumeGeometry
-        chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
-        for child in chBldg:
-            if "lod1Solid" in child.tag:
-                chBldgTzVolGeom.append(deepcopy(child[0]))
-
-        # boundedBy: Envelope
-        self.convertBound(self.bldgGeom, chBldgTzBound)
-
-        return linkUZ, chBldgTZ
-
-    # noinspection PyMethodMayBeStatic
-    def calcLoD2ThermalZone(self, ifcBuilding, chBldg, surfaces):
+    def calcLoDThermalZone(self, ifcBuilding, chBldg, surfaces, lod):
         """ Berechnung der thermischen Zone für die Energy ADE in LoD2
 
         Args:
             ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
             chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
             surfaces: Die GML-IDs und zugehörigen GML-IDs der Oberflächen
+            lod: Level of Detail als Zahl
 
         Returns
             linkUZ: GML-ID der anzufügenden Nutzungszone
@@ -3808,91 +3737,229 @@ class Converter(QgsTask):
 
         # boundedBy: ThermalBoundary
         constructions = []
-        for child in chBldg:
-            if "boundedBy" in child.tag:
-                # XML-Struktur
-                chBldgTzBby = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "boundedBy"))
-                chBldgTb = etree.SubElement(chBldgTzBby, QName(XmlNs.energy, "ThermalBoundary"))
-                chBldgTb.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+        if lod >= 2:
+            for child in chBldg:
+                if "boundedBy" in child.tag:
+                    # XML-Struktur
+                    chBldgTzBby = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "boundedBy"))
+                    chBldgTb = etree.SubElement(chBldgTzBby, QName(XmlNs.energy, "ThermalBoundary"))
+                    chBldgTb.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
 
-                # thermalBoundaryType
-                if "GroundSurface" in child[0].tag:
-                    type = "groundSlab"
-                elif "RoofSurface" in child[0].tag:
-                    type = "roof"
-                elif "WallSurface" in child[0].tag:
-                    type = "outerWall"
-                chBldgTbType = etree.SubElement(chBldgTb, QName(XmlNs.energy, "thermalBoundaryType"))
-                chBldgTbType.text = type
+                    # thermalBoundaryType
+                    if "GroundSurface" in child[0].tag:
+                        type = "groundSlab"
+                    elif "RoofSurface" in child[0].tag:
+                        type = "roof"
+                    elif "WallSurface" in child[0].tag:
+                        type = "outerWall"
+                    chBldgTbType = etree.SubElement(chBldgTb, QName(XmlNs.energy, "thermalBoundaryType"))
+                    chBldgTbType.text = type
 
-                for childGeom in child[0]:
-                    if "lod2MultiSurface" in childGeom.tag:
-                        geomGML = etree.tostring(childGeom[0][0][0]).decode('utf-8')
-                        geom = ogr.CreateGeometryFromGML(geomGML)
+                    for childGeom in child[0]:
+                        tag = "lod" + str(lod) + "MultiSurface"
+                        if tag in childGeom.tag:
+                            geomGML = etree.tostring(childGeom[0][0][0]).decode('utf-8')
+                            geom = ogr.CreateGeometryFromGML(geomGML)
+                            geomAll = []
+                            if geom.GetGeometryName() == "MULTIPOLYGON":
+                                geomR = geom.GetGeometryRef(0)
+                                for i in range(0, geom.GetGeometryCount()):
+                                    geomAll.append(geom.GetGeometryRef(i))
+                            else:
+                                geomR = geom
+                                geomAll = [geom]
 
-                # azimuth
-                chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
-                chBldgTbAz.set("uom", "deg")
-                chBldgTbAz.text = str(round(UtilitiesGeom.calcAzimuth(geom), 5))
+                    # azimuth
+                    chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
+                    chBldgTbAz.set("uom", "deg")
+                    chBldgTbAz.text = str(round(UtilitiesGeom.calcAzimuth(geomR), 5))
 
-                # inclination
-                chBldgTbIncl = etree.SubElement(chBldgTb, QName(XmlNs.energy, "inclination"))
-                chBldgTbIncl.set("uom", "deg")
-                chBldgTbIncl.text = str(round(UtilitiesGeom.calcInclination(geom) / math.pi * 180, 5))
+                    # inclination
+                    chBldgTbIncl = etree.SubElement(chBldgTb, QName(XmlNs.energy, "inclination"))
+                    chBldgTbIncl.set("uom", "deg")
+                    chBldgTbIncl.text = str(round(UtilitiesGeom.calcInclination(geomR) / math.pi * 180, 5))
 
-                # area
-                chBldgTbArea = etree.SubElement(chBldgTb, QName(XmlNs.energy, "area"))
-                chBldgTbArea.set("uom", "m2")
-                chBldgTbArea.text = str(round(UtilitiesGeom.calcArea3D([geom]), 5))
+                    # area
+                    chBldgTbArea = etree.SubElement(chBldgTb, QName(XmlNs.energy, "area"))
+                    chBldgTbArea.set("uom", "m2")
+                    chBldgTbArea.text = str(round(UtilitiesGeom.calcArea3D(geomAll), 5))
 
-                # surfaceGeometry
-                for childGeom in child[0]:
-                    if "lod2MultiSurface" in childGeom.tag:
-                        chGeom = childGeom
-                chBldgTbGeom = etree.SubElement(chBldgTb, QName(XmlNs.energy, "surfaceGeometry"))
-                chBldgTbGeom.append(deepcopy(chGeom[0]))
+                    # surfaceGeometry
+                    for childGeom in child[0]:
+                        tag = "lod" + str(lod) + "MultiSurface"
+                        if tag in childGeom.tag:
+                            chGeom = childGeom
+                    chBldgTbGeom = etree.SubElement(chBldgTb, QName(XmlNs.energy, "surfaceGeometry"))
+                    chBldgTbGeom.append(deepcopy(chGeom[0]))
 
-                # construction
-                ifcElem = None
-                for surface in surfaces:
-                    if child[0].attrib['{http://www.opengis.net/gml}id'] == surface[0]:
-                        ifcElem = surface[1]
-                        break
-
-                ifcMLS = None
-                rels = self.ifc.get_inverse(ifcElem)
-                for rel in rels:
-                    if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
-                        if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a("IfcMaterialLayerSetUsage"):
-                            ifcMLSU = rel.RelatingMaterial
-                            if ifcMLSU.ForLayerSet is not None:
-                                ifcMLS = ifcMLSU.ForLayerSet
-
-                if ifcMLS is not None:
-                    sameMLS = False
-                    for constr in constructions:
-                        if constr[1] == ifcMLS:
-                            sameMLS = True
+                    # construction
+                    ifcElem = None
+                    for surface in surfaces:
+                        if child[0].attrib['{http://www.opengis.net/gml}id'] == surface[0]:
+                            ifcElem = surface[1]
                             break
-                    if sameMLS:
-                        gmlIdConstr = constr[0]
-                        constr[2].append(ifcElem)
-                    else:
-                        gmlIdConstr = "GML_" + str(uuid.uuid4())
-                        constrNew = [gmlIdConstr, ifcMLS, [ifcElem]]
-                        constructions.append(constrNew)
 
-                    chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
-                    chBldgTbConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
+                    ifcMLS = None
+                    rels = self.ifc.get_inverse(ifcElem)
+                    for rel in rels:
+                        if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
+                            if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a("IfcMaterialLayerSetUsage"):
+                                ifcMLSU = rel.RelatingMaterial
+                                if ifcMLSU.ForLayerSet is not None:
+                                    ifcMLS = ifcMLSU.ForLayerSet
 
-                # delimits
-                chBldgTbDel = etree.SubElement(chBldgTb, QName(XmlNs.energy, "delimits"))
-                chBldgTbDel.set(QName(XmlNs.xlink, "href"), "#" + linkTZ)
+                    if ifcMLS is not None:
+                        sameMLS = False
+                        for constr in constructions:
+                            if constr[1] == ifcMLS:
+                                sameMLS = True
+                                break
+                        if sameMLS:
+                            gmlIdConstr = constr[0]
+                            constr[2].append(ifcElem)
+                        else:
+                            gmlIdConstr = "GML_" + str(uuid.uuid4())
+                            constrNew = [gmlIdConstr, ifcMLS, [ifcElem], "layer"]
+                            constructions.append(constrNew)
+
+                        chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
+                        chBldgTbConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
+
+                    # contains
+                    if lod >= 3:
+                        for childSurf in child[0]:
+                            if "opening" in childSurf.tag:
+                                chOpen = childSurf[0]
+
+                                # XML-Struktur
+                                chBldgTbCont = etree.SubElement(chBldgTb, QName(XmlNs.energy, "contains"))
+                                chBldgTo = etree.SubElement(chBldgTbCont, QName(XmlNs.energy, "ThermalOpening"))
+                                chBldgTo.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
+
+                                # area
+                                for chGeom in chOpen:
+                                    if "lod3MultiSurface" in chGeom.tag:
+                                        geomGML = etree.tostring(chGeom[0][0][0]).decode('utf-8')
+                                        geom = ogr.CreateGeometryFromGML(geomGML)
+                                chBldgToArea = etree.SubElement(chBldgTo, QName(XmlNs.energy, "area"))
+                                chBldgToArea.set("uom", "m2")
+                                chBldgToArea.text = str(round(UtilitiesGeom.calcArea3D(geom), 5))
+
+                                # construction
+                                ifcElem = None
+                                for surface in surfaces:
+                                    if chOpen.attrib['{http://www.opengis.net/gml}id'] == surface[0]:
+                                        ifcElem = surface[1]
+                                        break
+
+                                # Material, falls vorhanden
+                                ifcMLS = None
+                                rels = self.ifc.get_inverse(ifcElem)
+                                for rel in rels:
+                                    if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
+                                        if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a(
+                                                "IfcMaterialLayerSetUsage"):
+                                            ifcMLSU = rel.RelatingMaterial
+                                            if ifcMLSU.ForLayerSet is not None:
+                                                ifcMLS = ifcMLSU.ForLayerSet
+
+                                if ifcMLS is not None:
+                                    sameMLS = False
+                                    for constr in constructions:
+                                        if constr[1] == ifcMLS:
+                                            sameMLS = True
+                                            break
+                                    if sameMLS:
+                                        gmlIdConstr = constr[0]
+                                        constr[2].append(ifcElem)
+                                    else:
+                                        gmlIdConstr = "GML_" + str(uuid.uuid4())
+                                        constrNew = [gmlIdConstr, ifcMLS, [ifcElem], "layer"]
+                                        constructions.append(constrNew)
+
+                                    chBldgToConstr = etree.SubElement(chBldgTo, QName(XmlNs.energy, "construction"))
+                                    chBldgToConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
+
+                                # OpticalProperties, falls vorhanden
+                                else:
+                                    thTransm, glazing = None, None
+                                    solRefl, visRefl, solTransm, visTransm = None, None, None, None
+
+                                    # U-Wert
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_DoorCommon",
+                                                             "ThermalTransmittance") is not None:
+                                        thTransm = element.get_psets(ifcElem)["Pset_DoorCommon"]["ThermalTransmittance"]
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_WindowCommon",
+                                                             "ThermalTransmittance") is not None:
+                                        thTransm = element.get_psets(ifcElem)["Pset_WindowCommon"][
+                                            "ThermalTransmittance"]
+
+                                    # reflectance
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
+                                                             "SolarReflectance") is not None:
+                                        solRefl = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"][
+                                            "SolarReflectance"]
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
+                                                             "VisibleLightReflectance") is not None:
+                                        visRefl = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"][
+                                            "VisibleLightReflectance"]
+
+                                    # transmittance
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
+                                                             "SolarTransmittance") is not None:
+                                        solTransm = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"][
+                                            "SolarTransmittance"]
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
+                                                             "VisibleLightTransmittance") is not None:
+                                        visTransm = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"][
+                                            "VisibleLightTransmittance"]
+
+                                    # glazingRatio
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_DoorCommon",
+                                                             "GlazingAreaFraction") is not None:
+                                        glazing = element.get_psets(ifcElem)["Pset_DoorCommon"]["GlazingAreaFraction"]
+                                    if UtilitiesIfc.findPset(ifcElem, "Pset_WindowCommon",
+                                                             "GlazingAreaFraction") is not None:
+                                        glazing = element.get_psets(ifcElem)["Pset_WindowCommon"]["GlazingAreaFraction"]
+
+                                    if not (thTransm is None and solRefl is None and visRefl is None and solTransm
+                                            is None and visTransm is None and glazing is None):
+                                        sameOptProp = False
+                                        for constr in constructions:
+                                            if constr[3] == "optical" and constr[1][0] == thTransm and constr[1][
+                                                1] == solRefl \
+                                                    and constr[1][2] == visRefl and constr[1][3] == solTransm and \
+                                                    constr[1][4] == visTransm and constr[1][5] == glazing:
+                                                sameOptProp = True
+                                                break
+                                        if sameOptProp:
+                                            gmlIdConstr = constr[0]
+                                            constr[2].append(ifcElem)
+                                        else:
+                                            gmlIdConstr = "GML_" + str(uuid.uuid4())
+                                            optProp = [thTransm, solRefl, visRefl, solTransm, visTransm, glazing]
+                                            constrNew = [gmlIdConstr, optProp, [ifcElem], "optical"]
+                                            constructions.append(constrNew)
+
+                                        chBldgToConstr = etree.SubElement(chBldgTo, QName(XmlNs.energy, "construction"))
+                                        chBldgToConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
+
+                                # surfaceGeometry
+                                for chGeom in chOpen:
+                                    if "lod3MultiSurface" in chGeom.tag:
+                                        chBldgToGeom = etree.SubElement(chBldgTo,
+                                                                        QName(XmlNs.energy, "surfaceGeometry"))
+                                        chBldgToGeom.append(deepcopy(chGeom[0]))
+
+                    # delimits
+                    chBldgTbDel = etree.SubElement(chBldgTb, QName(XmlNs.energy, "delimits"))
+                    chBldgTbDel.set(QName(XmlNs.xlink, "href"), "#" + linkTZ)
 
         # volumeGeometry
         chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
         for child in chBldg:
-            if "lod2Solid" in child.tag:
+            tag = "lod" + str(lod) + "Solid"
+            if tag in child.tag:
                 chBldgTzVolGeom.append(deepcopy(child[0]))
 
         return linkUZ, chBldgTZ, constructions
@@ -4095,310 +4162,3 @@ class Converter(QgsTask):
                 chMatSpHeat = etree.SubElement(chMat, QName(XmlNs.energy, "specificHeat"))
                 chMatSpHeat.set("uom", "W/K*m")
                 chMatSpHeat.text = str(spHeat)
-
-    # noinspection PyMethodMayBeStatic
-    def calcLoD3ThermalZone(self, ifcBuilding, chBldg, surfaces):
-        """ Berechnung der thermischen Zone für die Energy ADE in LoD2
-
-        Args:
-            ifcBuilding: IFC-Gebäude, aus dem die Nutzungszone berechnezt werden soll
-            chBldg: XML-Objekt, an das die Nutzungszone angehängt werden soll
-            surfaces: Die GML-IDs und zugehörigen GML-IDs der Oberflächen
-
-        Returns
-            linkUZ: GML-ID der anzufügenden Nutzungszone
-            chBldgTZ: XML-Objekt der Thermal Zone
-            constructions: Die zu erstellenden Constructions der Boundary, mit GML-ID, IfcElement und Referenzen
-        """
-
-        # XML-Struktur
-        chBldgTz = etree.SubElement(chBldg, QName(XmlNs.energy, "thermalZone"))
-        chBldgTZ = etree.SubElement(chBldgTz, QName(XmlNs.energy, "ThermalZone"))
-        linkTZ = "GML_" + str(uuid.uuid4())
-        chBldgTZ.set(QName(XmlNs.gml, "id"), linkTZ)
-        chBldgTzBound = etree.SubElement(chBldgTZ, QName(XmlNs.gml, "boundedBy"))
-
-        # contains: UsageZone
-        chBldgTzContains = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "contains"))
-        linkUZ = "GML_" + str(uuid.uuid4())
-        chBldgTzContains.set(QName(XmlNs.xlink, "href"), "#" + linkUZ)
-
-        # floorArea & volume
-        for child in chBldg:
-            if "floorArea" in child.tag:
-                chBldgTZ.append(deepcopy(child))
-            if "volume" in child.tag:
-                chBldgTZ.append(deepcopy(child))
-
-        # infiltrationRate
-        infRateS, infRateW = None, None
-        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversitySummer") is not None:
-            infRateS = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversitySummer"]
-        if UtilitiesIfc.findPset(ifcBuilding, "Pset_ThermalLoad", "InfiltrationDiversityWinter") is not None:
-            infRateW = element.get_psets(ifcBuilding)["Pset_ThermalLoad"]["InfiltrationDiversityWinter"]
-        if infRateS is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
-                                                      "InfiltrationDiversitySummer") is not None:
-            infRateS = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversitySummer"]
-        if infRateW is None and UtilitiesIfc.findPset(ifcBuilding, "Pset_AirSideSystemInformation",
-                                                      "InfiltrationDiversityWinter") is not None:
-            infRateW = element.get_psets(ifcBuilding)["Pset_AirSideSystemInformation"]["InfiltrationDiversityWinter"]
-        if infRateS is not None or infRateW is not None:
-            chBldgTzInfRate = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "infiltrationRate"))
-            if infRateS is not None and infRateW is not None:
-                infRate = (infRateS + infRateW) / 2
-            else:
-                infRate = infRateS if infRateS is not None else infRateW
-            chBldgTzInfRate.text = infRate
-
-        # isCooled
-        isCooled = None
-        if UtilitiesIfc.findPset(ifcBuilding, "Pset_SpaceHVACDesign", "AirConditioning") is not None:
-            isCooled = element.get_psets(ifcBuilding)["Pset_SpaceHVACDesign"]["AirConditioning"]
-        if isCooled is None:
-            ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
-            for ifcSpace in ifcSpaces:
-                if UtilitiesIfc.findPset(ifcSpace, "Pset_SpaceHVACDesign", "AirConditioning") is not None and \
-                        element.get_psets(ifcSpace)["Pset_SpaceHVACDesign"]["AirConditioning"]:
-                    isCooled = True
-        if isCooled is None:
-            ifcCooler = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcChiller", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCoolingTower", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcCooledBeam", result=[])
-            ifcCooler += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcEvaproativeCooler", result=[])
-            isCooled = True if len(ifcCooler) > 0 else False
-        chBldgTzIsCooled = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isCooled"))
-        chBldgTzIsCooled.text = str(isCooled).lower()
-
-        # isHeated
-        if len(UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcDistributionElement", result=[])) == 0:
-            isHeated = True
-        else:
-            ifcHeater = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpaceHeater", result=[])
-            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcBurner", result=[])
-            ifcHeater += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcHeatExchanger", result=[])
-            isHeated = True if len(ifcHeater) > 0 else False
-        chBldgTzIsHeated = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "isHeated"))
-        chBldgTzIsHeated.text = str(isHeated).lower()
-
-        # boundedBy: Envelope
-        self.convertBound(self.bldgGeom, chBldgTzBound)
-
-        # boundedBy: ThermalBoundary
-        constructions = []
-        for child in chBldg:
-            if "boundedBy" in child.tag:
-                # XML-Struktur
-                chBldgTzBby = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "boundedBy"))
-                chBldgTb = etree.SubElement(chBldgTzBby, QName(XmlNs.energy, "ThermalBoundary"))
-                chBldgTb.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
-
-                # thermalBoundaryType
-                if "GroundSurface" in child[0].tag:
-                    type = "groundSlab"
-                elif "RoofSurface" in child[0].tag:
-                    type = "roof"
-                elif "WallSurface" in child[0].tag:
-                    type = "outerWall"
-                chBldgTbType = etree.SubElement(chBldgTb, QName(XmlNs.energy, "thermalBoundaryType"))
-                chBldgTbType.text = type
-
-                for childGeom in child[0]:
-                    if "lod3MultiSurface" in childGeom.tag:
-                        geomGML = etree.tostring(childGeom[0][0][0]).decode('utf-8')
-                        geom = ogr.CreateGeometryFromGML(geomGML)
-                        geomAll = []
-                        if geom.GetGeometryName() == "MULTIPOLYGON":
-                            geomR = geom.GetGeometryRef(0)
-                            for i in range(0, geom.GetGeometryCount()):
-                                geomAll.append(geom.GetGeometryRef(i))
-                        else:
-                            geomR = geom
-                            geomAll = [geom]
-
-                # azimuth
-                chBldgTbAz = etree.SubElement(chBldgTb, QName(XmlNs.energy, "azimuth"))
-                chBldgTbAz.set("uom", "deg")
-                chBldgTbAz.text = str(round(UtilitiesGeom.calcAzimuth(geomR), 5))
-
-                # inclination
-                chBldgTbIncl = etree.SubElement(chBldgTb, QName(XmlNs.energy, "inclination"))
-                chBldgTbIncl.set("uom", "deg")
-                chBldgTbIncl.text = str(round(UtilitiesGeom.calcInclination(geomR) / math.pi * 180, 5))
-
-                # area
-                chBldgTbArea = etree.SubElement(chBldgTb, QName(XmlNs.energy, "area"))
-                chBldgTbArea.set("uom", "m2")
-                chBldgTbArea.text = str(round(UtilitiesGeom.calcArea3D(geomAll), 5))
-
-                # surfaceGeometry
-                for childGeom in child[0]:
-                    if "lod3MultiSurface" in childGeom.tag:
-                        chGeom = childGeom
-                chBldgTbGeom = etree.SubElement(chBldgTb, QName(XmlNs.energy, "surfaceGeometry"))
-                chBldgTbGeom.append(deepcopy(chGeom[0]))
-
-                # construction
-                ifcElem = None
-                for surface in surfaces:
-                    if child[0].attrib['{http://www.opengis.net/gml}id'] == surface[0]:
-                        ifcElem = surface[1]
-                        break
-
-                ifcMLS = None
-                rels = self.ifc.get_inverse(ifcElem)
-                for rel in rels:
-                    if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
-                        if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a("IfcMaterialLayerSetUsage"):
-                            ifcMLSU = rel.RelatingMaterial
-                            if ifcMLSU.ForLayerSet is not None:
-                                ifcMLS = ifcMLSU.ForLayerSet
-
-                if ifcMLS is not None:
-                    sameMLS = False
-                    for constr in constructions:
-                        if constr[1] == ifcMLS:
-                            sameMLS = True
-                            break
-                    if sameMLS:
-                        gmlIdConstr = constr[0]
-                        constr[2].append(ifcElem)
-                    else:
-                        gmlIdConstr = "GML_" + str(uuid.uuid4())
-                        constrNew = [gmlIdConstr, ifcMLS, [ifcElem], "layer"]
-                        constructions.append(constrNew)
-
-                    chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
-                    chBldgTbConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
-
-                # contains
-                for childSurf in child[0]:
-                    if "opening" in childSurf.tag:
-                        chOpen = childSurf[0]
-
-                        # XML-Struktur
-                        chBldgTbCont = etree.SubElement(chBldgTb, QName(XmlNs.energy, "contains"))
-                        chBldgTo = etree.SubElement(chBldgTbCont, QName(XmlNs.energy, "ThermalOpening"))
-                        chBldgTo.set(QName(XmlNs.gml, "id"), "GML_" + str(uuid.uuid4()))
-
-                        # area
-                        for chGeom in chOpen:
-                            if "lod3MultiSurface" in chGeom.tag:
-                                geomGML = etree.tostring(chGeom[0][0][0]).decode('utf-8')
-                                geom = ogr.CreateGeometryFromGML(geomGML)
-                        chBldgToArea = etree.SubElement(chBldgTo, QName(XmlNs.energy, "area"))
-                        chBldgToArea.set("uom", "m2")
-                        chBldgToArea.text = str(round(UtilitiesGeom.calcArea3D(geom), 5))
-
-                        # construction
-                        ifcElem = None
-                        for surface in surfaces:
-                            if chOpen.attrib['{http://www.opengis.net/gml}id'] == surface[0]:
-                                ifcElem = surface[1]
-                                break
-
-                        # Material, falls vorhanden
-                        ifcMLS = None
-                        rels = self.ifc.get_inverse(ifcElem)
-                        for rel in rels:
-                            if rel.is_a('IfcRelAssociatesMaterial') and ifcElem in rel.RelatedObjects:
-                                if rel.RelatingMaterial is not None and rel.RelatingMaterial.is_a(
-                                        "IfcMaterialLayerSetUsage"):
-                                    ifcMLSU = rel.RelatingMaterial
-                                    if ifcMLSU.ForLayerSet is not None:
-                                        ifcMLS = ifcMLSU.ForLayerSet
-
-                        if ifcMLS is not None:
-                            sameMLS = False
-                            for constr in constructions:
-                                if constr[1] == ifcMLS:
-                                    sameMLS = True
-                                    break
-                            if sameMLS:
-                                gmlIdConstr = constr[0]
-                                constr[2].append(ifcElem)
-                            else:
-                                gmlIdConstr = "GML_" + str(uuid.uuid4())
-                                constrNew = [gmlIdConstr, ifcMLS, [ifcElem], "layer"]
-                                constructions.append(constrNew)
-
-                            chBldgToConstr = etree.SubElement(chBldgTo, QName(XmlNs.energy, "construction"))
-                            chBldgToConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
-
-                        # OpticalProperties, falls vorhanden
-                        else:
-                            thTransm, glazing = None, None
-                            solRefl, visRefl, solTransm, visTransm = None, None, None, None
-
-                            # U-Wert
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_DoorCommon",
-                                                     "ThermalTransmittance") is not None:
-                                thTransm = element.get_psets(ifcElem)["Pset_DoorCommon"]["ThermalTransmittance"]
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_WindowCommon",
-                                                     "ThermalTransmittance") is not None:
-                                thTransm = element.get_psets(ifcElem)["Pset_WindowCommon"]["ThermalTransmittance"]
-
-                            # reflectance
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
-                                                     "SolarReflectance") is not None:
-                                solRefl = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"]["SolarReflectance"]
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
-                                                     "VisibleLightReflectance") is not None:
-                                visRefl = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"][
-                                    "VisibleLightReflectance"]
-
-                            # transmittance
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
-                                                     "SolarTransmittance") is not None:
-                                solTransm = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"][
-                                    "SolarTransmittance"]
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_DoorWindowGlazingType",
-                                                     "VisibleLightTransmittance") is not None:
-                                visTransm = element.get_psets(ifcElem)["Pset_DoorWindowGlazingType"][
-                                    "VisibleLightTransmittance"]
-
-                            # glazingRatio
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_DoorCommon",
-                                                     "GlazingAreaFraction") is not None:
-                                glazing = element.get_psets(ifcElem)["Pset_DoorCommon"]["GlazingAreaFraction"]
-                            if UtilitiesIfc.findPset(ifcElem, "Pset_WindowCommon",
-                                                     "GlazingAreaFraction") is not None:
-                                glazing = element.get_psets(ifcElem)["Pset_WindowCommon"]["GlazingAreaFraction"]
-
-                            if not (thTransm is None and solRefl is None and visRefl is None and solTransm is None \
-                                    and visTransm is None and glazing is None):
-                                sameOptProp = False
-                                for constr in constructions:
-                                    if constr[3] == "optical" and constr[1][0] == thTransm and constr[1][1] == solRefl \
-                                            and constr[1][2] == visRefl and constr[1][3] == solTransm and \
-                                            constr[1][4] == visTransm and constr[1][5] == glazing:
-                                        sameOptProp = True
-                                        break
-                                if sameOptProp:
-                                    gmlIdConstr = constr[0]
-                                    constr[2].append(ifcElem)
-                                else:
-                                    gmlIdConstr = "GML_" + str(uuid.uuid4())
-                                    optProp = [thTransm, solRefl, visRefl, solTransm, visTransm, glazing]
-                                    constrNew = [gmlIdConstr, optProp, [ifcElem], "optical"]
-                                    constructions.append(constrNew)
-
-                                chBldgToConstr = etree.SubElement(chBldgTo, QName(XmlNs.energy, "construction"))
-                                chBldgToConstr.set(QName(XmlNs.xlink, "href"), "#" + gmlIdConstr)
-
-                        # surfaceGeometry
-                        for chGeom in chOpen:
-                            if "lod3MultiSurface" in chGeom.tag:
-                                chBldgToGeom = etree.SubElement(chBldgTo, QName(XmlNs.energy, "surfaceGeometry"))
-                                chBldgToGeom.append(deepcopy(chGeom[0]))
-
-                # delimits
-                chBldgTbDel = etree.SubElement(chBldgTb, QName(XmlNs.energy, "delimits"))
-                chBldgTbDel.set(QName(XmlNs.xlink, "href"), "#" + linkTZ)
-
-        # volumeGeometry
-        chBldgTzVolGeom = etree.SubElement(chBldgTZ, QName(XmlNs.energy, "volumeGeometry"))
-        for child in chBldg:
-            if "lod3Solid" in child.tag:
-                chBldgTzVolGeom.append(deepcopy(child[0]))
-
-        return linkUZ, chBldgTZ, constructions

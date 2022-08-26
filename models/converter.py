@@ -106,7 +106,7 @@ class Converter(QgsTask):
         elif self.lod == 1:
             dedConv = LoD1Converter(self.parent, ifc, name, trans, self.eade)
         elif self.lod == 2:
-            root = self.convertLoD2(root, self.eade)
+            dedConv = LoD2Converter(self.parent, ifc, name, trans, self.eade)
         elif self.lod == 3:
             root = self.convertLoD3(root, self.eade)
         elif self.lod == 4:

@@ -10,37 +10,19 @@
 
 #####
 
-# Standard-Bibliotheken
-import math
-import sys
-import uuid
-from copy import deepcopy
-from datetime import datetime
-import numpy as np
-
-# IFC-Bibliotheken
-import ifcopenshell
-import ifcopenshell.util.pset
-from ifcopenshell.util import element
-
 # XML-Bibliotheken
 from lxml import etree
 # noinspection PyUnresolvedReferences
 from lxml.etree import QName
 
 # QGIS-Bibliotheken
-from qgis.core import QgsTask
 from qgis.PyQt.QtCore import QCoreApplication
 
 # Geo-Bibliotheken
 from osgeo import ogr
-import sympy
-from sympy import Point3D, Plane, Line
 
 # Plugin
 from .xmlns import XmlNs
-from .mapper import Mapper
-from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
 from .converter_gen import GenConverter

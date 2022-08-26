@@ -867,8 +867,8 @@ class EADEConverter(QgsTask):
 
         return linkUZ, chBldgTZ, constructions
 
-    # noinspection PyMethodMayBeStatic
-    def convertConstructions(self, root, constructions):
+    @staticmethod
+    def convertConstructions(root, constructions):
         """ Berechnung der Konstruktionen der Begrenzung der thermalen Zone für die Energy ADE in LoD2
 
         Args:
@@ -1006,8 +1006,8 @@ class EADEConverter(QgsTask):
 
         return materials
 
-    # noinspection PyMethodMayBeStatic
-    def convertMaterials(self, root, materials):
+    @staticmethod
+    def convertMaterials(root, materials):
         """ Berechnung der Materialien der Konstruktionen der Begrenzung der thermalen Zone für die Energy ADE in LoD2
 
         Args:

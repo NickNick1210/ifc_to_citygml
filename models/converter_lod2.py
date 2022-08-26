@@ -14,14 +14,11 @@
 import math
 import sys
 import uuid
-from copy import deepcopy
-from datetime import datetime
 import numpy as np
 
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
-from ifcopenshell.util import element
 
 # XML-Bibliotheken
 from lxml import etree
@@ -29,7 +26,6 @@ from lxml import etree
 from lxml.etree import QName
 
 # QGIS-Bibliotheken
-from qgis.core import QgsTask
 from qgis.PyQt.QtCore import QCoreApplication
 
 # Geo-Bibliotheken
@@ -39,17 +35,37 @@ from sympy import Point3D, Plane, Line
 
 # Plugin
 from .xmlns import XmlNs
-from .mapper import Mapper
-from .transformer import Transformer
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+from .converter_gen import GenConverter
+from .converter_eade import EADEConverter
 
 
 #####
 
 
-class LoD2Converter(QgsTask):
+class LoD2Converter:
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+
+    def __init__(self, parent, ifc, name, trans, eade):
+        """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
+
+        Args:
+            parent: Die zugrunde liegende zentrale Converter-Klasse
+            ifc: IFC-Datei
+            name: Name des Modells
+            trans: Transformer-Objekt
+            eade: Ob die EnergyADE gewählt wurde als Boolean
+        """
+
+        # Initialisierung von Attributen
+        self.parent = parent
+        self.eade = eade
+        self.ifc = ifc
+        self.trans = trans
+        self.geom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
+        self.name = name
 
     @staticmethod
     def tr(msg):
@@ -63,12 +79,11 @@ class LoD2Converter(QgsTask):
         """
         return QCoreApplication.translate('LoD2Converter', msg)
 
-    def convertLoD2(self, root, eade):
+    def convert(self, root):
         """ Konvertieren von IFC zu CityGML im Level of Detail (LoD) 2
 
         Args:
             root: Das vorbereitete XML-Schema
-            eade: Ob die EnergyADE gewählt wurde als Boolean
         """
         # IFC-Grundelemente
         ifcProject = self.ifc.by_type("IfcProject")[0]
@@ -77,7 +92,7 @@ class LoD2Converter(QgsTask):
 
         # XML-Struktur
         chName = etree.SubElement(root, QName(XmlNs.gml, "name"))
-        chName.text = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        chName.text = self.name
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
 
         # Über alle enthaltenen Gebäude iterieren
@@ -87,33 +102,34 @@ class LoD2Converter(QgsTask):
 
             # Konvertierung
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
-            height = self.convertBldgAttr(ifcBuilding, chBldg)
-            links, footPrint, surfaces = self.convertLoD2BldgBound(ifcBuilding, chBldg, height)
-            self.convertLoDSolid(chBldg, links, 2)
+            height = GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg, height)
+            GenConverter.convertLoDSolid(chBldg, links, 2)
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
-            self.convertAddress(ifcBuilding, ifcSite, chBldg)
+            GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
-            bbox = self.convertBound(self.geom, chBound)
+            bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
 
             # EnergyADE
-            if eade:
+            if self.eade:
                 self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
-                self.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
-                self.convertEadeBldgAttr(ifcBuilding, chBldg, bbox, footPrint)
+                EADEConverter.convertEadeBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ, constructions = self.calcLoDThermalZone(ifcBuilding, chBldg, surfaces, 2)
+                linkUZ, chBldgTZ, constructions = EADEConverter.calcLoDThermalZone(self.ifc, ifcBuilding, chBldg, root,
+                                                                                   surfaces, 2)
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
-                self.calcLoDUsageZone(ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                EADEConverter.calcLoDUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
-                materials = self.convertConstructions(root, constructions)
+                materials = EADEConverter.convertConstructions(root, constructions)
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
-                self.convertMaterials(root, materials)
+                EADEConverter.convertMaterials(root, materials)
 
         return root
 
-    def convertLoD2BldgBound(self, ifcBuilding, chBldg, height):
+    def convertBldgBound(self, ifcBuilding, chBldg, height):
         """ Konvertieren des erweiterten Gebäudeumrisses von IFC zu CityGML in Level of Detail (LoD) 2
 
         Args:
@@ -141,7 +157,7 @@ class LoD2Converter(QgsTask):
 
         # Berechnung Grundfläche
         self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
-        base = self.calcPlane(ifcSlabs)
+        base = GenConverter.calcPlane(ifcSlabs, self.trans)
         if base is None:
             return []
 
@@ -157,13 +173,13 @@ class LoD2Converter(QgsTask):
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are extracted'))
         roofs = self.extractRoofs(ifcRoofs)
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
-        geomWalls, roofsNew = self.calcLoD2Walls(base, roofs, height)
+        geomWalls, roofsNew = self.calcWalls(base, roofs, height)
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces between roofs are calculated'))
-        geomWallsR, roofs = self.calcLoD2RoofWalls(roofs + roofsNew)
+        geomWallsR, roofs = self.calcRoofWalls(roofs + roofsNew)
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
-        roofs = self.calcLoD2Roofs(roofs, base)
+        roofs = self.calcRoofs(roofs, base)
         self.parent.dlg.log(self.tr(u'Building geometry: roof and wall surfaces are adjusted'))
-        geomWalls += self.checkLoD2RoofWalls(geomWallsR, roofs)
+        geomWalls += self.checkRoofWalls(geomWallsR, roofs)
         for roof in roofs:
             roof[1] = UtilitiesGeom.simplify(roof[1], 0.01, 0.05)
 
@@ -212,7 +228,7 @@ class LoD2Converter(QgsTask):
 
         return links, base[1], surfaces
 
-    def calcLoD2Walls(self, base, roofs, height):
+    def calcWalls(self, base, roofs, height):
         """ Berechnen der Grundwände in Level of Detail (LoD) 2
 
         Args:
@@ -467,9 +483,8 @@ class LoD2Converter(QgsTask):
 
         return walls, roofsNew
 
-        # noinspection PyMethodMayBeStatic
-
-    def calcLoD2Roofs(self, roofsIn, base):
+    @staticmethod
+    def calcRoofs(roofsIn, base):
         """ Anpassen der Dächer, u.a. auf die Grundfläche und überschneidende Dächer in Level of Detail (LoD) 2
 
         Args:
@@ -522,9 +537,8 @@ class LoD2Converter(QgsTask):
                     roofs.append([roofInElem[0], geomRoof])
         return roofs
 
-        # noinspection PyMethodMayBeStatic
-
-    def calcLoD2RoofWalls(self, roofs):
+    @staticmethod
+    def calcRoofWalls(roofs):
         """ Berechnen von Wänden zwischen zwei Dächern, die nicht bereits über die Grundfläche erstellt wurden
 
         Args:
@@ -544,7 +558,8 @@ class LoD2Converter(QgsTask):
                 roof2 = roofs[j][1]
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
-                    if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not intersect.IsEmpty():
+                    if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not \
+                            intersect.IsEmpty():
                         ringR1, ringR2 = roof1.GetGeometryRef(0), roof2.GetGeometryRef(0)
 
                         # Z-Koordinaten über Ebenen-Geraden-Schnitte berechnen
@@ -578,6 +593,7 @@ class LoD2Converter(QgsTask):
                         pt1, pt2 = [], []
 
                         # Z-Koordinaten der beiden Dächer heraussuchen
+                        ptz1, ptz2 = None, None
                         for k in range(0, ringInt.GetPointCount() - 1):
                             point = ogr.Geometry(ogr.wkbPoint)
                             point.AddPoint(ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1])
@@ -807,9 +823,8 @@ class LoD2Converter(QgsTask):
 
         return walls, roofsOut
 
-        # noinspection PyMethodMayBeStatic
-
-    def checkLoD2RoofWalls(self, wallsIn, roofs):
+    @staticmethod
+    def checkRoofWalls(wallsIn, roofs):
         """ Überprüfen und ggf. Aussortieren der neu erstellten Wand-Geometrien
 
         Args:
@@ -867,8 +882,10 @@ class LoD2Converter(QgsTask):
         """
         roofs = []
         for ifcRoof in ifcRoofs:
+            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
+            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             # Vertizes
             verts = shape.geometry.verts
@@ -973,7 +990,6 @@ class LoD2Converter(QgsTask):
             roofs.append([ifcRoof, finalRoof])
 
         return roofs
-
 
     def setElement(self, chBldg, geometry, type, lod):
         """ Setzen eines CityGML-Objekts

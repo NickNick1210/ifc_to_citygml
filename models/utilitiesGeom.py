@@ -215,7 +215,7 @@ class UtilitiesGeom:
         return angleDeg
 
     @staticmethod
-    def simplify(geom, distTol, angTol, zd=False):
+    def simplify(geom, distTol, angTol, zd=False, task=None):
         """ Vereinfachen von OGR-Geometrien (Polygone und LineStrings)
 
         Args:
@@ -224,6 +224,8 @@ class UtilitiesGeom:
             angTol: Die erlaubte Toleranz bei der Vereinfachung von Punkten auf vorhandenen Linien
             zd: Ob nur zweidimensional vereinfacht werden soll
                 default: False
+            task: Task-Objekt
+                default: None
 
         Returns:
             Die vereinfachte Geometrie, einzeln oder als Liste, oder None falls ungültig
@@ -310,7 +312,9 @@ class UtilitiesGeom:
 
                 # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
                 elif ringTest.GetPointCount() < count:
-                    simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol))
+                    if task is not None and task.isCanceled():
+                        return False
+                    simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol, task=task))
 
                 # Wenn fertig: Zurückgeben
                 else:
@@ -367,11 +371,13 @@ class UtilitiesGeom:
             return simpList
 
     @staticmethod
-    def union3D(geomsIn):
+    def union3D(geomsIn, task=None):
         """ Vereinigen von OGR-Polygonen, sofern möglich
 
         Args:
             geomsIn: Die zu vereinfachenden Polygone als Liste
+            task: Task-Objekt
+                default: None
 
         Returns:
             Die vereinigten Polygone in einer Liste
@@ -390,6 +396,8 @@ class UtilitiesGeom:
                 continue
             ring1 = geom1.GetGeometryRef(0)
             for j in range(i + 1, len(geomsIn)):
+                if task is not None and task.isCanceled():
+                    return False
                 if j in done:
                     continue
                 geom2 = geomsIn[j]
@@ -731,14 +739,23 @@ class UtilitiesGeom:
                                 break
                         if found:
                             break
+
+                if task is not None and task.isCanceled():
+                    return False
+
             # Wenn keine berührende Geometrie gefunden
             if i not in done:
                 done.append(i)
                 geomsOut.append(geomsIn[i])
 
+            if task is not None and task.isCanceled():
+                return False
+
         # Wenn es noch weiter vereinigt werden kann: Iterativer Vorgang über rekursive Aufrufe
         if len(geomsOut) < len(geomsIn):
-            return UtilitiesGeom.union3D(geomsOut)
+            if task is not None and task.isCanceled():
+                return False
+            return UtilitiesGeom.union3D(geomsOut, task=task)
 
         # Wenn fertig: Zurückgeben
         else:

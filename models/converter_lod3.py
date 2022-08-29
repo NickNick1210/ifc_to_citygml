@@ -47,11 +47,12 @@ from .converter_eade import EADEConverter
 class LoD3Converter:
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD3 """
 
-    def __init__(self, parent, ifc, name, trans, eade):
+    def __init__(self, parent, task, ifc, name, trans, eade):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD3
 
         Args:
-            parent: Die zugrunde liegende zentrale Converter-Klasse
+            parent: Die zugrunde liegende zentrale Model-Klasse
+            task: Die zugrunde liegende zentrale Converter-Klasse
             ifc: IFC-Datei
             name: Name des Modells
             trans: Transformer-Objekt
@@ -59,7 +60,7 @@ class LoD3Converter:
         """
 
         # Initialisierung von Attributen
-        self.parent = parent
+        self.parent, self.task = parent, task
         self.ifc = ifc
         self.name = name
         self.trans = trans
@@ -94,37 +95,82 @@ class LoD3Converter:
         chName.text = self.name
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
 
+        if self.task.isCanceled():
+            return False
+
         # Über alle enthaltenen Gebäude iterieren
         for ifcBuilding in ifcBuildings:
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
-            # Konvertierung
+            # Gebäudeattribute
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            if self.task.isCanceled():
+                return False
+
+            # Gebäudebestandteile
+            self.parent.dlg.log(self.tr(u'Building bounds are calculated'))
             links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg)
+            if self.task.isCanceled():
+                return False
+
+            # Gebäudekörper
+            self.parent.dlg.log(self.tr(u'Building solid is calculated'))
             GenConverter.convertLoDSolid(chBldg, links, 3)
+            if self.task.isCanceled():
+                return False
+
+            # Adresse
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
+            if self.task.isCanceled():
+                return False
+
+            # Bounding Box
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
+            if self.task.isCanceled():
+                return False
 
             # EnergyADE
             if self.eade:
-                self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
+                # Wetterdaten
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                if self.task.isCanceled():
+                    return False
+
+                # Gebäudeattribute
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                if self.task.isCanceled():
+                    return False
+
+                # Thermale Zone
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
                                                                                 surfaces, 3)
+                if self.task.isCanceled():
+                    return False
+
+                # Nutzungszone
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                if self.task.isCanceled():
+                    return False
+
+                # Konstruktionen
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
                 materials = EADEConverter.convertConstructions(root, constructions)
+                if self.task.isCanceled():
+                    return False
+
+                # Materialien
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
                 EADEConverter.convertMaterials(root, materials)
+                if self.task.isCanceled():
+                    return False
 
         return root
 
@@ -143,20 +189,43 @@ class LoD3Converter:
         # Berechnung
         self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
         bases, basesOrig, floors = self.calcBases(ifcBuilding)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
         roofs, roofsOrig = self.calcRoofs(ifcBuilding)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         walls = self.calcWalls(ifcBuilding)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: door surfaces are calculated'))
         openings = self.calcOpenings(ifcBuilding, "ifcDoor")
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: window surfaces are calculated'))
         openings += self.calcOpenings(ifcBuilding, "ifcWindow")
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: openings are assigned to walls'))
         walls = self.assignOpenings(openings, walls)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: wall and opening surfaces are adjusted to each other'))
         walls, wallMainCounts = self.adjustWallOpenings(walls)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are adjusted in their height'))
         walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig, wallMainCounts)
+        if self.task.isCanceled():
+            return False
 
         # Geometrie
         links, surfaces = [], []
@@ -199,12 +268,9 @@ class LoD3Converter:
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, it will also be missing in CityGML"))
                 return []
 
-        # Namen der Grundflächen heraussuchen
-        for ifcSlab in ifcSlabs:
-            baseNames.append(ifcSlab.Name)
-
         for i in range(0, len(ifcSlabs)):
             ifcSlab = ifcSlabs[i]
+            baseNames.append(ifcSlab.Name)
             # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -276,6 +342,9 @@ class LoD3Converter:
             bases.append([finalSlab, baseNames[i], [], ifcSlab])
             basesOrig.append(slabGeom)
 
+            if self.task.isCanceled():
+                return False
+
         floors = bases
 
         # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
@@ -324,6 +393,10 @@ class LoD3Converter:
                 # Falls nur Differenzen stattgefunden haben, die der Ausgangsfläche entsprechen: Entfernen
                 elif gotDiff:
                     removedBases.append(i)
+
+                if self.task.isCanceled():
+                    return False
+
             removedBases.sort(reverse=True)
             for removedBase in removedBases:
                 finalBases.pop(removedBase)
@@ -352,13 +425,10 @@ class LoD3Converter:
             self.parent.dlg.log(self.tr(u"Due to the missing roofs, it will also be missing in CityGML"))
             return []
 
-        # Namen der Dächer heraussuchen
-        for ifcRoof in ifcRoofs:
-            roofNames.append(ifcRoof.Name)
-
         # Geometrie
         for i in range(0, len(ifcRoofs)):
             ifcRoof = ifcRoofs[i]
+            roofNames.append(ifcRoof.Name)
             # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -426,6 +496,9 @@ class LoD3Converter:
             roofs.append([finalRoof, roofNames[i], [], ifcRoof])
             roofsOrig.append(roofGeom)
 
+            if self.task.isCanceled():
+                return False
+
         return roofs, roofsOrig
 
     def calcWalls(self, ifcBuilding):
@@ -462,13 +535,13 @@ class LoD3Converter:
             elif intCount == 0 and UtilitiesIfc.findPset(ifcWall, "Pset_WallCommon", "IsExternal"):
                 ifcWallsExt.append(ifcWall)
 
-        # Namen der Wände heraussuchen
-        for ifcWall in ifcWallsExt:
-            wallNames.append(ifcWall.Name)
+            if self.task.isCanceled():
+                return False
 
         # Geometrie
         for i in range(0, len(ifcWallsExt)):
             ifcWall = ifcWallsExt[i]
+            wallNames.append(ifcWall.Name)
             # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -491,6 +564,9 @@ class LoD3Converter:
                     points.append(point)
                 grVertsList.append(points)
 
+                if self.task.isCanceled():
+                    return False
+
             # Geometrien erstellen
             geometries = []
             for grVerts in grVertsList:
@@ -503,10 +579,17 @@ class LoD3Converter:
                 geometry.AddGeometry(ring)
                 geometries.append(geometry)
 
+                if self.task.isCanceled():
+                    return False
+
             # Vereinigen, Vereinfachen und Hinzufügen
-            wallGeom = UtilitiesGeom.union3D(geometries)
-            wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.001)
+            wallGeom = UtilitiesGeom.union3D(geometries, task=self.task)
+            wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.001, task=self.task)
             walls.append([wallGeom, wallNames[i], [], ifcWall])
+
+            if self.task.isCanceled():
+                return False
+
         return walls
 
     def calcOpenings(self, ifcBuilding, type):
@@ -541,13 +624,13 @@ class LoD3Converter:
             elif ext:
                 ifcOpeningsExt.append(ifcOpening)
 
-        # Namen der Öffnungen heraussuchen
-        for ifcOpening in ifcOpeningsExt:
-            openingNames.append(ifcOpening.Name)
+        if self.task.isCanceled():
+            return False
 
         # Geometrie
         for i in range(0, len(ifcOpeningsExt)):
             ifcOpening = ifcOpeningsExt[i]
+            openingNames.append(ifcOpening.Name)
             # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
@@ -571,10 +654,12 @@ class LoD3Converter:
                     grVertsList.append(point)
             openings.append([grVertsList, openingNames[i], type, ifcOpening])
 
+            if self.task.isCanceled():
+                return False
+
         return openings
 
-    @staticmethod
-    def assignOpenings(openings, walls):
+    def assignOpenings(self, openings, walls):
         """ Fügt die Öffnungen (Fenster & Türen) an die zugehörigen Wände in Level of Detail (LoD) 3 an
 
         Args:
@@ -602,10 +687,13 @@ class LoD3Converter:
             # Öffnung hinzufügen
             if minDistElem is not None:
                 minDistElem[2].append(opening)
+
+            if self.task.isCanceled():
+                return False
+
         return walls
 
-    @staticmethod
-    def adjustWallOpenings(walls):
+    def adjustWallOpenings(self, walls):
         """ Passt die Wände auf Grundlage der Dächer, Grundflächen und Öffnungen in Level of Detail (LoD) 3 an
 
         Args:
@@ -702,6 +790,9 @@ class LoD3Converter:
                             openBounds[i].append([len(finalWall), wallGeom])
                             finalWall.append(wallGeom)
 
+                        if self.task.isCanceled():
+                            return False
+
                 # Öffnungen durch eine gesamte Fläche darstellen
                 # über alle Öffnungen der Wand iterieren
                 for j in range(0, len(wall[2])):
@@ -750,6 +841,9 @@ class LoD3Converter:
                         elif openBounds[j].index(openBound) == 0:
                             lastHeight = minHeight
                             startHor = True
+
+                        if self.task.isCanceled():
+                            return False
 
                     # Wenn kein Intersect mit den Begrenzungen stattfindet
                     if len(sPts) == 0:
@@ -914,15 +1008,24 @@ class LoD3Converter:
 
                             finalWall[wallNr] = newGeomWall1 if minDist1 < minDist2 else newGeomWall2
 
+                        if self.task.isCanceled():
+                            return False
+
+                    if self.task.isCanceled():
+                        return False
+
             # Überflüssige OpenBounds entfernen
             delBounds.sort(reverse=True)
             for v in range(0, len(delBounds)):
                 finalWall.pop(delBounds[v])
             wall[0] = finalWall
+
+            if self.task.isCanceled():
+                return False
+
         return walls, wallMainCounts
 
-    @staticmethod
-    def adjustWallSize(walls, bases, roofs, basesOrig, roofsOrig, wallMainCounts):
+    def adjustWallSize(self, walls, bases, roofs, basesOrig, roofsOrig, wallMainCounts):
         """ Passt die Wände in Bezug auf die veränderten Grundflächen und Dächer in Level of Detail (LoD) 3 an
 
         Args:
@@ -1133,6 +1236,9 @@ class LoD3Converter:
                     # Neue Nebenwand hinzufügen
                     for newWall in newWalls:
                         walls[i][0].append(newWall)
+
+                if self.task.isCanceled():
+                    return False
 
         return walls
 

@@ -73,33 +73,38 @@ class Converter(QgsTask):
 
     def run(self):
         """ Führt die Konvertierung aus """
-        # Initialisieren von IFC und CityGML
+        # Initialisieren
         ifc = self.readIfc(self.inPath)
         root = self.createSchema()
-
-        # Initialisieren vom Transformer
         trans = Transformer(ifc)
-
-        # Name des Modells
         name = self.outPath[self.outPath.rindex("\\") + 1:-4]
+
+        if self.isCanceled():
+            return False
 
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
         dedConv = None
         if self.lod == 0:
-            dedConv = LoD0Converter(self.parent, ifc, name, trans, self.eade)
+            dedConv = LoD0Converter(self.parent, self, ifc, name, trans, self.eade)
         elif self.lod == 1:
-            dedConv = LoD1Converter(self.parent, ifc, name, trans, self.eade)
+            dedConv = LoD1Converter(self.parent, self, ifc, name, trans, self.eade)
         elif self.lod == 2:
-            dedConv = LoD2Converter(self.parent, ifc, name, trans, self.eade)
+            dedConv = LoD2Converter(self.parent, self, ifc, name, trans, self.eade)
         elif self.lod == 3:
-            dedConv = LoD3Converter(self.parent, ifc, name, trans, self.eade)
+            dedConv = LoD3Converter(self.parent, self, ifc, name, trans, self.eade)
         elif self.lod == 4:
-            dedConv = LoD4Converter(self.parent, ifc, name, trans, self.eade)
+            dedConv = LoD4Converter(self.parent, self, ifc, name, trans, self.eade)
         root = dedConv.convert(root)
+
+        if self.isCanceled():
+            return False
 
         # Schreiben der CityGML in eine Datei
         self.parent.dlg.log(self.tr(u'CityGML file is generated'))
         self.writeCGML(root)
+
+        if self.isCanceled():
+            return False
 
         # Integration der CityGML in QGIS
         if self.integr:

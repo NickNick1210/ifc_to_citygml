@@ -12,6 +12,7 @@
 
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QCoreApplication
+from qgis.core import QgsApplication
 
 # Plugin
 from .models.ifc_analyzer import IfcAnalyzer
@@ -31,6 +32,7 @@ class Model:
         self.inPath, self.outPath = None, None
         self.valid = False
         self.dlg, self.gis = None, None
+        self.task = None
 
     def setVM(self, dlg, gis):
         """ Setzt die ViewModels
@@ -95,12 +97,12 @@ class Model:
             ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
-        # TODO: Multithreading
-        # self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade,
-        #   integr)
-        # QgsApplication.taskManager().addTask(self.task)
-        conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
-        conv.run()
+        self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
+        QgsApplication.taskManager().addTask(self.task)
+
+        # Falls die Konvertierung zu Testzwecken auf dem Mainthread ausgeführt werden soll
+        # conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
+        # conv.run()
 
     def completed(self, result):
         """ Beendet die Konvertierung
@@ -116,3 +118,8 @@ class Model:
             self.dlg.log(self.tr(u'Conversion completed'))
         else:
             self.dlg.log(self.tr(u'Conversion crashed'))
+        self.task = None
+
+    def cancel(self):
+        if self.task is not None:
+            self.task.cancel()

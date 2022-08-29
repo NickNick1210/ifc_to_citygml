@@ -35,10 +35,11 @@ from .converter_eade import EADEConverter
 class LoD1Converter:
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD1 """
 
-    def __init__(self, parent, ifc, name, trans, eade):
+    def __init__(self, parent, task, ifc, name, trans, eade):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD1
 
         Args:
+            parent: Die zugrunde liegende zentrale Model-Klasse
             parent: Die zugrunde liegende zentrale Converter-Klasse
             ifc: IFC-Datei
             name: Name des Modells
@@ -47,7 +48,7 @@ class LoD1Converter:
         """
 
         # Initialisierung von Attributen
-        self.parent = parent
+        self.parent, self.task = parent, task
         self.ifc = ifc
         self.name = name
         self.trans = trans
@@ -82,32 +83,65 @@ class LoD1Converter:
         chName.text = self.name
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
 
+        if self.task.isCanceled():
+            return False
+
         # Über alle enthaltenen Gebäude iterieren
         for ifcBuilding in ifcBuildings:
             self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
-            # Konvertierung
+            # Gebäudeattribute
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             height = GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            if self.task.isCanceled():
+                return False
+
+            # Gebäudekörper
+            self.parent.dlg.log(self.tr(u'Building solid is calculated'))
             footPrint = self.convertSolid(ifcBuilding, chBldg, height)
+            if self.task.isCanceled():
+                return False
+
+            # Adresse
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
+            if self.task.isCanceled():
+                return False
+
+            # Bounding Box
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
+            if self.task.isCanceled():
+                return False
 
             # EnergyADE
             if self.eade:
+                # Wetterdaten
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                if self.task.isCanceled():
+                    return False
+
+                # Gebäudeattribute
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                if self.task.isCanceled():
+                    return False
+
+                # Thermale Zone
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
-                linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
-                                                                                   [], 1)
+                linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root, [],
+                                                                                1)
+                if self.task.isCanceled():
+                    return False
+
+                # Nutzungszone
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                if self.task.isCanceled():
+                    return False
 
         return root
 
@@ -132,14 +166,24 @@ class LoD1Converter:
                 self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
                 return
 
-        # Berechnung der Geometrien
         geometries = []
+        # Berechnung der Grundfläche
         self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
         geometries.append(GenConverter.calcPlane(ifcSlabs, self.trans)[1])
+        if self.task.isCanceled():
+            return False
+
+        # Berechnung des Daches
         self.parent.dlg.log(self.tr(u'Building geometry: roof surface is calculated'))
         geometries.append(self.calcRoof(geometries[0], height))
+        if self.task.isCanceled():
+            return False
+
+        # Berechnung der Wände
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         geometries += self.calcWalls(geometries[0], height)
+        if self.task.isCanceled():
+            return False
 
         # Geometrie
         if geometries is not None and len(geometries) > 0:

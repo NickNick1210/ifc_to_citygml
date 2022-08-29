@@ -52,15 +52,20 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         self.fileWidget_cgml.setFilter("Geography Markup Language (*.gml)")
         self.fileWidget_cgml.lineEdit().setReadOnly(True)
 
-        # EventListener für den Startknopf
+        # EventListener für die Knöpfe
         self.button_run.clicked.connect(model.run)
         self.fileWidget_ifc.fileChanged.connect(model.ifcFileChanged)
         self.fileWidget_cgml.fileChanged.connect(model.cgmlFileChanged)
+        self.button_close.clicked.connect(self.close)
 
         self.log(QCoreApplication.translate('DialogVM', u'Tool started'))
 
         # Deaktivieren von Funktionalität
         self.radioButton_lod4.setDisabled(True)
+
+    def closeEvent(self, event):
+        self.model.cancel()
+        super()
 
     def getInputPath(self):
         """ Gibt den Eingabepfad zurück.

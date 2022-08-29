@@ -47,10 +47,11 @@ from .converter_eade import EADEConverter
 class LoD2Converter:
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD2 """
 
-    def __init__(self, parent, ifc, name, trans, eade):
+    def __init__(self, parent, task, ifc, name, trans, eade):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD2
 
         Args:
+            parent: Die zugrunde liegende zentrale Model-Klasse
             parent: Die zugrunde liegende zentrale Converter-Klasse
             ifc: IFC-Datei
             name: Name des Modells
@@ -59,7 +60,7 @@ class LoD2Converter:
         """
 
         # Initialisierung von Attributen
-        self.parent = parent
+        self.parent, self.task = parent, task
         self.ifc = ifc
         self.name = name
         self.trans = trans
@@ -94,37 +95,82 @@ class LoD2Converter:
         chName.text = self.name
         chBound = etree.SubElement(root, QName(XmlNs.gml, "boundedBy"))
 
+        if self.task.isCanceled():
+            return False
+
         # Über alle enthaltenen Gebäude iterieren
         for ifcBuilding in ifcBuildings:
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
-            # Konvertierung
+            # Gebäudeattribute
             self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
             height = GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            if self.task.isCanceled():
+                return False
+
+            # Gebäudebestandteile
+            self.parent.dlg.log(self.tr(u'Building bounds are calculated'))
             links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg, height)
+            if self.task.isCanceled():
+                return False
+
+            # Gebäudekörper
+            self.parent.dlg.log(self.tr(u'Building solid is calculated'))
             GenConverter.convertLoDSolid(chBldg, links, 2)
+            if self.task.isCanceled():
+                return False
+
+            # Adresse
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
+            if self.task.isCanceled():
+                return False
+
+            # Bounding Box
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
+            if self.task.isCanceled():
+                return False
 
             # EnergyADE
             if self.eade:
-                self.parent.dlg.log(self.tr(u'Energy ADE is calculated'))
+                # Wetterdaten
                 self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
+                if self.task.isCanceled():
+                    return False
+
+                # Gebäudeattribute
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                if self.task.isCanceled():
+                    return False
+
+                # Thermale Zone
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
                                                                                 surfaces, 2)
+                if self.task.isCanceled():
+                    return False
+
+                # Nutzungszone
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
+                if self.task.isCanceled():
+                    return False
+
+                # Konstruktionen
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
                 materials = EADEConverter.convertConstructions(root, constructions)
+                if self.task.isCanceled():
+                    return False
+
+                # Materialien
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
                 EADEConverter.convertMaterials(root, materials)
+                if self.task.isCanceled():
+                    return False
 
         return root
 
@@ -168,19 +214,36 @@ class LoD2Converter:
                 u"Due to the missing roof, no building geometry can be calculated"))
             return None
 
-        # Berechnung
+        if self.task.isCanceled():
+            return False
+
+        # Berechnungen
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are extracted'))
         roofs = self.extractRoofs(ifcRoofs)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         geomWalls, roofsNew = self.calcWalls(base, roofs, height)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces between roofs are calculated'))
         geomWallsR, roofs = self.calcRoofWalls(roofs + roofsNew)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
         roofs = self.calcRoofs(roofs, base)
+        if self.task.isCanceled():
+            return False
+
         self.parent.dlg.log(self.tr(u'Building geometry: roof and wall surfaces are adjusted'))
         geomWalls += self.checkRoofWalls(geomWallsR, roofs)
         for roof in roofs:
             roof[1] = UtilitiesGeom.simplify(roof[1], 0.01, 0.05)
+        if self.task.isCanceled():
+            return False
 
         # Geometrie
         links, surfaces = [], []
@@ -345,6 +408,9 @@ class LoD2Converter:
                     finalRoof = geometriesRefUnionList[i]
             roofs.append([ifcRoof, finalRoof])
 
+            if self.task.isCanceled():
+                return False
+
         return roofs
 
     def calcWalls(self, base, roofs, height):
@@ -428,6 +494,9 @@ class LoD2Converter:
                         intPoints.append(ipt2)
                     intLines.append([ipt1, ipt2])
 
+                if self.task.isCanceled():
+                    return False
+
             # Normalfall: Wenn min. 1 Dach über einer Wand ist
             if len(intLines) > 0:
 
@@ -508,6 +577,9 @@ class LoD2Converter:
 
                 lastPoint = ringWall.GetPoint(ringWall.GetPointCount() - 1)
 
+                if self.task.isCanceled():
+                    return False
+
                 # Wenn der Endpunkt keinen Schnitt hat: Fehlendes Dach auf dem letzten Teil der Wand
                 if lastPoint[0] != pt2[0] or lastPoint[1] != pt2[1]:
                     self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
@@ -534,6 +606,9 @@ class LoD2Converter:
             else:
                 self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
                 wallsWORoof.append([pt1, pt2])
+
+            if self.task.isCanceled():
+                return False
 
         # Wenn über keinem Teil der Wand ein Dach ist
         for wall in wallsWORoof:
@@ -565,6 +640,9 @@ class LoD2Converter:
 
             # Fehlendes Fach merken
             missingRoof.append([[pt1[0], pt1[1], z1], [pt2[0], pt2[1], z2]])
+
+            if self.task.isCanceled():
+                return False
 
         # Neue Dächer, falls keine vorhanden
         roofsNew, done = [], []
@@ -600,10 +678,12 @@ class LoD2Converter:
                     if not geomRoof.IsEmpty() and geomRoof.GetGeometryName() == "POLYGON":
                         roofsNew.append([None, geomRoof])
 
+            if self.task.isCanceled():
+                return False
+
         return walls, roofsNew
 
-    @staticmethod
-    def calcRoofWalls(roofs):
+    def calcRoofWalls(self, roofs):
         """ Berechnet die Wände zwischen zwei Dächern, die nicht bereits über die Grundfläche erstellt wurden
 
         Args:
@@ -777,6 +857,9 @@ class LoD2Converter:
                         else:
                             roofsOut[i][1] = geomRoofOut
 
+                if self.task.isCanceled():
+                    return False
+
         # ÜBERPRÜFUNG DER WÄNDE #
         walls += wallsLine
         wallsCheck, wallsMod = walls.copy(), {}
@@ -886,10 +969,12 @@ class LoD2Converter:
                             ix = walls.index(wallP)
                             walls[ix] = geomWallCut
 
+                if self.task.isCanceled():
+                    return False
+
         return walls, roofsOut
 
-    @staticmethod
-    def calcRoofs(roofsIn, base):
+    def calcRoofs(self, roofsIn, base):
         """ Passt die Dächer, u.a. auf die Grundfläche und überschneidende Dächer, in Level of Detail (LoD) 2 an
 
         Args:
@@ -940,10 +1025,13 @@ class LoD2Converter:
                 geomRoof.AddGeometry(ringRoof)
                 if geomRoof is not None:
                     roofs.append([roofInElem[0], geomRoof])
+
+                if self.task.isCanceled():
+                    return False
+
         return roofs
 
-    @staticmethod
-    def checkRoofWalls(wallsIn, roofs):
+    def checkRoofWalls(self, wallsIn, roofs):
         """ Überprüft die neu erstellten Wand-Geometrien und sortiert sie ggf. aus
 
         Args:
@@ -983,9 +1071,16 @@ class LoD2Converter:
                             pt2Check = True
                     if pt1Check and pt2Check:
                         anyInt = True
+
+                if self.task.isCanceled():
+                    return False
+
             if anyInt:
                 wall = UtilitiesGeom.simplify(wall, 0.01, 0.05)
                 wallsChecked.append(wall)
+
+            if self.task.isCanceled():
+                return False
 
         wallsOut = UtilitiesGeom.union3D(wallsChecked)
         return wallsOut

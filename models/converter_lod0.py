@@ -94,7 +94,7 @@ class LoD0Converter:
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Gebäudeattribute
-            self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
+            self.task.logging.emit(self.tr(u'Building attributes are extracted'))
             GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
@@ -102,7 +102,7 @@ class LoD0Converter:
             self.task.setProgress(self.progress)
 
             # Grundfläche
-            self.parent.dlg.log(self.tr(u'Building footprint is calculated'))
+            self.task.logging.emit(self.tr(u'Building footprint is calculated'))
             footPrint = self.convertFootPrint(ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
@@ -110,7 +110,7 @@ class LoD0Converter:
             self.task.setProgress(self.progress)
 
             # Dachkantenfläche
-            self.parent.dlg.log(self.tr(u'Building roofedge is calculated'))
+            self.task.logging.emit(self.tr(u'Building roofedge is calculated'))
             self.convertRoofEdge(ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
@@ -118,17 +118,17 @@ class LoD0Converter:
             self.task.setProgress(self.progress)
 
             # Adresse
-            self.parent.dlg.log(self.tr(u'Building address is extracted'))
+            self.task.logging.emit(self.tr(u'Building address is extracted'))
             addressSuccess = GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             if not addressSuccess:
-                self.parent.dlg.log(self.tr(u'No address details existing'))
+                self.task.logging.emit(self.tr(u'No address details existing'))
             if self.task.isCanceled():
                 return False
             self.progress += (10 / bldgCount)
             self.task.setProgress(self.progress)
 
             # Bounding Box
-            self.parent.dlg.log(self.tr(u'Building bound is calculated'))
+            self.task.logging.emit(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
@@ -138,7 +138,7 @@ class LoD0Converter:
             # EnergyADE
             if self.eade:
                 # Wetterdaten
-                self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
+                self.task.logging.emit(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 if self.task.isCanceled():
                     return False
@@ -146,7 +146,7 @@ class LoD0Converter:
                 self.task.setProgress(self.progress)
 
                 # Gebäudeattribute
-                self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
+                self.task.logging.emit(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
@@ -168,7 +168,7 @@ class LoD0Converter:
             ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
-                self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no FootPrint geometry can be calculated"))
+                self.task.logging.emit(self.tr(u"Due to the missing baseslab, no FootPrint geometry can be calculated"))
                 return
 
         # Geometrie
@@ -199,7 +199,7 @@ class LoD0Converter:
             ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
             # Wenn kein Dach vorhanden
             if len(ifcRoofs) == 0:
-                self.parent.dlg.log(self.tr(u"Due to the missing roof, no RoofEdge geometry can be calculated"))
+                self.task.logging.emit(self.tr(u"Due to the missing roof, no RoofEdge geometry can be calculated"))
                 return
 
         # Geometrie

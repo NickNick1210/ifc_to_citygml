@@ -106,7 +106,7 @@ class LoD4Converter:
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Gebäudeattribute
-            self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
+            self.task.logging.emit(self.tr(u'Building attributes are extracted'))
             GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
@@ -114,25 +114,25 @@ class LoD4Converter:
             self.task.setProgress(self.progress)
 
             # Gebäudebestandteile
-            self.parent.dlg.log(self.tr(u'Building bounds are calculated'))
+            self.task.logging.emit(self.tr(u'Building bounds are calculated'))
             links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
 
             # Gebäudekörper
-            self.parent.dlg.log(self.tr(u'Building solid is calculated'))
+            self.task.logging.emit(self.tr(u'Building solid is calculated'))
             GenConverter.convertSolid(chBldg, links, 4)
             if self.task.isCanceled():
                 return False
 
             # Innenräume
-            self.parent.dlg.log(self.tr(u'Rooms are calculated'))
+            self.task.logging.emit(self.tr(u'Rooms are calculated'))
             self.convertInterior(ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
 
             # Adresse
-            self.parent.dlg.log(self.tr(u'Building address is extracted'))
+            self.task.logging.emit(self.tr(u'Building address is extracted'))
             GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             if self.task.isCanceled():
                 return False
@@ -140,7 +140,7 @@ class LoD4Converter:
             self.task.setProgress(self.progress)
 
             # Bounding Box
-            self.parent.dlg.log(self.tr(u'Building bound is calculated'))
+            self.task.logging.emit(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
@@ -150,7 +150,7 @@ class LoD4Converter:
             # EnergyADE
             if self.eade:
                 # Wetterdaten
-                self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
+                self.task.logging.emit(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 if self.task.isCanceled():
                     return False
@@ -158,7 +158,7 @@ class LoD4Converter:
                 self.task.setProgress(self.progress)
 
                 # Gebäudeattribute
-                self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
+                self.task.logging.emit(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
@@ -166,7 +166,7 @@ class LoD4Converter:
                 self.task.setProgress(self.progress)
 
                 # Thermale Zone
-                self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
                                                                                 surfaces, 4)
                 if self.task.isCanceled():
@@ -175,7 +175,7 @@ class LoD4Converter:
                 self.task.setProgress(self.progress)
 
                 # Nutzungszone
-                self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 if self.task.isCanceled():
                     return False
@@ -183,7 +183,7 @@ class LoD4Converter:
                 self.task.setProgress(self.progress)
 
                 # Konstruktionen
-                self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: construction is calculated'))
                 materials = EADEConverter.convertConstructions(root, constructions)
                 if self.task.isCanceled():
                     return False
@@ -191,7 +191,7 @@ class LoD4Converter:
                 self.task.setProgress(self.progress)
 
                 # Materialien
-                self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: material is calculated'))
                 EADEConverter.convertMaterials(root, materials)
                 if self.task.isCanceled():
                     return False
@@ -213,42 +213,42 @@ class LoD4Converter:
             Die GML-IDs der Bestandteile mit zugehörigen IFC-Elementen, als Liste
         """
         # Berechnungen
-        self.parent.dlg.log(self.tr(u'Building geometry: base surfaces are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: base surfaces are calculated'))
         bases, basesOrig, floors = self.calcBases(ifcBuilding)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: roof surfaces are calculated'))
         roofs, roofsOrig = self.calcRoofs(ifcBuilding)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: wall surfaces are calculated'))
         walls = self.calcWalls(ifcBuilding)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: door surfaces are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: door surfaces are calculated'))
         openings = self.calcOpenings(ifcBuilding, "ifcDoor")
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: window surfaces are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: window surfaces are calculated'))
         openings += self.calcOpenings(ifcBuilding, "ifcWindow")
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: openings are assigned to walls'))
+        self.task.logging.emit(self.tr(u'Building geometry: openings are assigned to walls'))
         walls = self.assignOpenings(openings, walls)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: wall and opening surfaces are adjusted to each other'))
+        self.task.logging.emit(self.tr(u'Building geometry: wall and opening surfaces are adjusted to each other'))
         walls, wallMainCounts = self.adjustWallOpenings(walls)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are adjusted in their height'))
+        self.task.logging.emit(self.tr(u'Building geometry: wall surfaces are adjusted in their height'))
         walls = self.adjustWallSize(walls, floors, roofs, basesOrig, roofsOrig, wallMainCounts)
         if self.task.isCanceled():
             return False
@@ -293,7 +293,7 @@ class LoD4Converter:
             floor = True
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
-                self.parent.dlg.log(self.tr(u"Due to the missing baseslab, it will also be missing in CityGML"))
+                self.task.logging.emit(self.tr(u"Due to the missing baseslab, it will also be missing in CityGML"))
                 return []
 
         for i in range(0, len(ifcSlabs)):
@@ -457,7 +457,7 @@ class LoD4Converter:
         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
         ifcRoofs += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
         if len(ifcRoofs) == 0:
-            self.parent.dlg.log(self.tr(u"Due to the missing roofs, it will also be missing in CityGML"))
+            self.task.logging.emit(self.tr(u"Due to the missing roofs, it will also be missing in CityGML"))
             return []
 
         # Geometrie
@@ -554,7 +554,7 @@ class LoD4Converter:
         # IFC-Elemente der Wände
         ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
         if len(ifcWalls) == 0:
-            self.parent.dlg.log(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
+            self.task.logging.emit(self.tr(u"Due to the missing walls, it will also be missing in CityGML"))
             return []
 
         # Heraussuchen der Außenwände
@@ -1377,7 +1377,7 @@ class LoD4Converter:
         # IFC-Elemente der Grundfläche
         ifcSpaces = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSpace", result=[])
         if len(ifcSpaces) == 0:
-            self.parent.dlg.log(self.tr(u"Due to the missing rooms, they will also be missing in CityGML"))
+            self.task.logging.emit(self.tr(u"Due to the missing rooms, they will also be missing in CityGML"))
             return []
 
         spaceCount = len(ifcSpaces)

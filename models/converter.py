@@ -21,7 +21,7 @@ from lxml.etree import QName
 
 # QGIS-Bibliotheken
 from qgis.core import QgsTask
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import QCoreApplication, pyqtSignal
 
 # Plugin
 from .xmlns import XmlNs
@@ -38,6 +38,8 @@ from .converter_lod4 import LoD4Converter
 
 class Converter(QgsTask):
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien """
+
+    logging = pyqtSignal(str)
 
     def __init__(self, description, parent, inPath, outPath, lod, eade, integr):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
@@ -58,9 +60,6 @@ class Converter(QgsTask):
         self.inPath, self.outPath = inPath, outPath
         self.lod, self.eade, self.integr = lod, eade, integr
         self.dedConv = None
-
-        # EventListener
-        self.progressChanged.connect(self.parent.progressChanged)
 
     @staticmethod
     def tr(msg):
@@ -112,7 +111,7 @@ class Converter(QgsTask):
             return False
 
         # Schreiben der CityGML in eine Datei
-        self.parent.dlg.log(self.tr(u'CityGML file is generated'))
+        self.logging.emit(self.tr(u'CityGML file is generated'))
         self.writeCGML(root)
         if self.isCanceled():
             return False
@@ -123,7 +122,7 @@ class Converter(QgsTask):
 
         # Integration der CityGML in QGIS
         if self.integr:
-            self.parent.dlg.log(self.tr(u'Model is integrated into QGIS'))
+            self.logging.emit(self.tr(u'Model is integrated into QGIS'))
             self.parent.gis.loadIntoGIS(self.outPath)
 
         # Abschließen

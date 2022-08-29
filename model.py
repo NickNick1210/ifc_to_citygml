@@ -104,6 +104,8 @@ class Model:
         # Konvertieren starten
         self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
         QgsApplication.taskManager().addTask(self.task)
+        self.task.progressChanged.connect(self.progressChanged)
+        self.task.logging.connect(lambda t: self.dlg.log(t))
 
         # Falls die Konvertierung zu Testzwecken auf dem Mainthread ausgeführt werden soll
         # conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)

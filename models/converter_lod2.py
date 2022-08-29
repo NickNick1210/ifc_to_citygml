@@ -106,7 +106,7 @@ class LoD2Converter:
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
 
             # Gebäudeattribute
-            self.parent.dlg.log(self.tr(u'Building attributes are extracted'))
+            self.task.logging.emit(self.tr(u'Building attributes are extracted'))
             height = GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
@@ -114,13 +114,13 @@ class LoD2Converter:
             self.task.setProgress(self.progress)
 
             # Gebäudebestandteile
-            self.parent.dlg.log(self.tr(u'Building bounds are calculated'))
+            self.task.logging.emit(self.tr(u'Building bounds are calculated'))
             links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg, height)
             if self.task.isCanceled():
                 return False
 
             # Gebäudekörper
-            self.parent.dlg.log(self.tr(u'Building solid is calculated'))
+            self.task.logging.emit(self.tr(u'Building solid is calculated'))
             GenConverter.convertSolid(chBldg, links, 2)
             if self.task.isCanceled():
                 return False
@@ -128,7 +128,7 @@ class LoD2Converter:
             self.task.setProgress(self.progress)
 
             # Adresse
-            self.parent.dlg.log(self.tr(u'Building address is extracted'))
+            self.task.logging.emit(self.tr(u'Building address is extracted'))
             GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             if self.task.isCanceled():
                 return False
@@ -136,7 +136,7 @@ class LoD2Converter:
             self.task.setProgress(self.progress)
 
             # Bounding Box
-            self.parent.dlg.log(self.tr(u'Building bound is calculated'))
+            self.task.logging.emit(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
@@ -146,7 +146,7 @@ class LoD2Converter:
             # EnergyADE
             if self.eade:
                 # Wetterdaten
-                self.parent.dlg.log(self.tr(u'Energy ADE: weather data is extracted'))
+                self.task.logging.emit(self.tr(u'Energy ADE: weather data is extracted'))
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 if self.task.isCanceled():
                     return False
@@ -154,7 +154,7 @@ class LoD2Converter:
                 self.task.setProgress(self.progress)
 
                 # Gebäudeattribute
-                self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
+                self.task.logging.emit(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
@@ -162,7 +162,7 @@ class LoD2Converter:
                 self.task.setProgress(self.progress)
 
                 # Thermale Zone
-                self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: thermal zone is calculated'))
                 linkUZ, chBldgTZ, constructions = EADEConverter.calcThermalZone(self.ifc, ifcBuilding, chBldg, root,
                                                                                 surfaces, 2)
                 if self.task.isCanceled():
@@ -171,7 +171,7 @@ class LoD2Converter:
                 self.task.setProgress(self.progress)
 
                 # Nutzungszone
-                self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 if self.task.isCanceled():
                     return False
@@ -179,7 +179,7 @@ class LoD2Converter:
                 self.task.setProgress(self.progress)
 
                 # Konstruktionen
-                self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: construction is calculated'))
                 materials = EADEConverter.convertConstructions(root, constructions)
                 if self.task.isCanceled():
                     return False
@@ -187,7 +187,7 @@ class LoD2Converter:
                 self.task.setProgress(self.progress)
 
                 # Materialien
-                self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
+                self.task.logging.emit(self.tr(u'Energy ADE: material is calculated'))
                 EADEConverter.convertMaterials(root, materials)
                 if self.task.isCanceled():
                     return False
@@ -211,7 +211,7 @@ class LoD2Converter:
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
-            self.parent.dlg.log(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
+            self.task.logging.emit(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -219,11 +219,11 @@ class LoD2Converter:
             ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="FLOOR")
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
-                self.parent.dlg.log(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
+                self.task.logging.emit(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
                 return
 
         # Berechnung Grundfläche
-        self.parent.dlg.log(self.tr(u'Building geometry: base surface is calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: base surface is calculated'))
         base = GenConverter.calcPlane(ifcSlabs, self.trans)
         if base is None:
             return []
@@ -234,7 +234,7 @@ class LoD2Converter:
         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
         ifcRoofs += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
         if len(ifcRoofs) == 0:
-            self.parent.dlg.log(self.tr(
+            self.task.logging.emit(self.tr(
                 u"Due to the missing roof, no building geometry can be calculated"))
             return None
 
@@ -242,27 +242,27 @@ class LoD2Converter:
             return False
 
         # Berechnungen
-        self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are extracted'))
+        self.task.logging.emit(self.tr(u'Building geometry: roof surfaces are extracted'))
         roofs = self.extractRoofs(ifcRoofs)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: wall surfaces are calculated'))
         geomWalls, roofsNew = self.calcWalls(base, roofs, height)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces between roofs are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: wall surfaces between roofs are calculated'))
         geomWallsR, roofs = self.calcRoofWalls(roofs + roofsNew)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: roof surfaces are calculated'))
+        self.task.logging.emit(self.tr(u'Building geometry: roof surfaces are calculated'))
         roofs = self.calcRoofs(roofs, base)
         if self.task.isCanceled():
             return False
 
-        self.parent.dlg.log(self.tr(u'Building geometry: roof and wall surfaces are adjusted'))
+        self.task.logging.emit(self.tr(u'Building geometry: roof and wall surfaces are adjusted'))
         geomWalls += self.checkRoofWalls(geomWallsR, roofs)
         for roof in roofs:
             roof[1] = UtilitiesGeom.simplify(roof[1], 0.01, 0.05)
@@ -569,7 +569,7 @@ class LoD2Converter:
                         else:
                             # Wenn der Startpunkt keinen Schnitt hat: Fehlendes Dach auf dem Anfangsteil der Wand
                             if ix1 == 0 and (ipt1[0] != pt1[0] or ipt1[1] != pt1[1]):
-                                self.parent.dlg.log(
+                                self.task.logging.emit(
                                     self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
 
                                 # Höhe des folgenden Punktes nehmen
@@ -611,7 +611,7 @@ class LoD2Converter:
 
                 # Wenn der Endpunkt keinen Schnitt hat: Fehlendes Dach auf dem letzten Teil der Wand
                 if lastPoint[0] != pt2[0] or lastPoint[1] != pt2[1]:
-                    self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
+                    self.task.logging.emit(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
 
                     # Höhe des vorherigen Punktes fortführen
                     ringWall.AddPoint(pt2[0], pt2[1], lastPoint[2])
@@ -633,7 +633,7 @@ class LoD2Converter:
 
             # Wenn über keinem Teil der Wand ein Dach ist
             else:
-                self.parent.dlg.log(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
+                self.task.logging.emit(self.tr(u'Due to a missing roof, a wall height can\'t be calculated!'))
                 wallsWORoof.append([pt1, pt2])
 
             if self.task.isCanceled():

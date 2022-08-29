@@ -149,7 +149,7 @@ class Base:
         """ Run-Methode, die den Ablauf startet """
 
         # Model starten
-        self.model = Model()
+        self.model = Model(self.iface)
 
         # Views und Viewmodels starten
         self.dlg = DialogVM(self, self.model)

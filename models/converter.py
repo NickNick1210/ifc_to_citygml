@@ -59,6 +59,9 @@ class Converter(QgsTask):
         self.lod, self.eade, self.integr = lod, eade, integr
         self.dedConv = None
 
+        # EventListener
+        self.progressChanged.connect(self.parent.progressChanged)
+
     @staticmethod
     def tr(msg):
         """ Übersetzt den gegebenen Text
@@ -75,9 +78,18 @@ class Converter(QgsTask):
         """ Führt die Konvertierung aus """
         # Initialisieren
         ifc = self.readIfc(self.inPath)
+        if self.lod >= 3 or (self.lod == 2 and self.eade):
+            self.setProgress(2.5)
+        else:
+            self.setProgress(5)
+
         root = self.createSchema()
         trans = Transformer(ifc)
         name = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        if self.lod >= 3 or (self.lod == 2 and self.eade):
+            self.setProgress(5)
+        else:
+            self.setProgress(10)
 
         if self.isCanceled():
             return False
@@ -102,9 +114,12 @@ class Converter(QgsTask):
         # Schreiben der CityGML in eine Datei
         self.parent.dlg.log(self.tr(u'CityGML file is generated'))
         self.writeCGML(root)
-
         if self.isCanceled():
             return False
+        if self.lod >= 3 or (self.lod == 2 and self.eade):
+            self.setProgress(97.5)
+        else:
+            self.setProgress(95)
 
         # Integration der CityGML in QGIS
         if self.integr:

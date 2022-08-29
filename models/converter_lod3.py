@@ -66,6 +66,7 @@ class LoD3Converter:
         self.trans = trans
         self.eade = eade
         self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
+        self.progress, self.bldgCount = 5, None
 
     @staticmethod
     def tr(msg):
@@ -99,6 +100,7 @@ class LoD3Converter:
             return False
 
         # Über alle enthaltenen Gebäude iterieren
+        self.bldgCount = len(ifcBuildings)
         for ifcBuilding in ifcBuildings:
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
@@ -108,6 +110,8 @@ class LoD3Converter:
             GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
+            self.progress += (2.5 / self.bldgCount)
+            self.task.setProgress(self.progress)
 
             # Gebäudebestandteile
             self.parent.dlg.log(self.tr(u'Building bounds are calculated'))
@@ -117,21 +121,27 @@ class LoD3Converter:
 
             # Gebäudekörper
             self.parent.dlg.log(self.tr(u'Building solid is calculated'))
-            GenConverter.convertLoDSolid(chBldg, links, 3)
+            GenConverter.convertSolid(chBldg, links, 3)
             if self.task.isCanceled():
                 return False
+            self.progress += (2.5 / self.bldgCount)
+            self.task.setProgress(self.progress)
 
             # Adresse
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
             GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             if self.task.isCanceled():
                 return False
+            self.progress += (2.5 / self.bldgCount)
+            self.task.setProgress(self.progress)
 
             # Bounding Box
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
+            self.progress += (2.5 / self.bldgCount)
+            self.task.setProgress(self.progress)
 
             # EnergyADE
             if self.eade:
@@ -140,12 +150,16 @@ class LoD3Converter:
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 if self.task.isCanceled():
                     return False
+                self.progress += (2.5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Gebäudeattribute
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
+                self.progress += (2.5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Thermale Zone
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
@@ -153,24 +167,32 @@ class LoD3Converter:
                                                                                 surfaces, 3)
                 if self.task.isCanceled():
                     return False
+                self.progress += (7.5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Nutzungszone
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 if self.task.isCanceled():
                     return False
+                self.progress += (2.5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Konstruktionen
                 self.parent.dlg.log(self.tr(u'Energy ADE: construction is calculated'))
                 materials = EADEConverter.convertConstructions(root, constructions)
                 if self.task.isCanceled():
                     return False
+                self.progress += (2.5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Materialien
                 self.parent.dlg.log(self.tr(u'Energy ADE: material is calculated'))
                 EADEConverter.convertMaterials(root, materials)
                 if self.task.isCanceled():
                     return False
+                self.progress += (2.5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
         return root
 
@@ -345,6 +367,10 @@ class LoD3Converter:
             if self.task.isCanceled():
                 return False
 
+            self.progress += (7 / self.bldgCount / len(ifcSlabs)) if not self.eade else (
+                    5 / self.bldgCount / len(ifcSlabs))
+            self.task.setProgress(self.progress)
+
         floors = bases
 
         # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
@@ -396,6 +422,10 @@ class LoD3Converter:
 
                 if self.task.isCanceled():
                     return False
+
+                self.progress += (3 / self.bldgCount / len(ifcSlabs)) if not self.eade else (
+                        2.5 / self.bldgCount / len(ifcSlabs))
+                self.task.setProgress(self.progress)
 
             removedBases.sort(reverse=True)
             for removedBase in removedBases:
@@ -499,6 +529,10 @@ class LoD3Converter:
             if self.task.isCanceled():
                 return False
 
+            self.progress += (10 / self.bldgCount / len(ifcRoofs)) if not self.eade else (
+                    7.5 / self.bldgCount / len(ifcRoofs))
+            self.task.setProgress(self.progress)
+
         return roofs, roofsOrig
 
     def calcWalls(self, ifcBuilding):
@@ -590,6 +624,9 @@ class LoD3Converter:
             if self.task.isCanceled():
                 return False
 
+            self.progress += (10 / self.bldgCount / len(ifcWallsExt))
+            self.task.setProgress(self.progress)
+
         return walls
 
     def calcOpenings(self, ifcBuilding, type):
@@ -657,6 +694,10 @@ class LoD3Converter:
             if self.task.isCanceled():
                 return False
 
+            self.progress += (10 / self.bldgCount / len(ifcOpeningsExt)) if not self.eade else (
+                    5 / self.bldgCount / len(ifcOpeningsExt))
+            self.task.setProgress(self.progress)
+
         return openings
 
     def assignOpenings(self, openings, walls):
@@ -690,6 +731,10 @@ class LoD3Converter:
 
             if self.task.isCanceled():
                 return False
+
+            self.progress += (10 / self.bldgCount / len(openings)) if not self.eade else (
+                        5 / self.bldgCount / len(openings))
+            self.task.setProgress(self.progress)
 
         return walls
 
@@ -1023,6 +1068,9 @@ class LoD3Converter:
             if self.task.isCanceled():
                 return False
 
+            self.progress += (10 / self.bldgCount / len(walls))
+            self.task.setProgress(self.progress)
+
         return walls, wallMainCounts
 
     def adjustWallSize(self, walls, bases, roofs, basesOrig, roofsOrig, wallMainCounts):
@@ -1239,6 +1287,9 @@ class LoD3Converter:
 
                 if self.task.isCanceled():
                     return False
+
+            self.progress += (10 / self.bldgCount / len(walls))
+            self.task.setProgress(self.progress)
 
         return walls
 

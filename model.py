@@ -12,7 +12,7 @@
 
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QCoreApplication
-from qgis.core import QgsApplication
+from qgis.core import QgsApplication, Qgis
 
 # Plugin
 from .models.ifc_analyzer import IfcAnalyzer
@@ -25,14 +25,19 @@ from .models.converter import Converter
 class Model:
     """ Zentrale Model-Klasse """
 
-    def __init__(self):
-        """ Konstruktor der zentralen Model-Klasse """
+    def __init__(self, iface):
+        """ Konstruktor der zentralen Model-Klasse
+
+        Args:
+            iface: Die QGIS-Interface-Instanz, an die sich das Plugin bindet
+        """
 
         # Initialisierung von Attributen
         self.inPath, self.outPath = None, None
         self.valid = False
         self.dlg, self.gis = None, None
         self.task = None
+        self.iface = iface
 
     def setVM(self, dlg, gis):
         """ Setzt die ViewModels
@@ -94,7 +99,7 @@ class Model:
         integr = self.dlg.getOptionIntegr()
         self.dlg.log(self.tr(u'Input') + ": " + self.inPath[self.inPath.rindex("\\") + 1:] + ", " + self.tr(
             u'Output') + ": " + self.outPath[self.outPath.rindex("\\") + 1:] + ", LoD: " + str(lod) +
-            ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
+                     ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
         self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
@@ -104,20 +109,23 @@ class Model:
         # conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
         # conv.run()
 
+    def progressChanged(self, result):
+        self.dlg.setProgress(result)
+
     def completed(self, result):
         """ Beendet die Konvertierung
 
             Args:
                 result: Ob die Konvertierung erfolgreich war, als Boolean
         """
-        # Ladebalken
-        self.dlg.setProgress(100)
-
         # Logging
         if result:
+            self.dlg.setProgress(100)
             self.dlg.log(self.tr(u'Conversion completed'))
         else:
             self.dlg.log(self.tr(u'Conversion crashed'))
+            self.iface.messageBar().pushMessage(self.tr("Error"), self.tr(u"IFC-to-CityGML conversion crashed"),
+                                                level=Qgis.Critical)
         self.task = None
 
     def cancel(self):

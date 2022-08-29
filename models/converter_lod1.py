@@ -54,6 +54,7 @@ class LoD1Converter:
         self.trans = trans
         self.eade = eade
         self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
+        self.progress, self.bldgCount = 10, None
 
     @staticmethod
     def tr(msg):
@@ -87,6 +88,7 @@ class LoD1Converter:
             return False
 
         # Über alle enthaltenen Gebäude iterieren
+        self.bldgCount = len(ifcBuildings)
         for ifcBuilding in ifcBuildings:
             self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection)
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
@@ -97,6 +99,8 @@ class LoD1Converter:
             height = GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
+            self.progress += (10 / self.bldgCount) if not self.eade else (5 / self.bldgCount)
+            self.task.setProgress(self.progress)
 
             # Gebäudekörper
             self.parent.dlg.log(self.tr(u'Building solid is calculated'))
@@ -109,12 +113,16 @@ class LoD1Converter:
             GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
             if self.task.isCanceled():
                 return False
+            self.progress += (10 / self.bldgCount)
+            self.task.setProgress(self.progress)
 
             # Bounding Box
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
+            self.progress += (10 / self.bldgCount)
+            self.task.setProgress(self.progress)
 
             # EnergyADE
             if self.eade:
@@ -123,12 +131,16 @@ class LoD1Converter:
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 if self.task.isCanceled():
                     return False
+                self.progress += (5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Gebäudeattribute
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
+                self.progress += (5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Thermale Zone
                 self.parent.dlg.log(self.tr(u'Energy ADE: thermal zone is calculated'))
@@ -136,12 +148,16 @@ class LoD1Converter:
                                                                                 1)
                 if self.task.isCanceled():
                     return False
+                self.progress += (10 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Nutzungszone
                 self.parent.dlg.log(self.tr(u'Energy ADE: usage zone is calculated'))
                 EADEConverter.calcUsageZone(self.ifc, ifcProject, ifcBuilding, chBldg, linkUZ, chBldgTZ)
                 if self.task.isCanceled():
                     return False
+                self.progress += (5 / self.bldgCount)
+                self.task.setProgress(self.progress)
 
         return root
 
@@ -172,18 +188,24 @@ class LoD1Converter:
         geometries.append(GenConverter.calcPlane(ifcSlabs, self.trans)[1])
         if self.task.isCanceled():
             return False
+        self.progress += (15 / self.bldgCount) if not self.eade else (10 / self.bldgCount)
+        self.task.setProgress(self.progress)
 
         # Berechnung des Daches
         self.parent.dlg.log(self.tr(u'Building geometry: roof surface is calculated'))
         geometries.append(self.calcRoof(geometries[0], height))
         if self.task.isCanceled():
             return False
+        self.progress += (15 / self.bldgCount) if not self.eade else (10 / self.bldgCount)
+        self.task.setProgress(self.progress)
 
         # Berechnung der Wände
         self.parent.dlg.log(self.tr(u'Building geometry: wall surfaces are calculated'))
         geometries += self.calcWalls(geometries[0], height)
         if self.task.isCanceled():
             return False
+        self.progress += (20 / self.bldgCount) if not self.eade else (10 / self.bldgCount)
+        self.task.setProgress(self.progress)
 
         # Geometrie
         if geometries is not None and len(geometries) > 0:

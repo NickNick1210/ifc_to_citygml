@@ -523,7 +523,7 @@ class GenConverter(QgsTask):
         return [ifcBase, geometry]
 
     @staticmethod
-    def convertLoDSolid(chBldg, links, lod):
+    def convertSolid(chBldg, links, lod):
         """ Gibt die Gebäudegeometrie als XLinks zu den Bounds an
 
         Args:

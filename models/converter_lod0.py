@@ -53,7 +53,8 @@ class LoD0Converter:
         self.name = name
         self.trans = trans
         self.eade = eade
-        self.geom, self.bldgGeom  = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
+        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
+        self.progress = 10
 
     @staticmethod
     def tr(msg):
@@ -87,6 +88,7 @@ class LoD0Converter:
             return False
 
         # Über alle enthaltenen Gebäude iterieren
+        bldgCount = len(ifcBuildings)
         for ifcBuilding in ifcBuildings:
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))
@@ -96,18 +98,24 @@ class LoD0Converter:
             GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
+            self.progress += (10 / bldgCount)
+            self.task.setProgress(self.progress)
 
             # Grundfläche
             self.parent.dlg.log(self.tr(u'Building footprint is calculated'))
             footPrint = self.convertFootPrint(ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
+            self.progress += (25 / bldgCount) if not self.eade else (15 / bldgCount)
+            self.task.setProgress(self.progress)
 
             # Dachkantenfläche
             self.parent.dlg.log(self.tr(u'Building roofedge is calculated'))
             self.convertRoofEdge(ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
+            self.progress += (25 / bldgCount) if not self.eade else (15 / bldgCount)
+            self.task.setProgress(self.progress)
 
             # Adresse
             self.parent.dlg.log(self.tr(u'Building address is extracted'))
@@ -116,12 +124,16 @@ class LoD0Converter:
                 self.parent.dlg.log(self.tr(u'No address details existing'))
             if self.task.isCanceled():
                 return False
+            self.progress += (10 / bldgCount)
+            self.task.setProgress(self.progress)
 
             # Bounding Box
             self.parent.dlg.log(self.tr(u'Building bound is calculated'))
             bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
+            self.progress += (10 / bldgCount)
+            self.task.setProgress(self.progress)
 
             # EnergyADE
             if self.eade:
@@ -130,12 +142,16 @@ class LoD0Converter:
                 EADEConverter.convertWeatherData(ifcProject, ifcSite, chBldg, bbox)
                 if self.task.isCanceled():
                     return False
+                self.progress += (10 / bldgCount)
+                self.task.setProgress(self.progress)
 
                 # Gebäudeattribute
                 self.parent.dlg.log(self.tr(u'Energy ADE: building attributes are extracted'))
                 EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
+                self.progress += (10 / bldgCount)
+                self.task.setProgress(self.progress)
 
         return root
 

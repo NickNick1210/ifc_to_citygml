@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.1 (23.06.2022)
+@version: v0.2 (26.08.2022)
  ***************************************************************************/
 """
 
@@ -140,7 +140,7 @@ class UtilitiesGeom:
         """ Berechnen der Fläche einer 3D-Geometrie
 
         Args:
-            geoms: Die Polygon, dessen Fläche berechnet werden sollen, als Liste
+            geoms: Die Polygone, dessen Fläche berechnet werden sollen, als Liste
 
         Returns:
             Die berechnete Fläche

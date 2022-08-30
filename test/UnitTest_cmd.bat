@@ -3,8 +3,6 @@
 set OSGEO4W_ROOT=D:\Business-Programme\QGIS\
 
 call "%OSGEO4W_ROOT%\bin\o4w_env.bat"
-call "%OSGEO4W_ROOT%\bin\qt5_env.bat"
-call "%OSGEO4W_ROOT%\bin\py3_env.bat"
 
 path %OSGEO4W_ROOT%\apps\qgis\bin;%PATH%
 set QGIS_PREFIX_PATH=%OSGEO4W_ROOT%\apps\qgis
@@ -28,8 +26,7 @@ cd /d %~dp0
 cd c:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/test
 python test_init.py
 
-python model/abc.py
+python models/test_utilitiesGeom.py
 
-python algorithm/xyz.py
 
 pause

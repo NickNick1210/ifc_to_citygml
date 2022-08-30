@@ -211,7 +211,8 @@ class LoD2Converter:
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
-            self.task.logging.emit(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
+            self.task.logging.emit(
+                self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -735,6 +736,7 @@ class LoD2Converter:
         walls, wallsLine = [], []
 
         # Alle Dächer miteinander auf Schnitt prüfen
+        ptz1, ptz2 = None, None
         for i in range(0, len(roofs)):
             roof1 = roofs[i][1]
             for j in range(i + 1, len(roofs)):
@@ -776,7 +778,6 @@ class LoD2Converter:
                         pt1, pt2 = [], []
 
                         # Z-Koordinaten der beiden Dächer heraussuchen
-                        ptz1, ptz2 = None, None
                         for k in range(0, ringInt.GetPointCount() - 1):
                             point = ogr.Geometry(ogr.wkbPoint)
                             point.AddPoint(ringInt.GetPoint(k)[0], ringInt.GetPoint(k)[1])

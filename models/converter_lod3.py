@@ -277,7 +277,7 @@ class LoD3Converter:
         Returns:
             Die berechneten Grundflächen-Geometrien, als Liste
         """
-        bases, baseNames, basesOrig = [], [], []
+        bases, baseNames, basesOrig, finalBases = [], [], [], []
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -362,6 +362,7 @@ class LoD3Converter:
                     finalSlab.append(slabGeom[j])
 
             bases.append([finalSlab, baseNames[i], [], ifcSlab])
+            finalBases.append([finalSlab, baseNames[i], [], ifcSlab])
             basesOrig.append(slabGeom)
 
             if self.task.isCanceled():
@@ -377,7 +378,7 @@ class LoD3Converter:
         if floor:
             bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
             minHeight = bases[0][0][0].GetGeometryRef(0).GetPoint(0)[2]
-            finalBases, removedBases = deepcopy(bases), []
+            removedBases = []
             for i in range(0, len(bases)):
 
                 # Unterste Flächen ohne Prüfungs durchlassen
@@ -430,10 +431,6 @@ class LoD3Converter:
             removedBases.sort(reverse=True)
             for removedBase in removedBases:
                 finalBases.pop(removedBase)
-
-        # Falls nur .BASE
-        else:
-            finalBases = bases
 
         return finalBases, basesOrig, floors
 

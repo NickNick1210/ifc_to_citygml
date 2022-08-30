@@ -51,7 +51,7 @@ class UtilitiesIfc:
             return None
 
     @staticmethod
-    def findElement(ifc, inElement, outElement, result=[], type=None):
+    def findElement(ifc, inElement, outElement, result=None, type=None):
         """ Rekursives Finden von IFC-Subelementen eines IFC-Elements
 
         Args:
@@ -59,13 +59,15 @@ class UtilitiesIfc:
             inElement: Das IFC-Element, für das die Subelemente gesucht werden sollen
             outElement: Name der IFC-Subelemente, die gesucht werden soll
             result: Feld, in dem die gefundenden Elemente gespeichert werden
-                Default: []
+                Default: None
             type: PredifinedType des IFC-Subelements, falls Eingrenzung gewünscht
                 Default: None
 
         Returns:
-            Das gesuchte PropertySet, falls gefunden. Ansonsten None
+            Die gesuchten IFC-Elemente, falls gefunden, als Liste. Ansonsten None
         """
+        if result is None:
+            result = []
         rels = ifc.get_inverse(inElement)
         for rel in rels:
 

@@ -27,6 +27,6 @@ cd c:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc
 python test_init.py
 
 python models/test_utilitiesGeom.py
-
+python models/test_utilitiesIFC.py
 
 pause

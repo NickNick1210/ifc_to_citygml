@@ -26,6 +26,8 @@ from sympy import Plane, Point3D
 sys.path.insert(0, '..')
 from models.utilitiesGeom import UtilitiesGeom
 
+#####
+
 LOGGER = logging.getLogger('QGIS')
 
 # Geometrien

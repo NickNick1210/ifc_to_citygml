@@ -28,5 +28,7 @@ python test_init.py
 
 python models/test_utilitiesGeom.py
 python models/test_utilitiesIFC.py
+python models/test_transformer.py
+python models/test_ifc_analyzer.py
 
 pause

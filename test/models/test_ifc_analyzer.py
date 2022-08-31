@@ -14,6 +14,7 @@ Unit-Test für die Modelklasse IfcAnalyzer
 import unittest
 import logging
 import sys
+import os
 
 # IFC-Bibliotheken
 import ifcopenshell
@@ -27,20 +28,33 @@ from models.ifc_analyzer import IfcAnalyzer
 LOGGER = logging.getLogger('QGIS')
 
 # IFC-Elemente
-dataPath = r"data/IFC_test.ifc"
+dirPath = os.path.dirname(os.path.abspath(__file__))
+dataPath = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test.ifc"
 ifc = ifcopenshell.open(dataPath)
-ifcSite = ifc.by_type("IfcSite")[0]
-ifcBldg = ifc.by_type("IfcBuilding")[0]
 
 
-class TestFindPset(unittest.TestCase):
+class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        #result = UtilitiesIfc.findPset(ifcSite, "Pset_SiteCommon")
-        #result = str(result)
-        corr = "{'BuildingHeightLimit': 9.0, 'GrossAreaPlanned': 0.0}"
-        #self.assertEqual(corr, result)
-        self.assertEqual(1, 1)
+        result = IfcAnalyzer(None, dataPath)
+        self.assertIsNone(result.parent)
+        self.assertIsNone(result.valTask)
+        corr = str(ifc.by_type('IfcProject')[0])
+        self.assertEqual(corr, str(result.ifc.by_type('IfcProject')[0]))
+        self.assertEqual("IFC_test", result.fileName)
+
+
+class TestRead(unittest.TestCase):
+
+    def test_1(self):
+        result = IfcAnalyzer.read(dataPath)
+        corr = str(ifc.by_type('IfcProject')[0])
+        self.assertEqual(corr, str(result.by_type('IfcProject')[0]))
+
+
+# Weitere Methoden können nicht getestet werden, da sie Verbindungen zu weiteren Klassen bzw. der QGIS-Instanz haben
+#   oder als eigenständige Tasks ausgeführt werden.
+
 
 
 if __name__ == '__main__':

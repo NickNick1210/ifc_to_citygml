@@ -18,7 +18,10 @@ import sys
 # IFC-Bibliotheken
 import ifcopenshell
 
+# XML-Bibliotheken
 from lxml import etree
+
+# Geo-Bibliotheken
 from osgeo import ogr
 
 # Plugin

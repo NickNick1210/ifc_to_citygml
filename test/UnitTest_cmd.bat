@@ -27,5 +27,6 @@ python models/test_utilitiesIFC.py
 python models/test_transformer.py
 python models/test_ifc_analyzer.py
 python models/test_converter_gen.py
+python models/test_converter_eade.py
 
 pause

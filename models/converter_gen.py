@@ -19,6 +19,7 @@ from datetime import datetime
 import ifcopenshell
 import ifcopenshell.util.pset
 from ifcopenshell.util import element
+import ifcopenshell.geom
 
 # XML-Bibliotheken
 from lxml import etree
@@ -290,7 +291,7 @@ class GenConverter(QgsTask):
                         number = ""
                 numberNr = int(number)
                 if 2700 >= numberNr >= 1000 and numberNr % 10 == 0:
-                    type = number
+                    type = int(number)
 
             # Prüfung, ob Angabe in Mapping vorhanden
             if type is None and typeIn in Mapper.functionUsageDict:
@@ -332,12 +333,10 @@ class GenConverter(QgsTask):
                 return None
 
         # Berechnung der Minimalhöhe
-        # noinspection PyUnresolvedReferences
         settings = ifcopenshell.geom.settings()
         settings.set(settings.USE_WORLD_COORDS, True)
         minHeight = sys.maxsize
         for ifcSlab in ifcSlabs:
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
             verts = shape.geometry.verts
             for i in range(2, len(verts), 3):
@@ -347,7 +346,6 @@ class GenConverter(QgsTask):
         # Berechnung der Maximalhöhe
         maxHeight = -sys.maxsize
         for ifcRoof in ifcRoofs:
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             verts = shape.geometry.verts
             for i in range(2, len(verts), 3):

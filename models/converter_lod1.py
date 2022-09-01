@@ -55,7 +55,7 @@ class LoD1Converter:
         self.trans = trans
         self.eade = eade
         self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
-        self.progress, self.bldgCount = 10, None
+        self.progress, self.bldgCount = 10, 1
 
     @staticmethod
     def tr(msg):
@@ -169,6 +169,9 @@ class LoD1Converter:
             ifcBuilding: Das IFC-Gebäude, aus dem der Gebäudeumriss entnommen werden soll
             chBldg: XML-Element, an dem der Gebäudeumriss angefügt werden soll
             height: Die Gebäudehöhe, als float
+
+        Returns:
+            Die Grundflächengeometrie
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:

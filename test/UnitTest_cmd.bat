@@ -20,13 +20,14 @@ set QGIS_PREFIX_PATH=%OSGEO4W_ROOT%\apps\qgis
 cd /d %~dp0
 cd c:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/test
 
-python test_init.py
+::python test_init.py
 
-python models/test_utilitiesGeom.py
-python models/test_utilitiesIFC.py
-python models/test_transformer.py
-python models/test_ifc_analyzer.py
-python models/test_converter_gen.py
-python models/test_converter_eade.py
+::python models/test_utilitiesGeom.py
+::python models/test_utilitiesIFC.py
+::python models/test_transformer.py
+::python models/test_ifc_analyzer.py
+::python models/test_converter_gen.py
+::python models/test_converter_eade.py
+python models/test_converter.py
 
 pause

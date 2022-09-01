@@ -6,7 +6,7 @@
 @author: Nicklas Meyer
 @version: v0.2 (26.08.2022)
 
-Unit-Test für die Modelklasse UtilitiesGeom
+Unit-Tests für die Modelklasse UtilitiesGeom
  ***************************************************************************/
 """
 
@@ -48,10 +48,9 @@ line3 = [[11, 11, 11], [21, 21, 21], [31, 41, 51]]
 line4 = [[0, 0, 0], [25, 25, 25], [40, 50, 60]]
 
 ring = geom3.GetGeometryRef(0)
-pt1 = ring.GetPoint(0)
-pt2 = ring.GetPoint(1)
-pt3 = ring.GetPoint(2)
-pt4 = ring.GetPoint(3)
+pt1, pt2, pt3, pt4 = ring.GetPoint(0), ring.GetPoint(1), ring.GetPoint(2), ring.GetPoint(3)
+
+#####
 
 
 class TestGeomToGML(unittest.TestCase):

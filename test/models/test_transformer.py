@@ -33,6 +33,8 @@ ifc = ifcopenshell.open(dataPath)
 dataPath2 = r"data/IFC_test2.ifc"
 ifc2 = ifcopenshell.open(dataPath2)
 
+#####
+
 
 class TestConstructor(unittest.TestCase):
 

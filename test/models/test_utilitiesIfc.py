@@ -6,7 +6,7 @@
 @author: Nicklas Meyer
 @version: v0.2 (26.08.2022)
 
-Unit-Test für die Modelklasse UtilitiesIfc
+Unit-Tests für die Modelklasse UtilitiesIfc
  ***************************************************************************/
 """
 
@@ -27,10 +27,11 @@ from models.utilitiesIfc import UtilitiesIfc
 LOGGER = logging.getLogger('QGIS')
 
 # IFC-Elemente
-dataPath = r"data/IFC_test.ifc"
-ifc = ifcopenshell.open(dataPath)
+ifc = ifcopenshell.open(r"data/IFC_test.ifc")
 ifcSite = ifc.by_type("IfcSite")[0]
 ifcBldg = ifc.by_type("IfcBuilding")[0]
+
+#####
 
 
 class TestFindPset(unittest.TestCase):

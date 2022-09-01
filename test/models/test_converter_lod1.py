@@ -6,7 +6,7 @@
 @author: Nicklas Meyer
 @version: v0.2 (26.08.2022)
 
-Unit-Test für die Modelklasse LoD1Converter
+Unit-Tests für die Modelklasse LoD1Converter
  ***************************************************************************/
 """
 
@@ -14,7 +14,6 @@ Unit-Test für die Modelklasse LoD1Converter
 import unittest
 import logging
 import sys
-import os
 
 # IFC-Bibliotheken
 import ifcopenshell
@@ -37,40 +36,23 @@ from models.transformer import Transformer
 LOGGER = logging.getLogger('QGIS')
 
 # IFC-Elemente
-dirPath = os.path.dirname(os.path.abspath(__file__))
-inPath1 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test.ifc"
-outPath1 = dirPath[0:dirPath.rindex("\\")+1] + "data\\CityGML_test.gml"
-inPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test3.ifc"
-outPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\CityGML_test3.gml"
-
-dataPath1 = r"data/IFC_test.ifc"
-ifc1 = ifcopenshell.open(dataPath1)
+ifc1 = ifcopenshell.open(r"data/IFC_test.ifc")
 trans1 = Transformer(ifc1)
 ifcBldg1 = ifc1.by_type("IfcBuilding")[0]
-ifcSite1 = ifc1.by_type("IfcSite")[0]
-ifcProj1 = ifc1.by_type("IfcProject")[0]
 
-dataPath2 = r"data/IFC_test3.ifc"
-ifc2 = ifcopenshell.open(dataPath2)
+ifc2 = ifcopenshell.open(r"data/IFC_test3.ifc")
 trans2 = Transformer(ifc2)
 ifcBldg2 = ifc2.by_type("IfcBuilding")[0]
-ifcSite2 = ifc2.by_type("IfcSite")[0]
-ifcProj2 = ifc2.by_type("IfcProject")[0]
 
-dataPath3 = r"data/IFC_test4.ifc"
-ifc3 = ifcopenshell.open(dataPath3)
+ifc3 = ifcopenshell.open(r"data/IFC_test4.ifc")
 trans3 = Transformer(ifc3)
 ifcBldg3 = ifc3.by_type("IfcBuilding")[0]
-ifcSite3 = ifc3.by_type("IfcSite")[0]
-ifcProj3 = ifc3.by_type("IfcProject")[0]
-
-# XML-Elemente
-root = etree.Element("root")
 
 # Geometrien
-bbox = (10, 10, 10, 20, 20, 20)
 geom1 = ogr.CreateGeometryFromWkt("Polygon((10 10 10, 10 20 10, 20 20 10, 20 10 10, 10 10 10))")
 geom2 = ogr.CreateGeometryFromWkt("Polygon((10 10 3.1415, 10 20 3.1415, 20 20 3.1415, 20 10 3.1415, 10 10 3.1415))")
+
+#####
 
 
 class TestConstructor(unittest.TestCase):
@@ -109,23 +91,23 @@ class TestConstructor(unittest.TestCase):
 class TestConvert(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
-        result = lod1Conv.convert(rootNew)
+        result = lod1Conv.convert(root)
         corr = 11410
         self.assertEqual(corr, len(etree.tostring(result)))
 
     def test_2(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
-        result = lod1Conv.convert(rootNew)
+        result = lod1Conv.convert(root)
         corr = 7806
         self.assertEqual(corr, len(etree.tostring(result)))
 
     def test_3(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc3, "ÄÖÜß", trans3, False)
-        result = lod1Conv.convert(rootNew)
+        result = lod1Conv.convert(root)
         corr = 39529
         self.assertEqual(corr, len(etree.tostring(result)))
 
@@ -133,22 +115,22 @@ class TestConvert(unittest.TestCase):
 class TestConvertSolid(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
-        result = lod1Conv.convertSolid(ifcBldg1, rootNew, 10)
+        result = lod1Conv.convertSolid(ifcBldg1, root, 10)
         corr = 2425
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
         corr = "POLYGON ((458870.063285681 5438773.62904949 110,458862.40284125 5438780.05692559 110," + \
                "458870.116292566 5438789.24945891 110,458877.776736998 5438782.82158281 110,458870.063285681 " + \
                "5438773.62904949 110))"
         self.assertEqual(corr, result.ExportToWkt())
 
     def test_2(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc2, "Test123", trans2, True)
-        result = lod1Conv.convertSolid(ifcBldg2, rootNew, 10)
+        result = lod1Conv.convertSolid(ifcBldg2, root, 10)
         corr = 5845
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
         corr = "POLYGON ((479356.600506348 5444183.43024925 -3,479356.600506348 5444185.43024925 -3," + \
                "479362.600506348 5444185.43024925 -3,479362.600506348 5444183.43024925 -3,479380.600506348 " + \
                "5444183.43024925 -3,479380.600506348 5444171.43024925 -3,479363.100506348 5444171.43024925 -3," + \
@@ -158,11 +140,11 @@ class TestConvertSolid(unittest.TestCase):
         self.assertEqual(corr, result.ExportToWkt())
 
     def test_3(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc3, "Test123", trans3, True)
-        result = lod1Conv.convertSolid(ifcBldg3, rootNew, 10)
+        result = lod1Conv.convertSolid(ifcBldg3, root, 10)
         corr = 37750
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
         corr = 85
         self.assertEqual(corr, result.GetGeometryRef(0).GetPointCount())
 

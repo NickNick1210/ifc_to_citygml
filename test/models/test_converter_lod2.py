@@ -6,7 +6,7 @@
 @author: Nicklas Meyer
 @version: v0.2 (26.08.2022)
 
-Unit-Test für die Modelklasse LoD2Converter
+Unit-Tests für die Modelklasse LoD2Converter
  ***************************************************************************/
 """
 
@@ -14,7 +14,6 @@ Unit-Test für die Modelklasse LoD2Converter
 import unittest
 import logging
 import sys
-import os
 
 # IFC-Bibliotheken
 import ifcopenshell
@@ -38,48 +37,31 @@ from models.utilitiesIfc import UtilitiesIfc
 LOGGER = logging.getLogger('QGIS')
 
 # IFC-Elemente
-dirPath = os.path.dirname(os.path.abspath(__file__))
-inPath1 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test.ifc"
-outPath1 = dirPath[0:dirPath.rindex("\\")+1] + "data\\CityGML_test.gml"
-inPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test3.ifc"
-outPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\CityGML_test3.gml"
-
-dataPath1 = r"data/IFC_test.ifc"
-ifc1 = ifcopenshell.open(dataPath1)
+ifc1 = ifcopenshell.open(r"data/IFC_test.ifc")
 trans1 = Transformer(ifc1)
 ifcBldg1 = ifc1.by_type("IfcBuilding")[0]
-ifcSite1 = ifc1.by_type("IfcSite")[0]
-ifcProj1 = ifc1.by_type("IfcProject")[0]
 
-dataPath2 = r"data/IFC_test3.ifc"
-ifc2 = ifcopenshell.open(dataPath2)
+ifc2 = ifcopenshell.open(r"data/IFC_test3.ifc")
 trans2 = Transformer(ifc2)
 ifcBldg2 = ifc2.by_type("IfcBuilding")[0]
-ifcSite2 = ifc2.by_type("IfcSite")[0]
-ifcProj2 = ifc2.by_type("IfcProject")[0]
 
-dataPath3 = r"data/IFC_test4.ifc"
-ifc3 = ifcopenshell.open(dataPath3)
+ifc3 = ifcopenshell.open(r"data/IFC_test4.ifc")
 trans3 = Transformer(ifc3)
 ifcBldg3 = ifc3.by_type("IfcBuilding")[0]
-ifcSite3 = ifc3.by_type("IfcSite")[0]
-ifcProj3 = ifc3.by_type("IfcProject")[0]
-
-# XML-Elemente
-root = etree.Element("root")
 
 # Geometrien
-bbox = (10, 10, 10, 20, 20, 20)
-geom1 = ogr.CreateGeometryFromWkt("Polygon((10 10 10, 10 20 10, 20 20 10, 20 10 10, 10 10 10))")
-geom2 = ogr.CreateGeometryFromWkt("Polygon((10 10 3.1415, 10 20 3.1415, 20 20 3.1415, 20 10 3.1415, 10 10 3.1415))")
-geom3 = ogr.CreateGeometryFromWkt("Polygon((9 9 10, 9 15 15, 21 15 15, 21 9 10, 9 9 10))")
-geom4 = ogr.CreateGeometryFromWkt("Polygon((9 15 15, 9 21 10, 21 21 10, 21 15 15, 9 15 15))")
+base = ogr.CreateGeometryFromWkt("Polygon((10 10 10, 10 20 10, 20 20 10, 20 10 10, 10 10 10))")
+roof1 = ogr.CreateGeometryFromWkt("Polygon((9 9 10, 9 15 15, 21 15 15, 21 9 10, 9 9 10))")
+roof2 = ogr.CreateGeometryFromWkt("Polygon((9 15 15, 9 21 10, 21 21 10, 21 15 15, 9 15 15))")
 wall1 = ogr.CreateGeometryFromWkt("Polygon((10 10 10,10 10 10.8333333333333,10 15 15,10 20 10.8333333333333," +
                                   "10 20 10,10 10 10))")
 wall2 = ogr.CreateGeometryFromWkt("Polygon((10 20 10,10 20 10.8333333333333,20 20 10.8333333333333,20 20 10,10 20 10))")
 wall3 = ogr.CreateGeometryFromWkt("Polygon((20 20 10,20 20 10.8333333333333,20 15 15,20 10 10.8333333333333," +
                                   "20 10 10,20 20 10))")
 wall4 = ogr.CreateGeometryFromWkt("Polygon((20 10 10,20 10 10.8333333333333,10 10 10.8333333333333,10 10 10,20 10 10))")
+
+#####
+
 
 class TestConstructor(unittest.TestCase):
 
@@ -117,9 +99,9 @@ class TestConstructor(unittest.TestCase):
 class TestConvert(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod2Conv = LoD2Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
-        result = lod2Conv.convert(rootNew)
+        result = lod2Conv.convert(root)
         corr = 24347
         self.assertEqual(corr, len(etree.tostring(result)))
 
@@ -127,11 +109,11 @@ class TestConvert(unittest.TestCase):
 class TestConvertBldgBound(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod2Conv = LoD2Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
-        result1, result2, result3 = lod2Conv.convertBldgBound(ifcBldg1, rootNew, 10)
+        result1, result2, result3 = lod2Conv.convertBldgBound(ifcBldg1, root, 10)
         corr = 5469
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
         corr = 7
         self.assertEqual(corr, len(result1))
         corr = "POLYGON ((458870.063285681 5438773.62904949 110,458862.40284125 5438780.05692559 110," + \
@@ -191,7 +173,7 @@ class TestCalcWalls(unittest.TestCase):
 
     def test_1(self):
         lod2Conv = LoD2Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
-        result1, result2 = lod2Conv.calcWalls([None, geom1], [[None, geom3], [None, geom4]], 10)
+        result1, result2 = lod2Conv.calcWalls([None, base], [[None, roof1], [None, roof2]], 10)
         corr = 4
         self.assertEqual(corr, len(result1))
         corr = "POLYGON ((10 10 10,10 10 10.8333333333333,10 15 15,10 15 15,10 20 10.8333333333333,10 20 10,10 10 10))"
@@ -210,14 +192,14 @@ class TestCalcRoofWalls(unittest.TestCase):
 
     def test_1(self):
         lod2Conv = LoD2Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
-        result1, result2 = lod2Conv.calcRoofWalls([[None, geom3], [None, geom4]])
+        result1, result2 = lod2Conv.calcRoofWalls([[None, roof1], [None, roof2]])
         corr = 0
         self.assertEqual(corr, len(result1))
         corr = 2
         self.assertEqual(corr, len(result2))
-        corr = geom3.ExportToWkt()
+        corr = roof1.ExportToWkt()
         self.assertEqual(corr, result2[0][1].ExportToWkt())
-        corr = geom4.ExportToWkt()
+        corr = roof2.ExportToWkt()
         self.assertEqual(corr, result2[1][1].ExportToWkt())
 
 
@@ -225,7 +207,7 @@ class TestCalcRoofs(unittest.TestCase):
 
     def test_1(self):
         lod2Conv = LoD2Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
-        result = lod2Conv.calcRoofs([[None, geom3], [None, geom4]], [None, geom1])
+        result = lod2Conv.calcRoofs([[None, roof1], [None, roof2]], [None, base])
         corr = 2
         self.assertEqual(corr, len(result))
         corr = "POLYGON ((20 15 15,10 15 15,10 10 10.8333333333333,20 10 10.8333333333333,20 15 15))"
@@ -238,7 +220,7 @@ class TestCheckRoofWallss(unittest.TestCase):
 
     def test_1(self):
         lod2Conv = LoD2Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
-        result = lod2Conv.checkRoofWalls([wall1, wall2, wall3, wall4], [[None, geom3], [None, geom4]])
+        result = lod2Conv.checkRoofWalls([wall1, wall2, wall3, wall4], [[None, roof1], [None, roof2]])
         corr = 4
         self.assertEqual(corr, len(result))
         corr = wall1.ExportToWkt()
@@ -254,33 +236,33 @@ class TestCheckRoofWallss(unittest.TestCase):
 class TestSetElement(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod2Conv = LoD2Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
-        result1, result2 = lod2Conv.setElement(rootNew, geom1, "GroundSurface", 2)
+        result1, result2 = lod2Conv.setElement(root, base, "GroundSurface", 2)
         corr = 583
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
         corr = 42
         self.assertEqual(corr, len(result1))
         corr = 40
         self.assertEqual(corr, len(result2))
 
     def test_2(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod2Conv = LoD2Converter(Model(), Converter(), ifc2, "Test123", trans2, False)
-        result1, result2 = lod2Conv.setElement(rootNew, geom3, "RoofSurface", 2)
+        result1, result2 = lod2Conv.setElement(root, roof1, "RoofSurface", 2)
         corr = 573
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
         corr = 42
         self.assertEqual(corr, len(result1))
         corr = 40
         self.assertEqual(corr, len(result2))
 
     def test_3(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         lod2Conv = LoD2Converter(Model(), Converter(), ifc3, "Test123", trans3, False)
-        result1, result2 = lod2Conv.setElement(rootNew, wall1, "WallSurface", 2)
+        result1, result2 = lod2Conv.setElement(root, wall1, "WallSurface", 2)
         corr = 616
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
         corr = 42
         self.assertEqual(corr, len(result1))
         corr = 40

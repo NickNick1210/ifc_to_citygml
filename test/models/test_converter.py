@@ -6,7 +6,7 @@
 @author: Nicklas Meyer
 @version: v0.2 (26.08.2022)
 
-Unit-Test für die Modelklasse Converter
+Unit-Tests für die Modelklasse Converter
  ***************************************************************************/
 """
 
@@ -21,9 +21,6 @@ import ifcopenshell
 
 # XML-Bibliotheken
 from lxml import etree
-
-# Geo-Bibliotheken
-from osgeo import ogr
 
 # Plugin
 from mock_model import Model
@@ -41,18 +38,10 @@ outPath1 = dirPath[0:dirPath.rindex("\\")+1] + "data\\CityGML_test.gml"
 inPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test3.ifc"
 outPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\CityGML_test3.gml"
 
-dataPath1 = r"data/IFC_test.ifc"
-ifc1 = ifcopenshell.open(dataPath1)
-dataPath2 = r"data/IFC_test3.ifc"
-ifc2 = ifcopenshell.open(dataPath2)
+ifc1 = ifcopenshell.open(r"data/IFC_test.ifc")
+ifc2 = ifcopenshell.open(r"data/IFC_test3.ifc")
 
-# XML-Elemente
-root = etree.Element("root")
-
-# Geometrien
-bbox = (10, 10, 10, 20, 20, 20)
-geom1 = ogr.CreateGeometryFromWkt("Polygon((10 10 10, 10 20 10, 20 20 10, 20 10 10, 10 10 10))")
-geom2 = ogr.CreateGeometryFromWkt("Polygon((10 10 3.1415, 10 20 3.1415, 20 20 3.1415, 20 10 10, 10 10 3.1415))")
+#####
 
 
 class TestConstructor(unittest.TestCase):
@@ -145,9 +134,9 @@ class TestWriteCGML(unittest.TestCase):
         self.assertEqual(corr, result)
 
     def test_2(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         conv = Converter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
-        conv.writeCGML(rootNew)
+        conv.writeCGML(root)
         f = open(outPath1, "r")
         result = ""
         for x in f:

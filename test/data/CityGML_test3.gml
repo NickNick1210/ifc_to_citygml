@@ -8,7 +8,7 @@
     </gml:Envelope>
   </gml:boundedBy>
   <core:cityObjectMember>
-    <bldg:Building gml:id="UUID_0195fd4e-6ace-478a-a8c4-b26f76f3358c">
+    <bldg:Building gml:id="UUID_f16bbd4a-8050-4738-aa7f-a0275d462d6e">
       <gml:name>Buerogebaeude</gml:name>
       <gml:description>No real Building</gml:description>
       <core:creationDate>2022-09-01</core:creationDate>

@@ -6,7 +6,7 @@
 @author: Nicklas Meyer
 @version: v0.2 (26.08.2022)
 
-Unit-Test für die Modelklasse GenConverter
+Unit-Tests für die Modelklasse GenConverter
  ***************************************************************************/
 """
 
@@ -35,26 +35,20 @@ from models.utilitiesIfc import UtilitiesIfc
 LOGGER = logging.getLogger('QGIS')
 
 # IFC-Elemente
-dataPath1 = r"data/IFC_test.ifc"
-ifc1 = ifcopenshell.open(dataPath1)
+ifc1 = ifcopenshell.open(r"data/IFC_test.ifc")
 ifcBldg1 = ifc1.by_type("IfcBuilding")[0]
 ifcSite1 = ifc1.by_type("IfcSite")[0]
 trans1 = Transformer(ifc1)
 
-dataPath2 = r"data/IFC_test3.ifc"
-ifc2 = ifcopenshell.open(dataPath2)
+ifc2 = ifcopenshell.open(r"data/IFC_test3.ifc")
 ifcBldg2 = ifc2.by_type("IfcBuilding")[0]
 ifcSite2 = ifc2.by_type("IfcSite")[0]
 trans2 = Transformer(ifc2)
 
-dataPath3 = r"data/IFC_test4.ifc"
-ifc3 = ifcopenshell.open(dataPath3)
+ifc3 = ifcopenshell.open(r"data/IFC_test4.ifc")
 ifcBldg3 = ifc3.by_type("IfcBuilding")[0]
 ifcSite3 = ifc3.by_type("IfcSite")[0]
 trans3 = Transformer(ifc3)
-
-# XML-Elemente
-root = etree.Element("root")
 
 # Geometrien
 geom1 = ogr.CreateGeometryFromWkt("GeometryCollection(Polygon((10 10 10, 10 20 10, 20 20 10, 20 15 10, 10 10 10)))")
@@ -65,25 +59,31 @@ geom4 = ogr.CreateGeometryFromWkt("GeometryCollection(Polygon((10 10 10, 10 20 1
                                   "Polygon((50 50 10, 50 90 10, 90 90 10, 90 70 10, 50 50 10)), " +
                                   "Polygon((10 10 10, 10 20 10, 20 20 20, 20 15 20, 10 10 10)))")
 
+#####
+
 
 class TestConvertBound(unittest.TestCase):
 
     def test_1(self):
+        root = etree.Element("root")
         result = GenConverter.convertBound(geom1, root, trans1)
         corr = (10, 20, 10, 20, 10, 10)
         self.assertEqual(corr, result)
 
     def test_2(self):
+        root = etree.Element("root")
         result = GenConverter.convertBound(geom2, root, trans1)
         corr = (10, 90, 10, 90, 10, 10)
         self.assertEqual(corr, result)
 
     def test_3(self):
+        root = etree.Element("root")
         result = GenConverter.convertBound(geom3, root, trans1)
         corr = (10, 20, 10, 20, 10, 20)
         self.assertEqual(corr, result)
 
     def test_4(self):
+        root = etree.Element("root")
         result = GenConverter.convertBound(geom4, root, trans1)
         corr = (10, 90, 10, 90, 10, 20)
         self.assertEqual(corr, result)
@@ -92,28 +92,28 @@ class TestConvertBound(unittest.TestCase):
 class TestConvertBldgAttr(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
-        result = GenConverter.convertBldgAttr(ifc1, ifcBldg1, rootNew)
+        root = etree.Element("root")
+        result = GenConverter.convertBldgAttr(ifc1, ifcBldg1, root)
         corr = 6.51769
         self.assertAlmostEqual(corr, result, 3)
         corr = 1514
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
 
     def test_2(self):
-        rootNew = etree.Element("root")
-        result = GenConverter.convertBldgAttr(ifc2, ifcBldg2, rootNew)
+        root = etree.Element("root")
+        result = GenConverter.convertBldgAttr(ifc2, ifcBldg2, root)
         corr = 15.34932
         self.assertAlmostEqual(corr, result, 3)
         corr = 1520
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
 
     def test_3(self):
-        rootNew = etree.Element("root")
-        result = GenConverter.convertBldgAttr(ifc3, ifcBldg3, rootNew)
+        root = etree.Element("root")
+        result = GenConverter.convertBldgAttr(ifc3, ifcBldg3, root)
         corr = 11.01
         self.assertAlmostEqual(corr, result, 3)
         corr = 918
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
 
 
 class TestConvertFunctionUsage(unittest.TestCase):
@@ -165,25 +165,25 @@ class TestCalcHeight(unittest.TestCase):
 class TestConvertAddress(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
-        result = GenConverter.convertAddress(ifcBldg1, ifcSite1, rootNew)
+        root = etree.Element("root")
+        result = GenConverter.convertAddress(ifcBldg1, ifcSite1, root)
         self.assertTrue(result)
         corr = 655
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
 
     def test_2(self):
-        rootNew = etree.Element("root")
-        result = GenConverter.convertAddress(ifcBldg2, ifcSite2, rootNew)
+        root = etree.Element("root")
+        result = GenConverter.convertAddress(ifcBldg2, ifcSite2, root)
         self.assertFalse(result)
         corr = 7
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
 
     def test_3(self):
-        rootNew = etree.Element("root")
-        result = GenConverter.convertAddress(ifcBldg3, ifcSite3, rootNew)
+        root = etree.Element("root")
+        result = GenConverter.convertAddress(ifcBldg3, ifcSite3, root)
         self.assertFalse(result)
         corr = 7
-        self.assertEqual(corr, len(etree.tostring(rootNew)))
+        self.assertEqual(corr, len(etree.tostring(root)))
 
 
 class TestCalcPlane(unittest.TestCase):
@@ -233,23 +233,23 @@ class TestCalcPlane(unittest.TestCase):
 class TestConvertSolid(unittest.TestCase):
 
     def test_1(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         links = ["ABC123", "GML_ID1234567890", "987zyx"]
-        GenConverter.convertSolid(rootNew, links, 2)
+        GenConverter.convertSolid(root, links, 2)
         corr = b'<root><ns0:lod2Solid xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:Solid xmlns:ns1=' + \
                b'"http://www.opengis.net/gml"><ns1:exterior><ns1:CompositeSurface><ns1:surfaceMember xmlns:ns2=' + \
                b'"http://www.w3.org/1999/xlink" ns2:href="#ABC123"/><ns1:surfaceMember xmlns:ns3=' + \
                b'"http://www.w3.org/1999/xlink" ns3:href="#GML_ID1234567890"/><ns1:surfaceMember xmlns:ns4=' + \
                b'"http://www.w3.org/1999/xlink" ns4:href="#987zyx"/></ns1:CompositeSurface></ns1:exterior>' + \
                b'</ns1:Solid></ns0:lod2Solid></root>'
-        self.assertEqual(corr, etree.tostring(rootNew))
+        self.assertEqual(corr, etree.tostring(root))
 
     def test_2(self):
-        rootNew = etree.Element("root")
+        root = etree.Element("root")
         links = []
-        GenConverter.convertSolid(rootNew, links, 3)
+        GenConverter.convertSolid(root, links, 3)
         corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(rootNew))
+        self.assertEqual(corr, etree.tostring(root))
 
 
 if __name__ == '__main__':

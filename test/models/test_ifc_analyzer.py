@@ -6,7 +6,7 @@
 @author: Nicklas Meyer
 @version: v0.2 (26.08.2022)
 
-Unit-Test für die Modelklasse IfcAnalyzer
+Unit-Tests für die Modelklasse IfcAnalyzer
  ***************************************************************************/
 """
 
@@ -31,11 +31,13 @@ LOGGER = logging.getLogger('QGIS')
 # IFC-Elemente
 dirPath = os.path.dirname(os.path.abspath(__file__))
 inPath1 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test.ifc"
-inPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test3.ifc"
-inPath3 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test4.ifc"
 ifc1 = ifcopenshell.open(inPath1)
+inPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test3.ifc"
 ifc2 = ifcopenshell.open(inPath2)
+inPath3 = dirPath[0:dirPath.rindex("\\")+1] + "data\\IFC_test4.ifc"
 ifc3 = ifcopenshell.open(inPath3)
+
+#####
 
 
 class TestConstructor(unittest.TestCase):

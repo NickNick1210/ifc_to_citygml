@@ -32,8 +32,8 @@ cd c:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc
 ::python models/test_converter_eade.py
 ::python models/test_converter.py
 ::python models/test_converter_lod0.py
-python models/test_converter_lod1.py
-::python models/test_converter_lod2.py
+::python models/test_converter_lod1.py
+python models/test_converter_lod2.py
 ::python models/test_converter_lod3.py
 ::python models/test_converter_lod4.py
 

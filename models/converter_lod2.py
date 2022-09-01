@@ -66,7 +66,7 @@ class LoD2Converter:
         self.trans = trans
         self.eade = eade
         self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
-        self.progress, self.bldgCount = 10 if not eade else 5, None
+        self.progress, self.bldgCount = 10 if not eade else 5, 1
 
     @staticmethod
     def tr(msg):

@@ -54,9 +54,18 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
 
         # EventListener für die Knöpfe
         self.button_run.clicked.connect(model.run)
+        self.button_close.clicked.connect(self.close)
+
+        # EventListener für die Dateiangaben
         self.fileWidget_ifc.fileChanged.connect(model.ifcFileChanged)
         self.fileWidget_cgml.fileChanged.connect(model.cgmlFileChanged)
-        self.button_close.clicked.connect(self.close)
+
+        # EventListener für die Einstellungen
+        self.radioButton_lod0.clicked.connect(self.activateIntegr)
+        self.radioButton_lod1.clicked.connect(self.activateIntegr)
+        self.radioButton_lod2.clicked.connect(self.deactivateIntegr)
+        self.radioButton_lod3.clicked.connect(self.deactivateIntegr)
+        self.radioButton_lod4.clicked.connect(self.deactivateIntegr)
 
         self.log(QCoreApplication.translate('DialogVM', u'Tool started'))
 
@@ -64,8 +73,30 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         self.radioButton_lod4.setDisabled(True)
 
     def closeEvent(self, event):
+        """ Behandelt das Schließen des Fensters
+
+        Args:
+            event: Das Close-Event
+        """
         self.model.cancel()
         super()
+
+    def activateIntegr(self, event):
+        """ Aktiviert die QGIS-Integration-Option nach Auswahl eines dazu geeigneten Level of Detail (LoD0/1)
+
+        Args:
+            event: Das Clicked-Event
+        """
+        self.checkBox_integr.setDisabled(False)
+
+    def deactivateIntegr(self, event):
+        """ Deaktiviert die QGIS-Integration-Option nach Auswahl eines dazu ungeeigneten Level of Detail (LoD2/3/4)
+
+        Args:
+            event: Das Clicked-Event
+        """
+        self.checkBox_integr.setDisabled(True)
+        self.checkBox_integr.setChecked(False)
 
     def getInputPath(self):
         """ Gibt den Eingabepfad zurück.

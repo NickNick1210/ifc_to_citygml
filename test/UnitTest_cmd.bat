@@ -17,17 +17,20 @@ set PYTHONPATH=%OSGEO4W_ROOT%\apps\Python39\lib\site-packages;%PYTHONPATH%
 set QT_QPA_PLATFORM_PLUGIN_PATH=%OSGEO4W_ROOT%\apps\Qt5\plugins\platforms
 set QGIS_PREFIX_PATH=%OSGEO4W_ROOT%\apps\qgis
 
+set CPL_LOG=NUL
+
 cd /d %~dp0
 cd c:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/test
 
-::python test_init.py
+python test_init.py
 
-::python models/test_utilitiesGeom.py
-::python models/test_utilitiesIFC.py
-::python models/test_transformer.py
+python models/test_utilitiesGeom.py
+python models/test_utilitiesIFC.py
+python models/test_transformer.py
 python models/test_ifc_analyzer.py
-::python models/test_converter_gen.py
-::python models/test_converter_eade.py
-::python models/test_converter.py
+python models/test_converter_gen.py
+python models/test_converter_eade.py
+python models/test_converter.py
+python models/test_converter_lod0.py
 
 pause

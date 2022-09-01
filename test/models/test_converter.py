@@ -26,7 +26,7 @@ from lxml import etree
 from osgeo import ogr
 
 # Plugin
-from dep_model import Model
+from mock_model import Model
 sys.path.insert(0, '..')
 from models.converter import Converter
 

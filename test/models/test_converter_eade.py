@@ -27,7 +27,6 @@ from osgeo import ogr
 # Plugin
 sys.path.insert(0, '..')
 from models.converter_eade import EADEConverter
-from models.utilitiesIfc import UtilitiesIfc
 
 #####
 

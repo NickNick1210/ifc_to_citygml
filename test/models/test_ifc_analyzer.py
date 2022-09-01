@@ -20,7 +20,7 @@ import os
 import ifcopenshell
 
 # Plugin
-from dep_model import Model
+from mock_model import Model
 sys.path.insert(0, '..')
 from models.ifc_analyzer import IfcAnalyzer
 

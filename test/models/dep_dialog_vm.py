@@ -9,5 +9,17 @@ from qgis.PyQt.QtCore import QCoreApplication
 
 
 class DialogVM:
+
+    def __init__(self):
+        self.logText = ""
+        self.ifcInfo = ""
+        self.ifcMsg = ""
+
     def log(self, msg):
-        pass
+        self.logText = msg
+
+    def setIfcInfo(self, msg):
+        self.ifcInfo = msg
+
+    def setIfcMsg(self, msg):
+        self.ifcMsg = msg

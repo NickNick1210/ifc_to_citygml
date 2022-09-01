@@ -26,6 +26,7 @@ from lxml import etree
 from osgeo import ogr
 
 # Plugin
+from dep_model import Model
 sys.path.insert(0, '..')
 from models.converter import Converter
 
@@ -42,21 +43,8 @@ outPath2 = dirPath[0:dirPath.rindex("\\")+1] + "data\\CityGML_test3.gml"
 
 dataPath1 = r"data/IFC_test.ifc"
 ifc1 = ifcopenshell.open(dataPath1)
-ifcBldg1 = ifc1.by_type("IfcBuilding")[0]
-ifcSite1 = ifc1.by_type("IfcSite")[0]
-ifcProj1 = ifc1.by_type("IfcProject")[0]
-
 dataPath2 = r"data/IFC_test3.ifc"
 ifc2 = ifcopenshell.open(dataPath2)
-ifcBldg2 = ifc2.by_type("IfcBuilding")[0]
-ifcSite2 = ifc2.by_type("IfcSite")[0]
-ifcProj2 = ifc2.by_type("IfcProject")[0]
-
-dataPath3 = r"data/IFC_test4.ifc"
-ifc3 = ifcopenshell.open(dataPath3)
-ifcBldg3 = ifc3.by_type("IfcBuilding")[0]
-ifcSite3 = ifc3.by_type("IfcSite")[0]
-ifcProj3 = ifc3.by_type("IfcProject")[0]
 
 # XML-Elemente
 root = etree.Element("root")
@@ -81,15 +69,29 @@ class TestConstructor(unittest.TestCase):
         self.assertIsNone(result.dedConv)
 
     def test_2(self):
-        result = Converter("IFC-to-CityGML Conversion", None, inPath2, outPath2, 3, True, True)
+        model = Model()
+        result = Converter("IFC-to-CityGML Conversion", model, inPath2, outPath2, 3, True, True)
         self.assertIsNone(result.exception)
-        self.assertIsNone(result.parent)
+        self.assertEqual(model, result.parent)
         self.assertEqual(inPath2, result.inPath)
         self.assertEqual(outPath2, result.outPath)
         self.assertEqual(3, result.lod)
         self.assertTrue(result.eade)
         self.assertTrue(result.integr)
         self.assertIsNone(result.dedConv)
+
+
+class TestRun(unittest.TestCase):
+
+    def test_1(self):
+        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, False, False)
+        result = conv.run()
+        self.assertTrue(result)
+
+    def test_2(self):
+        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 1, True, False)
+        result = conv.run()
+        self.assertTrue(result)
 
 
 class TestReadIfc(unittest.TestCase):
@@ -155,7 +157,17 @@ class TestWriteCGML(unittest.TestCase):
         self.assertEqual(corr, result)
 
 
-# run und finished können nicht getestet werden, da es sie im Endeffekt eine QGIS-Instanz bzw. die GUI benötigen
+class TestFinished(unittest.TestCase):
+
+    def test_1(self):
+        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 0, False, False)
+        conv.finished(True)
+        self.assertTrue(conv.parent.completedTest)
+
+    def test_2(self):
+        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, True, True)
+        conv.finished(False)
+        self.assertTrue(conv.parent.completedTest)
 
 
 if __name__ == '__main__':

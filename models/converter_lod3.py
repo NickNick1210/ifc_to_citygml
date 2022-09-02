@@ -14,11 +14,11 @@
 import math
 import sys
 import uuid
-from copy import deepcopy
 
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
+import ifcopenshell.geom
 
 # XML-Bibliotheken
 from lxml import etree
@@ -276,6 +276,8 @@ class LoD3Converter:
 
         Returns:
             Die berechneten Grundflächen-Geometrien, als Liste
+            Alle Grundflächen-Geometrien ohne Aussortierung, als Liste
+            Alle Geschossflächen-Geometrien, als Liste
         """
         bases, baseNames, basesOrig, finalBases = [], [], [], []
 
@@ -293,10 +295,8 @@ class LoD3Converter:
         for i in range(0, len(ifcSlabs)):
             ifcSlab = ifcSlabs[i]
             baseNames.append(ifcSlab.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
             # Vertizes
             verts = shape.geometry.verts
@@ -442,6 +442,7 @@ class LoD3Converter:
 
         Returns:
             Die berechneten Dächer, als Liste
+            Alle Dächer-Geometrien ohne Aussortierung, als Liste
         """
         roofs, roofNames, roofsOrig = [], [], []
 
@@ -456,10 +457,8 @@ class LoD3Converter:
         for i in range(0, len(ifcRoofs)):
             ifcRoof = ifcRoofs[i]
             roofNames.append(ifcRoof.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             # Vertizes
             verts = shape.geometry.verts
@@ -573,10 +572,8 @@ class LoD3Converter:
         for i in range(0, len(ifcWallsExt)):
             ifcWall = ifcWallsExt[i]
             wallNames.append(ifcWall.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcWall)
             # Vertizes
             verts = shape.geometry.verts
@@ -665,10 +662,8 @@ class LoD3Converter:
         for i in range(0, len(ifcOpeningsExt)):
             ifcOpening = ifcOpeningsExt[i]
             openingNames.append(ifcOpening.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcOpening)
             # Vertizes
             verts = shape.geometry.verts

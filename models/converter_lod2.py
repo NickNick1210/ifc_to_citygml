@@ -19,6 +19,7 @@ import numpy as np
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
+import ifcopenshell.geom
 
 # XML-Bibliotheken
 from lxml import etree
@@ -328,10 +329,8 @@ class LoD2Converter:
         """
         roofs = []
         for ifcRoof in ifcRoofs:
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             # Vertizes
             verts = shape.geometry.verts

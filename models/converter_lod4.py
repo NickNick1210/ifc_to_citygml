@@ -18,6 +18,7 @@ from copy import deepcopy
 # IFC-Bibliotheken
 import ifcopenshell
 import ifcopenshell.util.pset
+import ifcopenshell.geom
 
 # XML-Bibliotheken
 from lxml import etree
@@ -299,10 +300,8 @@ class LoD4Converter:
         for i in range(0, len(ifcSlabs)):
             ifcSlab = ifcSlabs[i]
             baseNames.append(ifcSlab.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
             # Vertizes
             verts = shape.geometry.verts
@@ -464,10 +463,8 @@ class LoD4Converter:
         for i in range(0, len(ifcRoofs)):
             ifcRoof = ifcRoofs[i]
             roofNames.append(ifcRoof.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
             # Vertizes
             verts = shape.geometry.verts
@@ -581,10 +578,8 @@ class LoD4Converter:
         for i in range(0, len(ifcWallsExt)):
             ifcWall = ifcWallsExt[i]
             wallNames.append(ifcWall.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcWall)
             # Vertizes
             verts = shape.geometry.verts
@@ -668,10 +663,8 @@ class LoD4Converter:
         for i in range(0, len(ifcOpeningsExt)):
             ifcOpening = ifcOpeningsExt[i]
             openingNames.append(ifcOpening.Name)
-            # noinspection PyUnresolvedReferences
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            # noinspection PyUnresolvedReferences
             shape = ifcopenshell.geom.create_shape(settings, ifcOpening)
             # Vertizes
             verts = shape.geometry.verts

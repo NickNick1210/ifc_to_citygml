@@ -41,8 +41,7 @@ class TestConstructor(unittest.TestCase):
     def test_1(self):
         result = Transformer(ifc)
         self.assertEqual(ifc, result.ifc)
-        corr = 32632
-        self.assertEqual(corr, result.epsg)
+        self.assertEqual(32632, result.epsg)
         corr = [458870.0632856814, 5438773.629049492, 110.0]
         self.assertEqual(corr, result.originShift)
         corr = [[0.64278761, 0.76604444, 0], [-0.76604444, 0.64278761, 0], [0, 0, 1]]
@@ -51,8 +50,7 @@ class TestConstructor(unittest.TestCase):
     def test_2(self):
         result = Transformer(ifc2)
         self.assertEqual(ifc2, result.ifc)
-        corr = 32633
-        self.assertEqual(corr, result.epsg)
+        self.assertEqual(32633, result.epsg)
         corr = [509733.27041584934, 6096718.499613839, 210.0]
         self.assertEqual(corr, result.originShift)
         corr = [[0.996923, 0.124615, 0], [-0.124615, 0.996923, 0], [0, 0, 1]]
@@ -63,13 +61,11 @@ class TestMergeDegrees(unittest.TestCase):
 
     def test_1(self):
         result = Transformer.mergeDegrees([53, 8, 34, 6])
-        corr = 53.142934
-        self.assertAlmostEqual(corr, result, 3)
+        self.assertAlmostEqual(53.142934, result, 3)
 
     def test_2(self):
         result = Transformer.mergeDegrees([8, 12, 0, 8])
-        corr = 8.200222
-        self.assertAlmostEqual(corr, result, 3)
+        self.assertAlmostEqual(8.200222, result, 3)
 
 
 class TestGeoreferencePoint(unittest.TestCase):

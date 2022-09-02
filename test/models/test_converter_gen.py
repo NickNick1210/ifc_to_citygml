@@ -94,72 +94,58 @@ class TestConvertBldgAttr(unittest.TestCase):
     def test_1(self):
         root = etree.Element("root")
         result = GenConverter.convertBldgAttr(ifc1, ifcBldg1, root)
-        corr = 6.51769
-        self.assertAlmostEqual(corr, result, 3)
-        corr = 1514
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertAlmostEqual(6.51769, result, 3)
+        self.assertEqual(1514, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         result = GenConverter.convertBldgAttr(ifc2, ifcBldg2, root)
-        corr = 15.34932
-        self.assertAlmostEqual(corr, result, 3)
-        corr = 1520
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertAlmostEqual(15.34932, result, 3)
+        self.assertEqual(1520, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         result = GenConverter.convertBldgAttr(ifc3, ifcBldg3, root)
-        corr = 11.01
-        self.assertAlmostEqual(corr, result, 3)
-        corr = 918
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertAlmostEqual(11.01, result, 3)
+        self.assertEqual(918, len(etree.tostring(root)))
 
 
 class TestConvertFunctionUsage(unittest.TestCase):
 
     def test_1(self):
         result = GenConverter.convertFunctionUsage("1680")
-        corr = 1680
-        self.assertEqual(corr, result)
+        self.assertEqual(1680, result)
 
     def test_2(self):
         result = GenConverter.convertFunctionUsage("3210")
-        corr = None
-        self.assertEqual(corr, result)
+        self.assertIsNone(result)
 
     def test_3(self):
         result = GenConverter.convertFunctionUsage("hospital")
-        corr = 2310
-        self.assertEqual(corr, result)
+        self.assertEqual(2310, result)
 
     def test_4(self):
         result = GenConverter.convertFunctionUsage("Bibliothek")
-        corr = 2190
-        self.assertEqual(corr, result)
+        self.assertEqual(2190, result)
 
     def test_5(self):
         result = GenConverter.convertFunctionUsage("Betreutes Wohnen")
-        corr = 1000
-        self.assertEqual(corr, result)
+        self.assertEqual(1000, result)
 
 
 class TestCalcHeight(unittest.TestCase):
 
     def test_1(self):
         result = GenConverter.calcHeight(ifc1, ifcBldg1)
-        corr = 6.51769
-        self.assertAlmostEqual(corr, result, 3)
+        self.assertAlmostEqual(6.51769, result, 3)
 
     def test_2(self):
         result = GenConverter.calcHeight(ifc2, ifcBldg2)
-        corr = 15.34932
-        self.assertAlmostEqual(corr, result, 3)
+        self.assertAlmostEqual(15.34932, result, 3)
 
     def test_3(self):
         result = GenConverter.calcHeight(ifc3, ifcBldg3)
-        corr = 11.01
-        self.assertAlmostEqual(corr, result, 3)
+        self.assertAlmostEqual(11.01, result, 3)
 
 
 class TestConvertAddress(unittest.TestCase):
@@ -168,22 +154,19 @@ class TestConvertAddress(unittest.TestCase):
         root = etree.Element("root")
         result = GenConverter.convertAddress(ifcBldg1, ifcSite1, root)
         self.assertTrue(result)
-        corr = 655
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(655, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         result = GenConverter.convertAddress(ifcBldg2, ifcSite2, root)
         self.assertFalse(result)
-        corr = 7
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(7, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         result = GenConverter.convertAddress(ifcBldg3, ifcSite3, root)
         self.assertFalse(result)
-        corr = 7
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(7, len(etree.tostring(root)))
 
 
 class TestCalcPlane(unittest.TestCase):
@@ -191,8 +174,7 @@ class TestCalcPlane(unittest.TestCase):
     def test_1(self):
         ifcSlabs = UtilitiesIfc.findElement(ifc1, ifcBldg1, "IfcSlab", result=[], type="BASESLAB")
         result = GenConverter.calcPlane(ifcSlabs, trans1)
-        corr = ifcSlabs[0]
-        self.assertEqual(corr, result[0])
+        self.assertEqual(ifcSlabs[0], result[0])
         corr = "POLYGON ((458870.063285681 5438773.62904949 110,458862.40284125 5438780.05692559 110," + \
                "458870.116292566 5438789.24945891 110,458877.776736998 5438782.82158281 110," + \
                "458870.063285681 5438773.62904949 110))"
@@ -201,8 +183,7 @@ class TestCalcPlane(unittest.TestCase):
     def test_2(self):
         ifcSlabs = UtilitiesIfc.findElement(ifc1, ifcBldg1, "IfcSlab", result=[], type="ROOF")
         result = GenConverter.calcPlane(ifcSlabs, trans1)
-        corr = ifcSlabs[0]
-        self.assertEqual(corr, result[0])
+        self.assertEqual(ifcSlabs[0], result[0])
         corr = "POLYGON ((458878.864175246 5438782.56181742 113,458870.50793632 5438772.60323966 113," + \
                "458861.315403002 5438780.31669098 113,458869.671641928 5438790.27526874 113," + \
                "458878.864175246 5438782.56181742 113))"
@@ -211,8 +192,7 @@ class TestCalcPlane(unittest.TestCase):
     def test_3(self):
         ifcSlabs = UtilitiesIfc.findElement(ifc2, ifcBldg2, "IfcSlab", result=[], type="FLOOR")
         result = GenConverter.calcPlane(ifcSlabs, trans2)
-        corr = ifcSlabs[0]
-        self.assertEqual(corr, result[0])
+        self.assertEqual(ifcSlabs[0], result[0])
         corr = "POLYGON ((479356.600506348 5444183.43024925 -3,479356.600506348 5444185.43024925 -3," + \
                "479362.600506348 5444185.43024925 -3,479362.600506348 5444183.43024925 -3,479380.600506348 " + \
                "5444183.43024925 -3,479380.600506348 5444171.43024925 -3,479363.100506348 5444171.43024925 " + \
@@ -224,18 +204,15 @@ class TestCalcPlane(unittest.TestCase):
     def test_4(self):
         ifcSlabs = UtilitiesIfc.findElement(ifc3, ifcBldg3, "IfcSlab", result=[], type="FLOOR")
         result = GenConverter.calcPlane(ifcSlabs, trans3)
-        corr = ifcSlabs[0]
-        self.assertEqual(corr, result[0])
-        corr = 3235
-        self.assertEqual(corr, len(result[1].ExportToWkt()))
+        self.assertEqual(ifcSlabs[0], result[0])
+        self.assertEqual(3235, len(result[1].ExportToWkt()))
 
 
 class TestConvertSolid(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        links = ["ABC123", "GML_ID1234567890", "987zyx"]
-        GenConverter.convertSolid(root, links, 2)
+        GenConverter.convertSolid(root, ["ABC123", "GML_ID1234567890", "987zyx"], 2)
         corr = b'<root><ns0:lod2Solid xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:Solid xmlns:ns1=' + \
                b'"http://www.opengis.net/gml"><ns1:exterior><ns1:CompositeSurface><ns1:surfaceMember xmlns:ns2=' + \
                b'"http://www.w3.org/1999/xlink" ns2:href="#ABC123"/><ns1:surfaceMember xmlns:ns3=' + \
@@ -246,10 +223,8 @@ class TestConvertSolid(unittest.TestCase):
 
     def test_2(self):
         root = etree.Element("root")
-        links = []
-        GenConverter.convertSolid(root, links, 3)
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        GenConverter.convertSolid(root, [], 3)
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
 
 if __name__ == '__main__':

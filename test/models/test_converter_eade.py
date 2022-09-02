@@ -76,14 +76,12 @@ class TestConvertWeatherData(unittest.TestCase):
     def test_2(self):
         root = etree.Element("root")
         EADEConverter.convertWeatherData(ifcProj2, ifcSite2, root, bbox)
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
     def test_3(self):
         root = etree.Element("root")
         EADEConverter.convertWeatherData(ifcProj3, ifcSite3, root, bbox)
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
 
 class TestConvertBldgAttr(unittest.TestCase):
@@ -130,20 +128,17 @@ class TestCalcUsageZone(unittest.TestCase):
     def test_1(self):
         root = etree.Element("root")
         EADEConverter.calcUsageZone(ifc1, ifcProj1, ifcBldg1, root, "GML_abc123", [])
-        corr = 827
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(827, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         EADEConverter.calcUsageZone(ifc2, ifcProj2, ifcBldg2, root, "GML_abc123", [])
-        corr = 175
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(175, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         EADEConverter.calcUsageZone(ifc3, ifcProj3, ifcBldg3, root, "GML_abc123", [])
-        corr = 175
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(175, len(etree.tostring(root)))
 
 
 class TestConstructTempSchedule(unittest.TestCase):
@@ -151,26 +146,22 @@ class TestConstructTempSchedule(unittest.TestCase):
     def test_1(self):
         root = etree.Element("root")
         EADEConverter.constructTempSchedule(ifc1, root, "Heating", ifcBldg1)
-        corr = 442
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(442, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         EADEConverter.constructTempSchedule(ifc1, root, "Cooling", ifcBldg1)
-        corr = 441
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(441, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         EADEConverter.constructTempSchedule(ifc2, root, "Heating", ifcBldg2)
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
     def test_4(self):
         root = etree.Element("root")
         EADEConverter.constructTempSchedule(ifc3, root, "Cooling", ifcBldg3)
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
 
 class TestConstructEquipSchedule(unittest.TestCase):
@@ -178,20 +169,17 @@ class TestConstructEquipSchedule(unittest.TestCase):
     def test_1(self):
         root = etree.Element("root")
         EADEConverter.constructEquipSchedule(root, "ElectricalAppliances")
-        corr = 565
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(565, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         EADEConverter.constructEquipSchedule(root, "LightingFacilities")
-        corr = 555
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(555, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         EADEConverter.constructEquipSchedule(root, "DHWFacilities")
-        corr = 530
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(530, len(etree.tostring(root)))
 
 
 class TestCalcThermalZone(unittest.TestCase):
@@ -199,32 +187,27 @@ class TestCalcThermalZone(unittest.TestCase):
     def test_1(self):
         root = etree.Element("root")
         EADEConverter.calcThermalZone(ifc1, ifcBldg1, root, [], [], 1)
-        corr = 425
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(425, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         EADEConverter.calcThermalZone(ifc1, ifcBldg1, root, [], [], 2)
-        corr = 425
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(425, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         EADEConverter.calcThermalZone(ifc1, ifcBldg1, root, [], [], 3)
-        corr = 425
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(425, len(etree.tostring(root)))
 
     def test_4(self):
         root = etree.Element("root")
         EADEConverter.calcThermalZone(ifc2, ifcBldg2, root, [], [], 3)
-        corr = 425
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(425, len(etree.tostring(root)))
 
     def test_5(self):
         root = etree.Element("root")
         EADEConverter.calcThermalZone(ifc3, ifcBldg3, root, [], [], 2)
-        corr = 425
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(425, len(etree.tostring(root)))
 
 
 class TestCalcThermalBoundaries(unittest.TestCase):
@@ -232,26 +215,22 @@ class TestCalcThermalBoundaries(unittest.TestCase):
     def test_1(self):
         root = etree.Element("root")
         EADEConverter.calcThermalBoundaries(ifc1, [], root, 2, [], "GML_abc123")
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
     def test_2(self):
         root = etree.Element("root")
         EADEConverter.calcThermalBoundaries(ifc1, [], root, 3, [], "GML_abc123")
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
     def test_3(self):
         root = etree.Element("root")
         EADEConverter.calcThermalBoundaries(ifc2, [], root, 2, [], "GML_abc123")
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
     def test_4(self):
         root = etree.Element("root")
         EADEConverter.calcThermalBoundaries(ifc3, [], root, 3, [], "GML_abc123")
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
 
 class TestCalcThermalOpenings(unittest.TestCase):
@@ -259,20 +238,17 @@ class TestCalcThermalOpenings(unittest.TestCase):
     def test_1(self):
         root = etree.Element("root")
         EADEConverter.calcThermalBoundaries(ifc1, [], root, 3, [], [])
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
     def test_2(self):
         root = etree.Element("root")
         EADEConverter.calcThermalBoundaries(ifc2, [], root, 3, [], [])
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
     def test_3(self):
         root = etree.Element("root")
         EADEConverter.calcThermalBoundaries(ifc3, [], root, 3, [], [])
-        corr = b'<root/>'
-        self.assertEqual(corr, etree.tostring(root))
+        self.assertEqual(b'<root/>', etree.tostring(root))
 
 
 class TestConvertConstructions(unittest.TestCase):
@@ -286,10 +262,8 @@ class TestConvertConstructions(unittest.TestCase):
             constr.append(["GML_abc" + str(i), ifcMLSs[i], [ifcWalls[i]], "layer"])
         constr.append(["GML_abc123", [123, 0.8, 0.6, 0.2, 0.4, 0.7], [ifcWindows[0]], "optical"])
         result = EADEConverter.convertConstructions(root, constr)
-        corr = 3
-        self.assertEqual(corr, len(result))
-        corr = 3809
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(3, len(result))
+        self.assertEqual(3809, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
@@ -300,10 +274,8 @@ class TestConvertConstructions(unittest.TestCase):
             constr.append(["GML_abc" + str(i), ifcMLSs[i], [ifcWalls[i]], "layer"])
         constr.append(["GML_abc123", [123, 0.8, 0.6, 0.2, 0.4, 0.7], [ifcWindows[0]], "optical"])
         result = EADEConverter.convertConstructions(root, constr)
-        corr = 3
-        self.assertEqual(corr, len(result))
-        corr = 3661
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(3, len(result))
+        self.assertEqual(3661, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
@@ -314,10 +286,8 @@ class TestConvertConstructions(unittest.TestCase):
             constr.append(["GML_abc" + str(i), ifcMLSs[i], [ifcWalls[i]], "layer"])
         constr.append(["GML_abc123", [123, 0.8, 0.6, 0.2, 0.4, 0.7], [ifcWindows[0]], "optical"])
         result = EADEConverter.convertConstructions(root, constr)
-        corr = 7
-        self.assertEqual(corr, len(result))
-        corr = 7900
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(7, len(result))
+        self.assertEqual(7900, len(etree.tostring(root)))
 
 
 class TestConvertMaterials(unittest.TestCase):

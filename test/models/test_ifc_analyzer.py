@@ -82,8 +82,7 @@ class TestPrintInfo(unittest.TestCase):
     def test_1(self):
         ifcAnalyzer = IfcAnalyzer(Model(), inPath1)
         ifcAnalyzer.printInfo(ifc1)
-        corr = "IFC file 'IFC_test' is analyzed"
-        self.assertEqual(corr, ifcAnalyzer.parent.dlg.logText)
+        self.assertEqual("IFC file 'IFC_test' is analyzed", ifcAnalyzer.parent.dlg.logText)
         corr = "Schema: IFC4<br>Name: Projekt-FZK-Haus<br>" + \
                "Description: Projekt FZK-House create by KHH Forschuungszentrum Karlsruhe<br>No. of Buildings: 1"
         self.assertEqual(corr, ifcAnalyzer.parent.dlg.ifcInfo)
@@ -91,16 +90,14 @@ class TestPrintInfo(unittest.TestCase):
     def test_2(self):
         ifcAnalyzer = IfcAnalyzer(Model(), inPath2)
         ifcAnalyzer.printInfo(ifc2)
-        corr = "IFC file 'IFC_test3' is analyzed"
-        self.assertEqual(corr, ifcAnalyzer.parent.dlg.logText)
+        self.assertEqual("IFC file 'IFC_test3' is analyzed", ifcAnalyzer.parent.dlg.logText)
         corr = "Schema: IFC4<br>Name: Projekt Buerogebaeude<br>Description: No real Project<br>No. of Buildings: 1"
         self.assertEqual(corr, ifcAnalyzer.parent.dlg.ifcInfo)
 
     def test_3(self):
         ifcAnalyzer = IfcAnalyzer(Model(), inPath3)
         ifcAnalyzer.printInfo(ifc3)
-        corr = "IFC file 'IFC_test4' is analyzed"
-        self.assertEqual(corr, ifcAnalyzer.parent.dlg.logText)
+        self.assertEqual("IFC file 'IFC_test4' is analyzed", ifcAnalyzer.parent.dlg.logText)
         corr = "Schema: IFC4<br>Name: Smiley West<br>Description: -<br>No. of Buildings: 1"
         self.assertEqual(corr, ifcAnalyzer.parent.dlg.ifcInfo)
 

@@ -51,8 +51,7 @@ ifcBldg3 = ifc3.by_type("IfcBuilding")[0]
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        model = Model()
-        conv = Converter()
+        model, conv = Model(), Converter()
         result = LoD0Converter(model, conv, ifc1, "Test123", trans1, False)
         self.assertEqual(model, result.parent)
         self.assertEqual(conv, result.task)
@@ -65,8 +64,7 @@ class TestConstructor(unittest.TestCase):
         self.assertEqual(10, result.progress)
 
     def test_2(self):
-        model = Model()
-        conv = Converter()
+        model, conv = Model(), Converter()
         result = LoD0Converter(model, conv, ifc2, "TestABC", trans2, True)
         self.assertEqual(model, result.parent)
         self.assertEqual(conv, result.task)
@@ -85,22 +83,19 @@ class TestConvert(unittest.TestCase):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convert(root)
-        corr = 5028
-        self.assertEqual(corr, len(etree.tostring(result)))
+        self.assertEqual(5028, len(etree.tostring(result)))
 
     def test_2(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convert(root)
-        corr = 2882
-        self.assertEqual(corr, len(etree.tostring(result)))
+        self.assertEqual(2882, len(etree.tostring(result)))
 
     def test_3(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Model(), Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod0Conv.convert(root)
-        corr = 6587
-        self.assertEqual(corr, len(etree.tostring(result)))
+        self.assertEqual(6587, len(etree.tostring(result)))
 
 
 class TestConvertFootPrint(unittest.TestCase):
@@ -148,10 +143,8 @@ class TestConvertFootPrint(unittest.TestCase):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Model(), Converter(), ifc3, "Test123", trans3, False)
         result = lod0Conv.convertFootPrint(ifcBldg3, root)
-        corr = 3584
-        self.assertEqual(corr, len(etree.tostring(root)))
-        corr = 85
-        self.assertEqual(corr, result.GetGeometryRef(0).GetPointCount())
+        self.assertEqual(3584, len(etree.tostring(root)))
+        self.assertEqual(85, result.GetGeometryRef(0).GetPointCount())
 
 
 class TestConvertRoofEdge(unittest.TestCase):
@@ -186,8 +179,7 @@ class TestConvertRoofEdge(unittest.TestCase):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Model(), Converter(), ifc3, "Test123", trans3, True)
         lod0Conv.convertRoofEdge(ifcBldg3, root)
-        corr = 2091
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(2091, len(etree.tostring(root)))
 
 
 if __name__ == '__main__':

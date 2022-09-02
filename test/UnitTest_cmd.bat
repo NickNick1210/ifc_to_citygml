@@ -34,7 +34,7 @@ python models/test_converter_lod0.py
 python models/test_converter_lod1.py
 python models/test_converter_lod2.py
 python models/test_converter_lod3.py
-python models/test_converter_lod4.py
+::python models/test_converter_lod4.py
 
 :: Die Klassen Base, Model, DialogVM und GisVM können nicht getestet werden, da sie eine laufende QGIS-Instanz benötigen
 

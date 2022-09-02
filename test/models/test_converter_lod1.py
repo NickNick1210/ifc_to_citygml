@@ -58,8 +58,7 @@ geom2 = ogr.CreateGeometryFromWkt("Polygon((10 10 3.1415, 10 20 3.1415, 20 20 3.
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        model = Model()
-        conv = Converter()
+        model, conv = Model(), Converter()
         result = LoD1Converter(model, conv, ifc1, "Test123", trans1, False)
         self.assertEqual(model, result.parent)
         self.assertEqual(conv, result.task)
@@ -73,8 +72,7 @@ class TestConstructor(unittest.TestCase):
         self.assertEqual(1, result.bldgCount)
 
     def test_2(self):
-        model = Model()
-        conv = Converter()
+        model, conv = Model(), Converter()
         result = LoD1Converter(model, conv, ifc2, "TestABC", trans2, True)
         self.assertEqual(model, result.parent)
         self.assertEqual(conv, result.task)
@@ -94,22 +92,19 @@ class TestConvert(unittest.TestCase):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
         result = lod1Conv.convert(root)
-        corr = 11410
-        self.assertEqual(corr, len(etree.tostring(result)))
+        self.assertEqual(11410, len(etree.tostring(result)))
 
     def test_2(self):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
         result = lod1Conv.convert(root)
-        corr = 7806
-        self.assertEqual(corr, len(etree.tostring(result)))
+        self.assertEqual(7806, len(etree.tostring(result)))
 
     def test_3(self):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod1Conv.convert(root)
-        corr = 39529
-        self.assertEqual(corr, len(etree.tostring(result)))
+        self.assertEqual(39529, len(etree.tostring(result)))
 
 
 class TestConvertSolid(unittest.TestCase):
@@ -118,8 +113,7 @@ class TestConvertSolid(unittest.TestCase):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
         result = lod1Conv.convertSolid(ifcBldg1, root, 10)
-        corr = 2425
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(2425, len(etree.tostring(root)))
         corr = "POLYGON ((458870.063285681 5438773.62904949 110,458862.40284125 5438780.05692559 110," + \
                "458870.116292566 5438789.24945891 110,458877.776736998 5438782.82158281 110,458870.063285681 " + \
                "5438773.62904949 110))"
@@ -129,8 +123,7 @@ class TestConvertSolid(unittest.TestCase):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc2, "Test123", trans2, True)
         result = lod1Conv.convertSolid(ifcBldg2, root, 10)
-        corr = 5845
-        self.assertEqual(corr, len(etree.tostring(root)))
+        self.assertEqual(5845, len(etree.tostring(root)))
         corr = "POLYGON ((479356.600506348 5444183.43024925 -3,479356.600506348 5444185.43024925 -3," + \
                "479362.600506348 5444185.43024925 -3,479362.600506348 5444183.43024925 -3,479380.600506348 " + \
                "5444183.43024925 -3,479380.600506348 5444171.43024925 -3,479363.100506348 5444171.43024925 -3," + \
@@ -143,10 +136,8 @@ class TestConvertSolid(unittest.TestCase):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Model(), Converter(), ifc3, "Test123", trans3, True)
         result = lod1Conv.convertSolid(ifcBldg3, root, 10)
-        corr = 37750
-        self.assertEqual(corr, len(etree.tostring(root)))
-        corr = 85
-        self.assertEqual(corr, result.GetGeometryRef(0).GetPointCount())
+        self.assertEqual(37750, len(etree.tostring(root)))
+        self.assertEqual(85, result.GetGeometryRef(0).GetPointCount())
 
 
 class TestCalcRoof(unittest.TestCase):
@@ -166,8 +157,7 @@ class TestCalcWalls(unittest.TestCase):
 
     def test_1(self):
         result = LoD1Converter.calcWalls(geom1, 10)
-        corr = 4
-        self.assertEqual(corr, len(result))
+        self.assertEqual(4, len(result))
         corr = "POLYGON ((10 10 10,10 10 20,10 20 20,10 20 10,10 10 10))"
         self.assertEqual(corr, result[0].ExportToWkt())
         corr = "POLYGON ((10 20 10,10 20 20,20 20 20,20 20 10,10 20 10))"

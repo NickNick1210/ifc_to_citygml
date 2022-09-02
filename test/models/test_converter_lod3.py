@@ -74,8 +74,7 @@ door2 = [doorGeom2, "Tür-Ext-TestABC", 'ifcDoor', ifcDoor]
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        model = Model()
-        conv = Converter()
+        model, conv = Model(), Converter()
         result = LoD3Converter(model, conv, ifc1, "Test123", trans1, False)
         self.assertEqual(model, result.parent)
         self.assertEqual(conv, result.task)
@@ -89,8 +88,7 @@ class TestConstructor(unittest.TestCase):
         self.assertEqual(1, result.bldgCount)
 
     def test_2(self):
-        model = Model()
-        conv = Converter()
+        model, conv = Model(), Converter()
         result = LoD3Converter(model, conv, ifc2, "TestABC", trans2, True)
         self.assertEqual(model, result.parent)
         self.assertEqual(conv, result.task)

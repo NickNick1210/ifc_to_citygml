@@ -20,7 +20,7 @@ Geoinformation Gesundheitstechnologie (BGG) der
 - Kontakt: nicklas.meyer@student.jade-hs.de
 - Notwendige QGIS-Version: 3.X
 - Notwendige Bibliotheken: [IfcOpenShell](https://pypi.org/project/python-ifcopenshell/)
-
+  , [SymPy](https://pypi.org/project/sympy/)
 
 ### Bedienung
 
@@ -36,10 +36,6 @@ und gegebenenfalls in QGIS integriert. Ist dies geschehen wird eine Meldung abge
 kann geschlossen werden. Das Plugin kann jedoch auch jederzeit geschlossen und die bisherigen
 Schritte damit abgebrochen werden.
 
-### Hinweise
-
-Das Plugin ist derzeit noch in Arbeit.
-
 ---
 
 ## English
@@ -54,15 +50,15 @@ The level of detail (LoD) and the use of the
 [Energy ADE (Application Domain Extension)](https://www.citygmlwiki.org/index.php/CityGML_Energy_ADE)
 can be selected. Latter enables the support of building energy simulations (BES).
 
-It's part of a master's thesis in the GIScience course in the Civil Engineering Geoinformation
-Health Technologie department of the [Jade University of Applied Sciences
+It's part of a master's thesis in the GIScience course in the Civil Engineering, Geoinformation and
+Health Technology department of the [Jade University of Applied Sciences
 Wilhelmshaven/Oldenburg/Elsfleth](https://www.jade-hs.de/en/) in Oldenburg, Germany.
 
 - Author: Nicklas Meyer
 - Contact: <nicklas.meyer@student.jade-hs.de>
 - Needed QGIS version: 3.X
 - Needed libaries: [IfcOpenShell](https://pypi.org/project/python-ifcopenshell/)
-
+  , [SymPy](https://pypi.org/project/sympy/)
 
 ### Operation
 
@@ -75,8 +71,3 @@ critical error occurs, the input can start from the beginning. If the conversion
 the CityGML file ist saved in the desired directory and, if necessary, integrated into QGIS. If
 this is done, a message is issued and the plugin can be closed. However, the plugin can also be
 closed at any time and the previous steps thus aborted.
-
-
-### Notice
-
-This plugin is currently still under development.

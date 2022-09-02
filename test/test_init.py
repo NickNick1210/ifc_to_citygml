@@ -1,6 +1,16 @@
-# coding=utf-8
-""" Unit-Test für das Initialisieren des Plugins. """
+# -*- coding: utf-8 -*-
+"""
+/***************************************************************************
+@title: IFC-to-CityGML
+@organization: Jade Hochschule Oldenburg
+@author: Nicklas Meyer
+@version: v1.0 (02.09.2022)
 
+Unit-Test für das Initialisieren des Plugins
+ ***************************************************************************/
+"""
+
+# Standard-Bibliotheken
 import os
 import unittest
 import logging

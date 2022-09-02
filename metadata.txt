@@ -6,7 +6,7 @@
 name=IFC-to-CityGML
 qgisMinimumVersion=3.0
 description=Conversion of building models from IFC to CityGML.
-version=0.1
+version=1.0
 author=Nicklas Meyer (Jade University of Applied Sciences Oldenburg)
 email=nicklas.meyer@student.jade-hs.de
 
@@ -37,7 +37,7 @@ deprecated=False
 # Since QGIS 3.8, a comma separated list of plugins to be installed
 # (or upgraded) can be specified.
 # Check the documentation for more information.
-# plugin_dependencies=python-ifcopenshell
+# plugin_dependencies=python-ifcopenshell, sympy
 
 Category of the plugin: Raster, Vector, Database or Web
 # category=Vector

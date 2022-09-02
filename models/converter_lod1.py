@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.2 (26.08.2022)
+@version: v1.0 (02.09.2022)
  ***************************************************************************/
 """
 
@@ -20,7 +20,6 @@ from qgis.PyQt.QtCore import QCoreApplication
 
 # Geo-Bibliotheken
 from osgeo import ogr
-from qgis.core import QgsMessageLog, Qgis
 
 # Plugin
 from .xmlns import XmlNs
@@ -175,7 +174,8 @@ class LoD1Converter:
         """
         # Prüfung, ob die Höhe unbekannt ist
         if height is None or height == 0:
-            self.task.logging.emit(self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
+            self.task.logging.emit(self.tr(
+                u'Due to the missing height and roof, no building geometry can be calculated'))
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")

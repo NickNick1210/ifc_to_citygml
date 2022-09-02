@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.2 (26.08.2022)
+@version: v1.0 (02.09.2022)
 
 Unit-Tests für die Modelklasse Converter
  ***************************************************************************/

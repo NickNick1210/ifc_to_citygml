@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v0.2 (26.08.2022)
+@version: v1.0 (02.09.2022)
  ***************************************************************************/
 """
 
@@ -72,6 +72,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         # Deaktivieren von Funktionalität
         self.radioButton_lod4.setDisabled(True)
 
+    # noinspection PyUnusedLocal
     def closeEvent(self, event):
         """ Behandelt das Schließen des Fensters
 
@@ -81,6 +82,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         self.model.cancel()
         super()
 
+    # noinspection PyUnusedLocal
     def activateIntegr(self, event):
         """ Aktiviert die QGIS-Integration-Option nach Auswahl eines dazu geeigneten Level of Detail (LoD0/1)
 
@@ -89,6 +91,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         """
         self.checkBox_integr.setDisabled(False)
 
+    # noinspection PyUnusedLocal
     def deactivateIntegr(self, event):
         """ Deaktiviert die QGIS-Integration-Option nach Auswahl eines dazu ungeeigneten Level of Detail (LoD2/3/4)
 

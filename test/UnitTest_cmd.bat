@@ -1,5 +1,11 @@
 @ECHO OFF 
 
+:: title: IFC-to-CityGML
+:: organization: Jade Hochschule Oldenburg
+:: author: Nicklas Meyer
+:: version: v1.0 (02.09.2022)
+:: Batch-Datei zum Ausführen von UnitTests
+
 set OSGEO4W_ROOT=D:\Business-Programme\QGIS\
 call "%OSGEO4W_ROOT%\bin\o4w_env.bat"
 path %OSGEO4W_ROOT%\apps\qgis\bin;%PATH%

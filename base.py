@@ -24,8 +24,8 @@ from qgis.PyQt.QtGui import QIcon
 # noinspection PyUnresolvedReferences
 from .resources import resources
 from .model import Model
-from .dialog_vm import DialogVM
-from .gis_vm import GisVM
+from .viewmodels.dialog_vm import DialogVM
+from .viewmodels.gis_vm import GisVM
 
 #####
 

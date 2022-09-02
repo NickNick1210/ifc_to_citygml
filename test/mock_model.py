@@ -10,8 +10,12 @@ Mock-Klasse der Modelklasse Model
  ***************************************************************************/
 """
 
+# Standard-Bibliotheken
+import sys
+
 # Plugin
-from mock_dialog_vm import DialogVM
+sys.path.insert(0, '..')
+from test.viewmodels.mock_dialog_vm import DialogVM
 
 
 #####

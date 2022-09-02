@@ -22,9 +22,9 @@ import ifcopenshell
 from lxml import etree
 
 # Plugin
-from mock_model import Model
 from mock_converter import Converter
 sys.path.insert(0, '..')
+from test.mock_model import Model
 from models.converter_lod0 import LoD0Converter
 from models.transformer import Transformer
 

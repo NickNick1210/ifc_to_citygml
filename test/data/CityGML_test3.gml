@@ -8,10 +8,10 @@
     </gml:Envelope>
   </gml:boundedBy>
   <core:cityObjectMember>
-    <bldg:Building gml:id="UUID_f16bbd4a-8050-4738-aa7f-a0275d462d6e">
+    <bldg:Building gml:id="UUID_975a248a-c81d-4466-8efd-a110c607f9c0">
       <gml:name>Buerogebaeude</gml:name>
       <gml:description>No real Building</gml:description>
-      <core:creationDate>2022-09-01</core:creationDate>
+      <core:creationDate>2022-09-02</core:creationDate>
       <bldg:class codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml">1030</bldg:class>
       <bldg:function codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml">1120</bldg:function>
       <bldg:usage codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml">1120</bldg:usage>

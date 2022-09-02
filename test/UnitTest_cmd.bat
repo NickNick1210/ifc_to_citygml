@@ -22,24 +22,20 @@ set CPL_LOG=NUL
 cd /d %~dp0
 cd c:/Users/nickl/AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins/ifc_to_citygml/test
 
-::python test_init.py
-
-::python models/test_utilitiesGeom.py
-::python models/test_utilitiesIFC.py
-::python models/test_transformer.py
-::python models/test_ifc_analyzer.py
-::python models/test_converter_gen.py
-::python models/test_converter_eade.py
-::python models/test_converter.py
-::python models/test_converter_lod0.py
-::python models/test_converter_lod1.py
-::python models/test_converter_lod2.py
+python test_init.py
+python models/test_utilitiesGeom.py
+python models/test_utilitiesIFC.py
+python models/test_transformer.py
+python models/test_ifc_analyzer.py
+python models/test_converter_gen.py
+python models/test_converter_eade.py
+python models/test_converter.py
+python models/test_converter_lod0.py
+python models/test_converter_lod1.py
+python models/test_converter_lod2.py
 python models/test_converter_lod3.py
-::python models/test_converter_lod4.py
+python models/test_converter_lod4.py
 
-::python model.py
-::python dialog_vm.py
-::python gis_vm.py
-::python base.py
+:: Die Klassen Base, Model, DialogVM und GisVM können nicht getestet werden, da sie eine laufende QGIS-Instanz benötigen
 
 pause

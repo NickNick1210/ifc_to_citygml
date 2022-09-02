@@ -20,7 +20,7 @@ from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtCore import QCoreApplication
 
 # GUI-Datei
-FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'dialog.ui'))
+FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), '../dialog.ui'))
 
 
 #####

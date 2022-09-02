@@ -20,8 +20,8 @@ import os
 import ifcopenshell
 
 # Plugin
-from mock_model import Model
 sys.path.insert(0, '..')
+from test.mock_model import Model
 from models.ifc_analyzer import IfcAnalyzer
 
 #####

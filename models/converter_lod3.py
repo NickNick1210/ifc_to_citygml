@@ -39,6 +39,7 @@ from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
 from .converter import Converter
 from .converter_eade import EADEConverter
+from .objects.surface import Surface
 
 
 #####
@@ -247,21 +248,22 @@ class LoD3Converter(Converter):
         # Geometrie
         links, surfaces = [], []
         for base in bases:
-            linksBase, gmlId, openSurf = self.setElementGroup(chBldg, base[0], "GroundSurface", 3, base[1], base[2])
+            linksBase, base.gmlId, openSurf = self.setElementGroup(chBldg, base.geom, "GroundSurface", 3, base.name,
+                                                              base.openings)
             links += linksBase
-            surfaces.append([gmlId, base[3]])
             surfaces += openSurf
         for roof in roofs:
-            linksRoof, gmlId, openSurf = self.setElementGroup(chBldg, roof[0], "RoofSurface", 3, roof[1], roof[2])
+            linksRoof, roof.gmlId, openSurf = self.setElementGroup(chBldg, roof.geom, "RoofSurface", 3, roof.name,
+                                                              roof.openings)
             links += linksRoof
-            surfaces.append([gmlId, roof[3]])
             surfaces += openSurf
         for wall in walls:
-            linksWall, gmlId, openSurf = self.setElementGroup(chBldg, wall[0], "WallSurface", 3, wall[1], wall[2])
+            linksWall, wall.gmlId, openSurf = self.setElementGroup(chBldg, wall.geom, "WallSurface", 3, wall.name,
+                                                              wall.openings)
             links += linksWall
-            surfaces.append([gmlId, wall[3]])
             surfaces += openSurf
-        return links, bases[0][0][0], surfaces
+        surfaces += bases + roofs + walls
+        return links, bases[0].geom[0], surfaces
 
     def calcBases(self, ifcBuilding):
         """ Berechnet die Grundfläche in Level of Detail (LoD) 3
@@ -274,7 +276,7 @@ class LoD3Converter(Converter):
             Alle Grundflächen-Geometrien ohne Aussortierung, als Liste
             Alle Geschossflächen-Geometrien, als Liste
         """
-        bases, baseNames, basesOrig, finalBases = [], [], [], []
+        bases, basesOrig, finalBases = [], [], []
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -289,7 +291,6 @@ class LoD3Converter(Converter):
 
         for i in range(0, len(ifcSlabs)):
             ifcSlab = ifcSlabs[i]
-            baseNames.append(ifcSlab.Name)
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcSlab)
@@ -356,8 +357,8 @@ class LoD3Converter(Converter):
                 if areas[j] > 0.9 * max(areas) and heights[j] <= min(heights) + 0.01:
                     finalSlab.append(slabGeom[j])
 
-            bases.append([finalSlab, baseNames[i], [], ifcSlab])
-            finalBases.append([finalSlab, baseNames[i], [], ifcSlab])
+            bases.append(Surface(finalSlab, ifcSlab.Name, ifcSlab, "Base"))
+            finalBases.append(Surface(finalSlab, ifcSlab.Name, ifcSlab, "Base"))
             basesOrig.append(slabGeom)
 
             if self.task.isCanceled():
@@ -371,21 +372,21 @@ class LoD3Converter(Converter):
 
         # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
         if floor:
-            bases.sort(key=lambda elem: (elem[0][0].GetGeometryRef(0).GetPoint(0)[2]))
-            minHeight = bases[0][0][0].GetGeometryRef(0).GetPoint(0)[2]
+            bases.sort(key=lambda elem: (elem.geom[0].GetGeometryRef(0).GetPoint(0)[2]))
+            minHeight = bases[0].geom[0].GetGeometryRef(0).GetPoint(0)[2]
             removedBases = []
             for i in range(0, len(bases)):
 
                 # Unterste Flächen ohne Prüfungs durchlassen
-                currHeight = bases[i][0][0].GetGeometryRef(0).GetPoint(0)[2]
+                currHeight = bases[i].geom[0].GetGeometryRef(0).GetPoint(0)[2]
                 gotDiff, diffGeom = False, None
                 if not (minHeight - 0.01 < currHeight < minHeight + 0.01):
 
                     # Differenz zwischen Fläche und den vorherigen Flächen berechnen
-                    base = bases[i][0][0]
+                    base = bases[i].geom[0]
                     for k in range(0, i):
                         if k not in removedBases:
-                            baseLast = bases[k][0][0]
+                            baseLast = bases[k].geom[0]
                             diff = base.Difference(baseLast)
                             bArea = base.Area()
                             diffArea = diff.Area()
@@ -410,7 +411,7 @@ class LoD3Converter(Converter):
 
                 # Letzte Differenz übernehmen.
                 if diffGeom is not None:
-                    finalBases[i][0][0] = diffGeom
+                    finalBases[i].geom[0] = diffGeom
 
                 # Falls nur Differenzen stattgefunden haben, die der Ausgangsfläche entsprechen: Entfernen
                 elif gotDiff:
@@ -439,7 +440,7 @@ class LoD3Converter(Converter):
             Die berechneten Dächer, als Liste
             Alle Dächer-Geometrien ohne Aussortierung, als Liste
         """
-        roofs, roofNames, roofsOrig = [], [], []
+        roofs, roofsOrig = [], []
 
         # IFC-Elemente des Daches
         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
@@ -451,7 +452,6 @@ class LoD3Converter(Converter):
         # Geometrie
         for i in range(0, len(ifcRoofs)):
             ifcRoof = ifcRoofs[i]
-            roofNames.append(ifcRoof.Name)
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
@@ -514,7 +514,7 @@ class LoD3Converter(Converter):
                 if areas[j] > 0.9 * max(areas) and round(heights[j], 2) >= round(max(heights) - 0.01, 2):
                     finalRoof.append(roofGeom[j])
 
-            roofs.append([finalRoof, roofNames[i], [], ifcRoof])
+            roofs.append(Surface(finalRoof, ifcRoof.Name, ifcRoof, "Roof"))
             roofsOrig.append(roofGeom)
 
             if self.task.isCanceled():
@@ -533,9 +533,9 @@ class LoD3Converter(Converter):
             ifcBuilding: Das Gebäude, aus dem die Wände entnommen werden sollen
 
         Returns:
-            Die berechneten Wand-Geometrien, als Liste
+            Die berechneten Wände, als Liste
         """
-        walls, wallNames = [], []
+        walls = []
 
         # IFC-Elemente der Wände
         ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
@@ -566,7 +566,6 @@ class LoD3Converter(Converter):
         # Geometrie
         for i in range(0, len(ifcWallsExt)):
             ifcWall = ifcWallsExt[i]
-            wallNames.append(ifcWall.Name)
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcWall)
@@ -608,7 +607,7 @@ class LoD3Converter(Converter):
             # Vereinigen, Vereinfachen und Hinzufügen
             wallGeom = UtilitiesGeom.union3D(geometries, task=self.task)
             wallGeom = UtilitiesGeom.simplify(wallGeom, 0.001, 0.001, task=self.task)
-            walls.append([wallGeom, wallNames[i], [], ifcWall])
+            walls.append(Surface(wallGeom, ifcWall.Name, ifcWall, "Wall"))
 
             if self.task.isCanceled():
                 return False
@@ -656,7 +655,6 @@ class LoD3Converter(Converter):
         # Geometrie
         for i in range(0, len(ifcOpeningsExt)):
             ifcOpening = ifcOpeningsExt[i]
-            openingNames.append(ifcOpening.Name)
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
             shape = ifcopenshell.geom.create_shape(settings, ifcOpening)
@@ -676,7 +674,7 @@ class LoD3Converter(Converter):
                 if point[2] >= maxHeight:
                     maxHeight = point[2]
                     grVertsList.append(point)
-            openings.append([grVertsList, openingNames[i], type, ifcOpening])
+            openings.append(Surface(grVertsList, ifcOpening.Name, ifcOpening, type))
 
             if self.task.isCanceled():
                 return False
@@ -698,12 +696,12 @@ class LoD3Converter(Converter):
             Die angepassten Wände, als Liste
         """
         for opening in openings:
-            ptOp = opening[0][0]
+            ptOp = opening.geom[0]
 
             # Wand bzw. Dach mit geringstem Abstand zur Öffnung berechnen
             minDist, minDistElem = sys.maxsize, None
             for wall in walls:
-                for geom in wall[0]:
+                for geom in wall.geom:
                     for i in range(0, geom.GetGeometryCount()):
                         ring = geom.GetGeometryRef(i)
                         for j in range(0, ring.GetPointCount()):
@@ -714,13 +712,13 @@ class LoD3Converter(Converter):
 
             # Öffnung hinzufügen
             if minDistElem is not None:
-                minDistElem[2].append(opening)
+                minDistElem.openings.append(opening)
 
             if self.task.isCanceled():
                 return False
 
             self.progress += (10 / self.bldgCount / len(openings)) if not self.eade else (
-                        5 / self.bldgCount / len(openings))
+                    5 / self.bldgCount / len(openings))
             self.task.setProgress(self.progress)
 
         return walls
@@ -740,7 +738,7 @@ class LoD3Converter(Converter):
             delBounds = []
             # Maximale Durchmesser der einzelnen Oberflächen heraussuchen
             dists = []
-            for wallGeom in wall[0]:
+            for wallGeom in wall.geom:
                 maxDist = -sys.maxsize
                 ring = wallGeom.GetGeometryRef(0)
                 heightDiff = False
@@ -765,50 +763,50 @@ class LoD3Converter(Converter):
                     lastMaxDist = k
                 if dists[k] > 0.5 * max(dists):
                     bigDists.append(k)
-            finalWall = [wall[0][lastMaxDist]]
+            finalWall = [wall.geom[lastMaxDist]]
 
             # Ggf. weitere Flächen, sofern diese in einer Ebene nur Hauptfläche sind
             mainGeomCount = 1
             if len(bigDists) > 2:
-                maxGeom = wall[0][lastMaxDist].GetGeometryRef(0)
+                maxGeom = wall.geom[lastMaxDist].GetGeometryRef(0)
                 planeMax = UtilitiesGeom.getPlane(maxGeom.GetPoint(0), maxGeom.GetPoint(1), maxGeom.GetPoint(2))
                 pointMax = Point3D(maxGeom.GetPoint(0)[0], maxGeom.GetPoint(0)[1], maxGeom.GetPoint(0)[2])
                 for bigDist in bigDists:
                     if bigDist != lastMaxDist:
-                        newGeom = wall[0][bigDist].GetGeometryRef(0)
+                        newGeom = wall.geom[bigDist].GetGeometryRef(0)
                         planeNew = UtilitiesGeom.getPlane(newGeom.GetPoint(0), newGeom.GetPoint(1), newGeom.GetPoint(2))
                         angle = float(planeMax.angle_between(planeNew))
                         if 0 <= angle < 0.01 or math.pi - 0.01 < angle < math.pi + 0.01 \
                                 or 2 * math.pi - 0.01 < angle < 2 * math.pi + 0.01:
                             planeDist = float(planeNew.distance(pointMax))
                             if planeDist < 0.01:
-                                finalWall.append(wall[0][bigDist])
+                                finalWall.append(wall.geom[bigDist])
                                 mainGeomCount += 1
             wallMainCounts.append(mainGeomCount)
 
             # Wenn Öffnungen vorhanden sind: Entsprechende Begrenzungsflächen heraussuchen
-            if len(wall[2]) != 0:
+            if len(wall.openings) != 0:
                 # noinspection PyUnusedLocal
-                openBounds = [[] for x in range(len(wall[2]))]
-                for h in range(0, len(wall[0])):
-                    wallGeom = wall[0][h]
+                openBounds = [[] for x in range(len(wall.openings))]
+                for h in range(0, len(wall.geom)):
+                    wallGeom = wall.geom[h]
                     if wallGeom in finalWall:
                         continue
                     same = False
                     wallRing = wallGeom.GetGeometryRef(0)
 
                     # Auf Nähe mit den Öffnungen (Türen und Fenster) prüfen
-                    for i in range(0, len(wall[2])):
+                    for i in range(0, len(wall.openings)):
                         if same:
                             break
-                        opening = wall[2][i]
+                        opening = wall.openings[i]
                         near = False
                         maxDist = -sys.maxsize
                         for o in range(0, wallRing.GetPointCount()):
                             ptO = wallRing.GetPoint(o)
                             minDistBound = sys.maxsize
-                            for p in range(0, len(opening[0])):
-                                ptP = opening[0][p]
+                            for p in range(0, len(opening.geom)):
+                                ptP = opening.geom[p]
                                 dist = math.sqrt(
                                     (ptP[0] - ptO[0]) ** 2 + (ptP[1] - ptO[1]) ** 2 + (ptP[2] - ptO[2]) ** 2)
                                 if dist < 0.2:
@@ -827,9 +825,9 @@ class LoD3Converter(Converter):
 
                 # Öffnungen durch eine gesamte Fläche darstellen
                 # über alle Öffnungen der Wand iterieren
-                for j in range(0, len(wall[2])):
-                    opening = wall[2][j]
-                    verts = opening[0]
+                for j in range(0, len(wall.openings)):
+                    opening = wall.openings[j]
+                    verts = opening.geom
                     sPts, lastHeight = [], None
 
                     # Schnittpunkte zwischen Öffnung und Wand herausfinden
@@ -928,7 +926,7 @@ class LoD3Converter(Converter):
                         # Geometrie abschließen
                         newGeomRing.CloseRings()
                         newGeomOpen.AddGeometry(newGeomRing)
-                        opening[0] = [newGeomOpen]
+                        opening.geom = [newGeomOpen]
 
                         # Begrenzungen entfernen
                         for openBound in openBounds[j]:
@@ -943,7 +941,7 @@ class LoD3Converter(Converter):
                             newGeomRing.AddPoint(sPts[o][0], sPts[o][1], sPts[o][2])
                         newGeomRing.CloseRings()
                         newGeomOpen.AddGeometry(newGeomRing)
-                        opening[0] = [newGeomOpen]
+                        opening.geom = [newGeomOpen]
 
                         # Schnittpunkte, nach Wandstück geordnet
                         newSPts, q = [], 1
@@ -1050,7 +1048,7 @@ class LoD3Converter(Converter):
             delBounds.sort(reverse=True)
             for v in range(0, len(delBounds)):
                 finalWall.pop(delBounds[v])
-            wall[0] = finalWall
+            wall.geom = finalWall
 
             if self.task.isCanceled():
                 return False
@@ -1067,8 +1065,8 @@ class LoD3Converter(Converter):
             walls: Die anzupassenden Wände, als Liste
             bases: Die Grundflächen, an die die Wände angepasst werden sollen, als Liste
             roofs: Die Dächer, an die die Wände angepasst werden sollen, als Liste
-            basesOrig: Die originalen Grundflächen als Liste
-            roofsOrig: Die originalen Dächer als Liste
+            basesOrig: Die originalen Grundflächen, als Liste
+            roofsOrig: Die originalen Dächer, als Liste
             wallMainCounts: Die Anzahl an Hauptflächen pro Wand, als Liste
 
         Returns:
@@ -1080,7 +1078,7 @@ class LoD3Converter(Converter):
         lastPt, height, lastHeight = [], None, None
         for i in range(0, len(walls)):
             for h in range(0, wallMainCounts[i]):
-                wallGeom = walls[i][0][h]
+                wallGeom = walls[i].geom[h]
                 wallRing = wallGeom.GetGeometryRef(0)
                 wallGeomTemp, wallRingTemp = ogr.Geometry(ogr.wkbPolygon), ogr.Geometry(ogr.wkbLinearRing)
                 wallHoles, inHole, newWalls = [], False, []
@@ -1090,8 +1088,8 @@ class LoD3Converter(Converter):
                 for j in range(0, wallRing.GetPointCount()):
                     pt = wallRing.GetPoint(j)
                     intOp = False
-                    for m in range(wallMainCounts[i], len(walls[i][0])):
-                        wallOpGeom = walls[i][0][m]
+                    for m in range(wallMainCounts[i], len(walls[i].geom)):
+                        wallOpGeom = walls[i].geom[m]
                         wallOpRing = wallOpGeom.GetGeometryRef(0)
                         for n in range(0, wallOpRing.GetPointCount()):
                             wallOpPt = wallOpRing.GetPoint(n)
@@ -1133,7 +1131,7 @@ class LoD3Converter(Converter):
                             for m in range(0, len(origs[k])):
                                 origGeom = origs[k][m]
                                 origRing = origGeom.GetGeometryRef(0)
-                                geom = roofs[k - anzBases][0][0] if k >= anzBases else bases[k][0][0]
+                                geom = roofs[k - anzBases].geom[0] if k >= anzBases else bases[k].geom[0]
                                 ring = geom.GetGeometryRef(0)
 
                                 # Prüfen, ob Wandpunkt gleich zu Punkt von Grundfläche/Dach
@@ -1171,8 +1169,8 @@ class LoD3Converter(Converter):
                         # ÖFFNUNGEN und GEOMETRIE #
                         # Über alle Nebenwände und dessen Eckpunkte gehen
                         opBound, pts, nextPt = False, [], []
-                        for m in range(wallMainCounts[i], len(walls[i][0])):
-                            wallOpGeom = walls[i][0][m]
+                        for m in range(wallMainCounts[i], len(walls[i].geom)):
+                            wallOpGeom = walls[i].geom[m]
                             wallOpRing = wallOpGeom.GetGeometryRef(0)
                             for n in range(0, wallOpRing.GetPointCount()):
                                 wallOpPt = wallOpRing.GetPoint(n)
@@ -1266,11 +1264,11 @@ class LoD3Converter(Converter):
                         wallHole.CloseRings()
                         wallGeomTemp.AddGeometry(wallHole)
 
-                    walls[i][0][h] = UtilitiesGeom.simplify(wallGeomTemp, 0.01, 0.01)
+                    walls[i].geom[h] = UtilitiesGeom.simplify(wallGeomTemp, 0.01, 0.01)
 
                     # Neue Nebenwand hinzufügen
                     for newWall in newWalls:
-                        walls[i][0].append(newWall)
+                        walls[i].geom.append(newWall)
 
                 if self.task.isCanceled():
                     return False
@@ -1334,13 +1332,13 @@ class LoD3Converter(Converter):
         openSurf = []
         for opening in openings:
             chBldgSurfSO = etree.SubElement(chBldgS, QName(XmlNs.bldg, "opening"))
-            name = "Door" if opening[2] == "ifcDoor" else "Window"
+            name = "Door" if opening.type == "ifcDoor" else "Window"
             chBldgSurfSOE = etree.SubElement(chBldgSurfSO, QName(XmlNs.bldg, name))
             gmlId = "GML_" + str(uuid.uuid4())
             chBldgSurfSOE.set(QName(XmlNs.gml, "id"), gmlId)
-            if opening[1] is not None:
+            if opening.name is not None:
                 chBldgSurfSOName = etree.SubElement(chBldgSurfSOE, QName(XmlNs.gml, "name"))
-                chBldgSurfSOName.text = opening[1]
+                chBldgSurfSOName.text = opening.name
             chBldgSurfSOMS = etree.SubElement(chBldgSurfSOE, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
             chBldgOMS = etree.SubElement(chBldgSurfSOMS, QName(XmlNs.gml, "MultiSurface"))
             chBldgOSM = etree.SubElement(chBldgOMS, QName(XmlNs.gml, "surfaceMember"))
@@ -1348,7 +1346,7 @@ class LoD3Converter(Converter):
             polyId = "GML_" + str(uuid.uuid4())
             chBldgOCS.set(QName(XmlNs.gml, "id"), polyId)
             polyIds.append(polyId)
-            for geometry in opening[0]:
+            for geometry in opening.geom:
                 chBldgOCSSM = etree.SubElement(chBldgOCS, QName(XmlNs.gml, "surfaceMember"))
                 geomXML = UtilitiesGeom.geomToGml(geometry)
                 chBldgOCSSM.append(geomXML)
@@ -1358,6 +1356,7 @@ class LoD3Converter(Converter):
                 gmlIdPoly = "PolyID" + str(uuid.uuid4())
                 chBldgPol.set(QName(XmlNs.gml, "id"), gmlIdPoly)
 
-            openSurf.append([gmlId, opening[3]])
+            opening.gmlId = gmlId
+            openSurf.append(opening)
 
         return polyIds, gmlIdMain, openSurf

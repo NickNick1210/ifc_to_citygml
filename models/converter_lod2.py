@@ -40,6 +40,7 @@ from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
 from .converter import Converter
 from .converter_eade import EADEConverter
+from .objects.surface import Surface
 
 
 #####
@@ -221,9 +222,10 @@ class LoD2Converter(Converter):
 
         # Berechnung Grundfläche
         self.task.logging.emit(self.tr(u'Building geometry: base surface is calculated'))
-        base = self.calcPlane(ifcSlabs, self.trans)
-        if base is None:
+        baseList = self.calcPlane(ifcSlabs, self.trans)
+        if baseList is None:
             return []
+        base = Surface(baseList[1], baseList[0].Name, baseList[0], "Base")
         self.progress += (10 / self.bldgCount)
         self.task.setProgress(self.progress)
 
@@ -245,12 +247,12 @@ class LoD2Converter(Converter):
             return False
 
         self.task.logging.emit(self.tr(u'Building geometry: wall surfaces are calculated'))
-        geomWalls, roofsNew = self.calcWalls(base, roofs, height)
+        walls, roofsNew = self.calcWalls(base, roofs, height)
         if self.task.isCanceled():
             return False
 
         self.task.logging.emit(self.tr(u'Building geometry: wall surfaces between roofs are calculated'))
-        geomWallsR, roofs = self.calcRoofWalls(roofs + roofsNew)
+        wallsR, roofs = self.calcRoofWalls(roofs + roofsNew)
         if self.task.isCanceled():
             return False
 
@@ -260,9 +262,9 @@ class LoD2Converter(Converter):
             return False
 
         self.task.logging.emit(self.tr(u'Building geometry: roof and wall surfaces are adjusted'))
-        geomWalls += self.checkRoofWalls(geomWallsR, roofs)
+        walls += self.checkRoofWalls(wallsR, roofs)
         for roof in roofs:
-            roof[1] = UtilitiesGeom.simplify(roof[1], 0.01, 0.05)
+            roof.geom = UtilitiesGeom.simplify(roof.geom, 0.01, 0.05)
             self.progress += (2 / self.bldgCount / len(roofs))
             self.task.setProgress(self.progress)
         if self.task.isCanceled():
@@ -270,28 +272,28 @@ class LoD2Converter(Converter):
 
         # Geometrie
         links, surfaces = [], []
-        if geomWalls is not None and len(geomWalls) > 0 and roofs[1] is not None and len(roofs) > 0:
+        if walls is not None and len(walls) > 0 and roofs[1] is not None and len(roofs) > 0:
 
             # Base
-            link, gmlId = self.setElement(chBldg, base[1], "GroundSurface", 2)
+            link, base.gmlId = self.setElement(chBldg, base.geom, "GroundSurface", base.name)
             links.append(link)
-            surfaces.append([gmlId, base[0]])
+            surfaces.append(base)
 
             # Roofs
             for roof in roofs:
-                if roof[1].GetGeometryName() == "POLYGON":
-                    link, gmlId = self.setElement(chBldg, roof[1], "RoofSurface", 2)
+                if roof.geom.GetGeometryName() == "POLYGON":
+                    link, gmlId = self.setElement(chBldg, roof.geom, "RoofSurface", roof.name)
                     links.append(link)
-                    if roof[0] is not None:
-                        surfaces.append([gmlId, roof[0]])
-                    else:
+                    roof.gmlId = gmlId
+                    if roof.ifcElem is None:
                         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
                         ifcRoofs += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
-                        surfaces.append([gmlId, ifcRoofs[0]])
+                        roof.ifcElem = ifcRoofs[0]
+                    surfaces.append(roof)
 
             # Walls
-            for geomWall in geomWalls:
-                link, gmlId = self.setElement(chBldg, geomWall, "WallSurface", 2)
+            for wall in walls:
+                link, wall.gmlId = self.setElement(chBldg, wall.geom, "WallSurface", wall.name)
                 links.append(link)
                 # Zufällige IfcWall
                 ifcWalls = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcWall", result=[])
@@ -309,9 +311,10 @@ class LoD2Converter(Converter):
                     if extCt > 0 or (intCt == 0 and UtilitiesIfc.findPset(ifcWall, "Pset_WallCommon", "IsExternal")):
                         randomWall = ifcWall
                         break
-                surfaces.append([gmlId, randomWall])
+                wall.ifcElem = randomWall
+                surfaces.append(wall)
 
-        return links, base[1], surfaces
+        return links, base.geom, surfaces
 
     def extractRoofs(self, ifcRoofs):
         """ Extrahiert die Geometrien von Dächern aus IFC
@@ -320,7 +323,7 @@ class LoD2Converter(Converter):
             ifcRoofs: Die IFC-Dächer, aus denen extrahiert werden soll
 
         Returns:
-            Dächer-Geometrien mit den zugehörigen IFC-Elementen, als Liste
+            Die extrahierten Dächer, als Liste
         """
         roofs = []
         for ifcRoof in ifcRoofs:
@@ -427,7 +430,7 @@ class LoD2Converter(Converter):
             for i in range(0, len(areas)):
                 if areas[i] > 0.9 * max(areas) and round(heights[i], 2) >= round(max(heights) - 0.01, 2):
                     finalRoof = geometriesRefUnionList[i]
-            roofs.append([ifcRoof, finalRoof])
+            roofs.append(Surface(finalRoof, ifcRoof.Name, ifcRoof, "Roof"))
 
             if self.task.isCanceled():
                 return False
@@ -446,13 +449,13 @@ class LoD2Converter(Converter):
             height: Die Gebäudehöhe, als float
 
         Returns:
-            Die berechneten Wand-Geometrien, als Liste
-            Neu erstellte Dach-Geometrien mit den zugehörigen IFC-Elementen, als Liste
+            Die berechneten Wände, als Liste
+            Neu erstellte Dächer, als Liste
         """
         walls, roofPoints, wallsWORoof, missingRoof = [], [], [], []
 
         # Über die Eckpunkte der Grundfläche Wände hochziehen
-        ringBase = base[1].GetGeometryRef(0)
+        ringBase = base.geom.GetGeometryRef(0)
         for i in range(0, ringBase.GetPointCount() - 1):
 
             # Wand ohne Dachbegrenzung
@@ -469,7 +472,7 @@ class LoD2Converter(Converter):
             # Schnitt von Dächern mit der Wand
             intPoints, intLines = [], []
             for roof in roofs:
-                roofGeom = roof[1]
+                roofGeom = roof.geom
                 # 2D-Schnitt
                 intersect = geomWall.Intersection(roofGeom)
                 if not intersect.IsEmpty():
@@ -619,7 +622,7 @@ class LoD2Converter(Converter):
                 ringWall.AddPoint(pt2[0], pt2[1], pt2[2])
                 ringWall.CloseRings()
                 geomWall.AddGeometry(ringWall)
-                walls.append(geomWall)
+                walls.append(Surface(geomWall, None, None, "Wall"))
 
                 # Merken der genutzten Wand-Dach-Schnittpunkte
                 for k in range(0, len(intPoints)):
@@ -663,7 +666,7 @@ class LoD2Converter(Converter):
             # Geometrie abschließen
             ringWall.CloseRings()
             geomWall.AddGeometry(ringWall)
-            walls.append(geomWall)
+            walls.append(Surface(geomWall, None, None, "Wall"))
 
             # Fehlendes Fach merken
             missingRoof.append([[pt1[0], pt1[1], z1], [pt2[0], pt2[1], z2]])
@@ -706,7 +709,7 @@ class LoD2Converter(Converter):
                     ringRoof.CloseRings()
                     geomRoof.AddGeometry(ringRoof)
                     if not geomRoof.IsEmpty() and geomRoof.GetGeometryName() == "POLYGON":
-                        roofsNew.append([None, geomRoof])
+                        roofsNew.append(Surface(geomRoof, None, None, "Roof"))
 
             if self.task.isCanceled():
                 return False
@@ -732,9 +735,9 @@ class LoD2Converter(Converter):
         # Alle Dächer miteinander auf Schnitt prüfen
         ptz1, ptz2 = None, None
         for i in range(0, len(roofs)):
-            roof1 = roofs[i][1]
+            roof1 = roofs[i].geom
             for j in range(i + 1, len(roofs)):
-                roof2 = roofs[j][1]
+                roof2 = roofs[j].geom
                 if roof1.Intersects(roof2):
                     intersect = roof1.Intersection(roof2)
                     if intersect is not None and intersect.GetGeometryName() == "LINESTRING" and not \
@@ -761,7 +764,7 @@ class LoD2Converter(Converter):
                             ringWall.AddPoint(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], min(z21, z22))
                             ringWall.CloseRings()
                             geomWall.AddGeometry(ringWall)
-                            wallsLine.append(geomWall)
+                            wallsLine.append(Surface(geomWall, None, None, "Wall"))
 
                     elif intersect is not None and intersect.GetGeometryName() == "POLYGON" and not intersect.IsEmpty():
                         ringInt = intersect.GetGeometryRef(0)
@@ -837,7 +840,7 @@ class LoD2Converter(Converter):
                                 ringWall.AddPoint(p4[0], p4[1], p4[2])
                                 ringWall.CloseRings()
                                 geomWall.AddGeometry(ringWall)
-                                wallsInt.append(geomWall)
+                                wallsInt.append(Surface(geomWall, None, None, "Wall"))
 
                                 # Letzten Schnittpunkt für folgenden Durchlauf speichern
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
@@ -853,9 +856,9 @@ class LoD2Converter(Converter):
 
                         # ANPASSUNG DER DÄCHER #
                         if z1 <= z2:
-                            geomRoof = roofsOut[j][1]
+                            geomRoof = roofsOut[j].geom
                         else:
-                            geomRoof = roofsOut[i][1]
+                            geomRoof = roofsOut[i].geom
 
                         roofInt = geomRoof.Difference(intersect).Simplify(0.0)
                         ringInt = roofInt.GetGeometryRef(0)
@@ -886,9 +889,9 @@ class LoD2Converter(Converter):
                         ringRoofOut.CloseRings()
                         geomRoofOut.AddGeometry(ringRoofOut)
                         if z1 <= z2:
-                            roofsOut[j][1] = geomRoofOut
+                            roofsOut[j].geom = geomRoofOut
                         else:
-                            roofsOut[i][1] = geomRoofOut
+                            roofsOut[i].geom = geomRoofOut
 
                 if self.task.isCanceled():
                     return False
@@ -903,8 +906,8 @@ class LoD2Converter(Converter):
         # Verschneidung aller neuen Wände miteinander
         for o in range(0, len(wallsCheck)):
             for p in range(o + 1, len(wallsCheck)):
-                wallO = wallsMod[str(o)] if str(o) in wallsMod else wallsCheck[o]
-                wallP = wallsMod[str(p)] if str(p) in wallsMod else wallsCheck[p]
+                wallO = wallsMod[str(o)] if str(o) in wallsMod else wallsCheck[o].geom
+                wallP = wallsMod[str(p)] if str(p) in wallsMod else wallsCheck[p].geom
                 intersect = wallO.Intersection(wallP)
                 if not intersect.IsEmpty():
                     ipt1, ipt2 = intersect.GetPoint(0), intersect.GetPoint(1)
@@ -916,7 +919,7 @@ class LoD2Converter(Converter):
                     # Wenn Verschneidung = Wand: Wand entfernen
                     if (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1] and ipt2[0] == ptO2[0] and ipt2[1] == ptO2[1]) or (
                             ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1] and ipt2[0] == ptO1[0] and ipt2[1] == ptO1[1]):
-                        walls.remove(wallO)
+                        walls.remove(wallsCheck[o])
 
                     # Wenn Verschneidung teilweise Wand: Entsprechenden Wandteil entfernen
                     elif (ipt1[0] == ptO1[0] and ipt1[1] == ptO1[1]) or (ipt1[0] == ptO2[0] and ipt1[1] == ptO2[1]) or (
@@ -924,7 +927,7 @@ class LoD2Converter(Converter):
                         diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
                         diffOPt = np.sqrt(np.square(ptO2[0] - ptO1[0]) + np.square(ptO2[1] - ptO1[1]))
                         if diffIPt > diffOPt:
-                            walls.remove(wallO)
+                            walls.remove(wallsCheck[o])
                         else:
                             geomWallCut = ogr.Geometry(ogr.wkbPolygon)
                             ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
@@ -956,13 +959,13 @@ class LoD2Converter(Converter):
                             geomWallCut.AddGeometry(ringWallCut)
 
                             wallsMod[str(o)] = geomWallCut
-                            ix = walls.index(wallO)
-                            walls[ix] = geomWallCut
+                            ix = walls.index(wallsCheck[o])
+                            walls[ix].geom = geomWallCut
 
                     # Wenn Verschneidung = Wand: Wand entfernen
                     if (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1] and ipt2[0] == ptP2[0] and ipt2[1] == ptP2[1]) or (
                             ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1] and ipt2[0] == ptP1[0] and ipt2[1] == ptP1[1]):
-                        walls.remove(wallP)
+                        walls.remove(wallsCheck[p])
 
                     # Wenn Verschneidung teilweise Wand: Entsprechenden Wandteil entfernen
                     elif (ipt1[0] == ptP1[0] and ipt1[1] == ptP1[1]) or (ipt1[0] == ptP2[0] and ipt1[1] == ptP2[1]) or (
@@ -970,7 +973,7 @@ class LoD2Converter(Converter):
                         diffIPt = np.sqrt(np.square(ipt2[0] - ipt1[0]) + np.square(ipt2[1] - ipt1[1]))
                         diffPPt = np.sqrt(np.square(ptP2[0] - ptP1[0]) + np.square(ptP2[1] - ptP1[1]))
                         if diffIPt > diffPPt:
-                            walls.remove(wallP)
+                            walls.remove(wallsCheck[p])
                         else:
                             geomWallCut = ogr.Geometry(ogr.wkbPolygon)
                             ringWallCut = ogr.Geometry(ogr.wkbLinearRing)
@@ -1002,8 +1005,8 @@ class LoD2Converter(Converter):
                             geomWallCut.AddGeometry(ringWallCut)
 
                             wallsMod[str(p)] = geomWallCut
-                            ix = walls.index(wallP)
-                            walls[ix] = geomWallCut
+                            ix = walls.index(wallsCheck[p])
+                            walls[ix].geom = geomWallCut
 
                 if self.task.isCanceled():
                     return False
@@ -1027,12 +1030,12 @@ class LoD2Converter(Converter):
 
         # Alle Dächer überprüfen
         for roofInElem in roofsIn:
-            roofIn = roofInElem[1]
+            roofIn = roofInElem.geom
             if roofIn is None:
                 continue
 
             # Mit Grundfläche verschneiden
-            intersection = roofIn.Intersection(base[1])
+            intersection = roofIn.Intersection(base.geom)
             for intGeometry in intersection:
                 if intersection.GetGeometryCount() == 1:
                     ringInt = intersection.GetGeometryRef(0)
@@ -1063,7 +1066,7 @@ class LoD2Converter(Converter):
                 ringRoof.CloseRings()
                 geomRoof.AddGeometry(ringRoof)
                 if geomRoof is not None:
-                    roofs.append([roofInElem[0], geomRoof])
+                    roofs.append(Surface(geomRoof, roofInElem.name, roofInElem.ifcElem, roofInElem.type))
 
                 if self.task.isCanceled():
                     return False
@@ -1089,8 +1092,8 @@ class LoD2Converter(Converter):
         for wall in wallsIn:
             anyInt = False
             for roof in roofs:
-                roofGeom = roof[1]
-                intersect = wall.Intersection(roofGeom)
+                roofGeom = roof.geom
+                intersect = wall.geom.Intersection(roofGeom)
                 if not intersect.IsEmpty():
 
                     # Wenn MultiPolygon/MultiLineString als Schnitt: Zusammenführen
@@ -1101,7 +1104,7 @@ class LoD2Converter(Converter):
                         intersect2.AddPoint(startPt[0], startPt[1], startPt[2])
                         intersect2.AddPoint(endPt[0], endPt[1], endPt[2])
                         intersect = intersect2
-                    wallRing = wall.GetGeometryRef(0)
+                    wallRing = wall.geom.GetGeometryRef(0)
 
                     # Prüfen, ob Wand insgesamt unter Dächern
                     pt1Check, pt2Check = False, False
@@ -1118,7 +1121,7 @@ class LoD2Converter(Converter):
                     return False
 
             if anyInt:
-                wall = UtilitiesGeom.simplify(wall, 0.01, 0.05)
+                wall.geom = UtilitiesGeom.simplify(wall.geom, 0.01, 0.05)
                 wallsChecked.append(wall)
 
             if self.task.isCanceled():
@@ -1127,17 +1130,23 @@ class LoD2Converter(Converter):
             self.progress += (8 / self.bldgCount / len(wallsIn))
             self.task.setProgress(self.progress)
 
-        wallsOut = UtilitiesGeom.union3D(wallsChecked)
+        geoms = []
+        for surface in wallsChecked:
+            geoms.append(surface.geom)
+        geoms = UtilitiesGeom.union3D(geoms)
+        wallsOut = []
+        for geom in geoms:
+            wallsOut.append(Surface(geom, None, None, "Wall"))
         return wallsOut
 
-    def setElement(self, chBldg, geometry, type, lod):
+    def setElement(self, chBldg, geometry, type, name):
         """ Setzt ein CityGML-Objekts
 
         Args:
             chBldg: XML-Element, an dem das Objekt angefügt werden soll
             geometry: Die Geometrie des Objekts
             type: Der Typ des Objekts
-            lod: Level of Detail (LoD)
+            name: Der Name des Objekts
 
         Returns:
             Die Poly-ID der Geometrie
@@ -1151,7 +1160,14 @@ class LoD2Converter(Converter):
         chBldgS = etree.SubElement(chBldgBB, QName(XmlNs.bldg, type))
         gmlId = "GML_" + str(uuid.uuid4())
         chBldgS.set(QName(XmlNs.gml, "id"), gmlId)
-        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
+
+        # Name
+        if name is not None:
+            chBldgSName = etree.SubElement(chBldgS, QName(XmlNs.gml, "name"))
+            chBldgSName.text = name
+
+        # MultiSurface
+        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod2MultiSurface"))
         chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
         chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
 

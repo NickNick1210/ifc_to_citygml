@@ -34,6 +34,8 @@ from .xmlns import XmlNs
 from .mapper import Mapper
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+from .objects.construction import Construction
+from .objects.material import Material
 
 #####
 
@@ -538,7 +540,7 @@ class EADEConverter(QgsTask):
         Returns
             linkUZ: GML-ID der anzufügenden Nutzungszone
             chBldgTZ: XML-Objekt der thermischen Zone
-            constructions: Die zu erstellenden Konstruktionen der Boundary, mit GML-ID, IfcElement und Referenzen
+            constructions: Die zu erstellenden Konstruktionen, als Liste
         """
 
         # XML-Struktur
@@ -639,11 +641,11 @@ class EADEConverter(QgsTask):
             chBldg: XML-Objekt, aus dem die Begrenzungen entnommen werden sollen
             chBldgTZ: XML-Objekt, an das die thermischen Begrenzungen angehängt werden sollen
             lod: Level of Detail, als Zahl
-            surfaces: Die GML-IDs und zugehörigen GML-IDs der Oberflächen
+            surfaces: Die Öffnungen
             linkTZ: GML-ID der thermischen Zone, der die thermischen Begrenzungen angehören
 
         Returns
-            constructions: Die zu erstellenden Konstruktionen der Boundary, mit GML-ID, IfcElement und Referenzen
+            constructions: Die zu erstellenden Konstruktionen, als Liste
         """
         constructions = []
         for child in chBldg:
@@ -705,8 +707,8 @@ class EADEConverter(QgsTask):
                 # construction
                 ifcElem = None
                 for surface in surfaces:
-                    if child[0].attrib['{http://www.opengis.net/gml}id'] == surface[0]:
-                        ifcElem = surface[1]
+                    if child[0].attrib['{http://www.opengis.net/gml}id'] == surface.gmlId:
+                        ifcElem = surface.ifcElem
                         break
 
                 ifcMLS = None
@@ -722,15 +724,15 @@ class EADEConverter(QgsTask):
                 if ifcMLS is not None:
                     sameMLS, constr = False, None
                     for constr in constructions:
-                        if constr[1] == ifcMLS:
+                        if constr.ifcMLS == ifcMLS:
                             sameMLS = True
                             break
                     if sameMLS:
-                        gmlIdConstr = constr[0]
-                        constr[2].append(ifcElem)
+                        gmlIdConstr = constr.gmlId
+                        constr.ifcElems.append(ifcElem)
                     else:
                         gmlIdConstr = "GML_" + str(uuid.uuid4())
-                        constrNew = [gmlIdConstr, ifcMLS, [ifcElem], "layer"]
+                        constrNew = Construction(gmlIdConstr, ifcMLS, None, [ifcElem], "layer")
                         constructions.append(constrNew)
 
                     chBldgTbConstr = etree.SubElement(chBldgTb, QName(XmlNs.energy, "construction"))
@@ -755,8 +757,8 @@ class EADEConverter(QgsTask):
             child: XML-Objekt, aus dem die Öffnungen entnommen werden sollen
             chBldgTb: XML-Objekt, an das die thermischen Öffnungen angehängt werden sollen
             lod: Level of Detail, als Zahl
-            surfaces: Die GML-IDs und zugehörigen GML-IDs der Oberflächen
-            constructions: Die Liste der zu erstellenden Konstruktionen
+            surfaces: Die GML-IDs und zugehörigen IFC-Elemente der Oberflächen
+            constructions: Die zu erstellenden Konstruktionen, als Liste
 
         Returns
             constructions: Die zu erstellenden Konstruktionen der Boundary, mit GML-ID, IfcElement und Referenzen
@@ -783,8 +785,8 @@ class EADEConverter(QgsTask):
                 # construction
                 ifcElem = None
                 for surface in surfaces:
-                    if chOpen.attrib['{http://www.opengis.net/gml}id'] == surface[0]:
-                        ifcElem = surface[1]
+                    if chOpen.attrib['{http://www.opengis.net/gml}id'] == surface.gmlId:
+                        ifcElem = surface.ifcElem
                         break
 
                 # Material, falls vorhanden
@@ -801,15 +803,15 @@ class EADEConverter(QgsTask):
                 if ifcMLS is not None:
                     sameMLS, constr = False, None
                     for constr in constructions:
-                        if constr[1] == ifcMLS:
+                        if constr.ifcMLS == ifcMLS:
                             sameMLS = True
                             break
                     if sameMLS:
-                        gmlIdConstr = constr[0]
-                        constr[2].append(ifcElem)
+                        gmlIdConstr = constr.gmlId
+                        constr.ifcElems.append(ifcElem)
                     else:
                         gmlIdConstr = "GML_" + str(uuid.uuid4())
-                        constrNew = [gmlIdConstr, ifcMLS, [ifcElem], "layer"]
+                        constrNew = Construction(gmlIdConstr, ifcMLS, None, [ifcElem], "layer")
                         constructions.append(constrNew)
 
                     chBldgToConstr = etree.SubElement(chBldgTo,
@@ -866,22 +868,20 @@ class EADEConverter(QgsTask):
                             is None and visTransm is None and glazing is None):
                         sameOptProp, constr = False, None
                         for constr in constructions:
-                            if constr[3] == "optical" and constr[1][0] == thTransm and \
-                                    constr[1][
-                                        1] == solRefl \
-                                    and constr[1][2] == visRefl and constr[1][
-                                3] == solTransm and \
-                                    constr[1][4] == visTransm and constr[1][5] == glazing:
+                            optProp = constr.optProp
+                            if constr.type == "optical" and optProp[0] == thTransm and optProp[1] == solRefl and \
+                                    optProp[2] == visRefl and optProp[3] == solTransm and optProp[4] == visTransm \
+                                    and optProp[5] == glazing:
                                 sameOptProp = True
                                 break
                         if sameOptProp:
-                            gmlIdConstr = constr[0]
-                            constr[2].append(ifcElem)
+                            gmlIdConstr = constr.gmlId
+                            constr.ifcElems.append(ifcElem)
                         else:
                             gmlIdConstr = "GML_" + str(uuid.uuid4())
                             optProp = [thTransm, solRefl, visRefl, solTransm, visTransm,
                                        glazing]
-                            constrNew = [gmlIdConstr, optProp, [ifcElem], "optical"]
+                            constrNew = Construction(gmlIdConstr, None, optProp, [ifcElem], "optical")
                             constructions.append(constrNew)
 
                         chBldgToConstr = etree.SubElement(chBldgTo,
@@ -904,44 +904,44 @@ class EADEConverter(QgsTask):
 
         Args:
             root: XML-Objekt, an das die Konstruktionen angehängt werden sollen
-            constructions: Liste der GML-IDs und zugehörigen IfcMaterialLayerSets
+            constructions: Die zu erstellenden Konstruktionen, als Liste
 
         Returns
-            materials: Die zu erstellenden Materialien der Konstruktion, mit GML-ID und IfcElement
+            materials: Die zu erstellenden Materialien der Konstruktion, als Liste
         """
         materials = []
         for constr in constructions:
             # XML-Struktur
             chFM = etree.SubElement(root, QName(XmlNs.gml, "featureMember"))
             chConstr = etree.SubElement(chFM, QName(XmlNs.energy, "Construction"))
-            chConstr.set(QName(XmlNs.gml, "id"), constr[0])
+            chConstr.set(QName(XmlNs.gml, "id"), constr.gmlId)
 
-            if constr[3] == "layer":
+            if constr.type == "layer":
 
                 # Name & Beschreibung
-                if constr[1].LayerSetName is not None:
+                if constr.ifcMLS.LayerSetName is not None:
                     chConstrName = etree.SubElement(chConstr, QName(XmlNs.gml, "name"))
-                    chConstrName.text = constr[1].LayerSetName
-                if constr[1].Description is not None:
+                    chConstrName.text = constr.ifcMLS.LayerSetName
+                if constr.ifcMLS.Description is not None:
                     chConstrDescr = etree.SubElement(chConstr, QName(XmlNs.gml, "description"))
-                    chConstrDescr.text = constr[1].Description
+                    chConstrDescr.text = constr.ifcMLS.Description
 
                 # U-Wert
                 thTransm = None
-                if UtilitiesIfc.findPset(constr[2][0], "Pset_WallCommon", "ThermalTransmittance") is not None:
-                    thTransm = element.get_psets(constr[2][0])["Pset_WallCommon"]["ThermalTransmittance"]
-                if UtilitiesIfc.findPset(constr[2][0], "Pset_RoofCommon", "ThermalTransmittance") is not None:
-                    thTransm = element.get_psets(constr[2][0])["Pset_RoofCommon"]["ThermalTransmittance"]
-                if UtilitiesIfc.findPset(constr[2][0], "Pset_SlabCommon", "ThermalTransmittance") is not None:
-                    thTransm = element.get_psets(constr[2][0])["Pset_SlabCommon"]["ThermalTransmittance"]
+                if UtilitiesIfc.findPset(constr.ifcElems[0], "Pset_WallCommon", "ThermalTransmittance") is not None:
+                    thTransm = element.get_psets(constr.ifcElems[0])["Pset_WallCommon"]["ThermalTransmittance"]
+                if UtilitiesIfc.findPset(constr.ifcElems[0], "Pset_RoofCommon", "ThermalTransmittance") is not None:
+                    thTransm = element.get_psets(constr.ifcElems[0])["Pset_RoofCommon"]["ThermalTransmittance"]
+                if UtilitiesIfc.findPset(constr.ifcElems[0], "Pset_SlabCommon", "ThermalTransmittance") is not None:
+                    thTransm = element.get_psets(constr.ifcElems[0])["Pset_SlabCommon"]["ThermalTransmittance"]
                 if thTransm is not None:
                     chConstrUV = etree.SubElement(chConstr, QName(XmlNs.energy, "uValue"))
                     chConstrUV.set("uom", "W/K*m2")
                     chConstrUV.text = str(thTransm)
 
                 # Layer
-                if constr[1].MaterialLayers is not None:
-                    for matLayer in constr[1].MaterialLayers:
+                if constr.ifcMLS.MaterialLayers is not None:
+                    for matLayer in constr.ifcMLS.MaterialLayers:
 
                         # XML-Struktur
                         chConstrlayer = etree.SubElement(chConstr, QName(XmlNs.energy, "layer"))
@@ -968,72 +968,73 @@ class EADEConverter(QgsTask):
                             chConstrLayMat = etree.SubElement(chConstrLayComp, QName(XmlNs.energy, "material"))
                             gmlId = None
                             for mat in materials:
-                                if mat[1] == matLayer.Material:
-                                    gmlId = mat[0]
+                                if mat.ifcMat == matLayer.Material:
+                                    gmlId = mat.gmlId
                             if gmlId is None:
                                 gmlId = "GML_" + str(uuid.uuid4())
-                                materials.append([gmlId, matLayer.Material])
+                                materials.append(Material(gmlId, matLayer.Material))
                             chConstrLayMat.set(QName(XmlNs.xlink, "href"), "#" + gmlId)
             else:
                 # U-Wert
-                if constr[1][0] is not None:
+                optProp = constr.optProp
+                if optProp[0] is not None:
                     chConstrUV = etree.SubElement(chConstr, QName(XmlNs.energy, "uValue"))
                     chConstrUV.set("uom", "W/K*m2")
-                    chConstrUV.text = str(constr[1][0])
+                    chConstrUV.text = str(optProp[0])
 
                 # OpticalProperties
-                if not (constr[1][1] is None and constr[1][2] is None and constr[1][3] is None and constr[1][4]
-                        is None and constr[1][5] is None):
+                if not (optProp[1] is None and optProp[2] is None and optProp[3] is None and optProp[4]
+                        is None and optProp[5] is None):
                     chConstrOp = etree.SubElement(chConstr, QName(XmlNs.energy, "opticalProperties"))
                     chConstrOP = etree.SubElement(chConstrOp, QName(XmlNs.energy, "OpticalProperties"))
-                    if constr[1][1] is not None:
+                    if optProp[1] is not None:
                         chConstrOprefl = etree.SubElement(chConstrOP, QName(XmlNs.energy, "reflectance"))
                         chConstrOpRefl = etree.SubElement(chConstrOprefl, QName(XmlNs.energy, "Reflectance"))
                         chConstrOpReflFrac = etree.SubElement(chConstrOpRefl, QName(XmlNs.energy, "fraction"))
                         chConstrOpReflFrac.set("uom", "scale")
-                        chConstrOpReflFrac.text = str(constr[1][1])
+                        chConstrOpReflFrac.text = str(optProp[1])
                         chConstrOpReflSurf = etree.SubElement(chConstrOpRefl, QName(XmlNs.energy, "surface"))
                         chConstrOpReflSurf.text = "outside"
                         chConstrOpReflWLR = etree.SubElement(chConstrOpRefl,
                                                              QName(XmlNs.energy, "wavelengthRange"))
                         chConstrOpReflWLR.text = "solar"
-                    if constr[1][2] is not None:
+                    if optProp[2] is not None:
                         chConstrOprefl = etree.SubElement(chConstrOP, QName(XmlNs.energy, "reflectance"))
                         chConstrOpRefl = etree.SubElement(chConstrOprefl, QName(XmlNs.energy, "Reflectance"))
                         chConstrOpReflFrac = etree.SubElement(chConstrOpRefl, QName(XmlNs.energy, "fraction"))
                         chConstrOpReflFrac.set("uom", "scale")
-                        chConstrOpReflFrac.text = str(constr[1][2])
+                        chConstrOpReflFrac.text = str(optProp[2])
                         chConstrOpReflSurf = etree.SubElement(chConstrOpRefl, QName(XmlNs.energy, "surface"))
                         chConstrOpReflSurf.text = "outside"
                         chConstrOpReflWLR = etree.SubElement(chConstrOpRefl,
                                                              QName(XmlNs.energy, "wavelengthRange"))
                         chConstrOpReflWLR.text = "visible"
-                    if constr[1][3] is not None:
+                    if optProp[3] is not None:
                         chConstrOptransm = etree.SubElement(chConstrOP, QName(XmlNs.energy, "transmittance"))
                         chConstrOpTransm = etree.SubElement(chConstrOptransm,
                                                             QName(XmlNs.energy, "Transmittance"))
                         chConstrOpTransmFrac = etree.SubElement(chConstrOpTransm,
                                                                 QName(XmlNs.energy, "fraction"))
                         chConstrOpTransmFrac.set("uom", "scale")
-                        chConstrOpTransmFrac.text = str(constr[1][3])
+                        chConstrOpTransmFrac.text = str(optProp[3])
                         chConstrOpTransmWLR = etree.SubElement(chConstrOpTransm,
                                                                QName(XmlNs.energy, "wavelengthRange"))
                         chConstrOpTransmWLR.text = "solar"
-                    if constr[1][4] is not None:
+                    if optProp[4] is not None:
                         chConstrOptransm = etree.SubElement(chConstrOP, QName(XmlNs.energy, "transmittance"))
                         chConstrOpTransm = etree.SubElement(chConstrOptransm,
                                                             QName(XmlNs.energy, "Transmittance"))
                         chConstrOpTransmFrac = etree.SubElement(chConstrOpTransm,
                                                                 QName(XmlNs.energy, "fraction"))
                         chConstrOpTransmFrac.set("uom", "scale")
-                        chConstrOpTransmFrac.text = str(constr[1][4])
+                        chConstrOpTransmFrac.text = str(optProp[4])
                         chConstrOpTransmWLR = etree.SubElement(chConstrOpTransm,
                                                                QName(XmlNs.energy, "wavelengthRange"))
                         chConstrOpTransmWLR.text = "visible"
-                    if constr[1][5] is not None:
+                    if optProp[5] is not None:
                         chConstrOpGlaz = etree.SubElement(chConstrOP, QName(XmlNs.energy, "glazingRatio"))
                         chConstrOpGlaz.set("uom", "scale")
-                        chConstrOpGlaz.text = str(constr[1][5])
+                        chConstrOpGlaz.text = str(optProp[5])
 
         return materials
 
@@ -1043,26 +1044,26 @@ class EADEConverter(QgsTask):
 
         Args:
             root: XML-Objekt, an das die Materialien angehängt werden sollen
-            materials: Liste der GML-IDs und zugehörigen IfcMaterials
+            materials: Zu erstellende Materialien, als Liste
         """
         for mat in materials:
 
             # XML-Struktur
             chFM = etree.SubElement(root, QName(XmlNs.gml, "featureMember"))
             chMat = etree.SubElement(chFM, QName(XmlNs.energy, "SolidMaterial"))
-            chMat.set(QName(XmlNs.gml, "id"), mat[0])
+            chMat.set(QName(XmlNs.gml, "id"), mat.gmlId)
 
             # Name & Beschreibung
-            if mat[1].Name is not None:
+            if mat.ifcMat.Name is not None:
                 chMatName = etree.SubElement(chMat, QName(XmlNs.gml, "name"))
-                chMatName.text = mat[1].Name
-            if mat[1].Description is not None:
+                chMatName.text = mat.ifcMat.Name
+            if mat.ifcMat.Description is not None:
                 chMatDescr = etree.SubElement(chMat, QName(XmlNs.gml, "description"))
-                chMatDescr.text = mat[1].Description
+                chMatDescr.text = mat.ifcMat.Description
 
             # Eigenschaften heraussuchen
             cond, density, perm, spHeat = None, None, None, None
-            matProps = mat[1].HasProperties
+            matProps = mat.ifcMat.HasProperties
             for matProp in matProps:
                 # noinspection PyBroadException
                 try:

@@ -127,6 +127,9 @@ class Converter(QgsTask):
             ifc: IFC-Datei
             ifcBuilding: IFC-Gebäude, aus dem die Attribute entnommen werden sollen
             chBldg: XML-Objekt, an das die Gebäudeattribute angehängt werden sollen
+
+        Returns:
+            Die Höhe des Gebäudes
         """
         # ID
         chBldg.set(QName(XmlNs.gml, "id"), "UUID_" + str(uuid.uuid4()))
@@ -474,7 +477,7 @@ class Converter(QgsTask):
             trans: Transformer-Objekt
 
         Returns:
-            Erzeugte GML-Geometrie mit zugehörigem IFC-Element
+            Erzeugte Geometrie mit zugehörigem IFC-Element
         """
         # Vertizes aus den Elementen entnehmen und georeferenzieren
         grVertsList = []

@@ -96,7 +96,7 @@ class LoD4Converter(Converter):
             return False
 
         # Über alle enthaltenen Gebäude iterieren
-        self.bldgGeom = len(ifcBuildings)
+        self.bldgCount = len(ifcBuildings)
         for ifcBuilding in ifcBuildings:
             chCOM = etree.SubElement(root, QName(XmlNs.core, "cityObjectMember"))
             chBldg = etree.SubElement(chCOM, QName(XmlNs.bldg, "Building"))

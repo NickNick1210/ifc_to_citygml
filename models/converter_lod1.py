@@ -25,14 +25,14 @@ from osgeo import ogr
 from .xmlns import XmlNs
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
-from .converter_gen import GenConverter
+from .converter import Converter
 from .converter_eade import EADEConverter
 
 
 #####
 
 
-class LoD1Converter:
+class LoD1Converter(Converter):
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD1 """
 
     def __init__(self, parent, task, ifc, name, trans, eade):
@@ -46,15 +46,10 @@ class LoD1Converter:
             trans: Transformer-Objekt
             eade: Ob die EnergyADE gewählt wurde als Boolean
         """
+        super().__init__(parent, task, ifc, name, trans, eade)
 
         # Initialisierung von Attributen
-        self.parent, self.task = parent, task
-        self.ifc = ifc
-        self.name = name
-        self.trans = trans
-        self.eade = eade
-        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
-        self.progress, self.bldgCount = 10, 1
+        self.progress = 10
 
     @staticmethod
     def tr(msg):
@@ -96,7 +91,7 @@ class LoD1Converter:
 
             # Gebäudeattribute
             self.task.logging.emit(self.tr(u'Building attributes are extracted'))
-            height = GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            height = self.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
             self.progress += (10 / self.bldgCount) if not self.eade else (5 / self.bldgCount)
@@ -110,7 +105,7 @@ class LoD1Converter:
 
             # Adresse
             self.task.logging.emit(self.tr(u'Building address is extracted'))
-            GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.convertAddress(ifcBuilding, ifcSite, chBldg)
             if self.task.isCanceled():
                 return False
             self.progress += (10 / self.bldgCount)
@@ -118,7 +113,7 @@ class LoD1Converter:
 
             # Bounding Box
             self.task.logging.emit(self.tr(u'Building bound is calculated'))
-            bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
+            bbox = self.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
             self.progress += (10 / self.bldgCount)
@@ -189,7 +184,7 @@ class LoD1Converter:
         geometries = []
         # Berechnung der Grundfläche
         self.task.logging.emit(self.tr(u'Building geometry: base surface is calculated'))
-        geometries.append(GenConverter.calcPlane(ifcSlabs, self.trans)[1])
+        geometries.append(self.calcPlane(ifcSlabs, self.trans)[1])
         if self.task.isCanceled():
             return False
         self.progress += (15 / self.bldgCount) if not self.eade else (10 / self.bldgCount)

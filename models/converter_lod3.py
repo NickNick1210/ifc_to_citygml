@@ -37,14 +37,14 @@ from sympy import Point3D, Line
 from .xmlns import XmlNs
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
-from .converter_gen import GenConverter
+from .converter import Converter
 from .converter_eade import EADEConverter
 
 
 #####
 
 
-class LoD3Converter:
+class LoD3Converter(Converter):
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD3 """
 
     def __init__(self, parent, task, ifc, name, trans, eade):
@@ -58,15 +58,10 @@ class LoD3Converter:
             trans: Transformer-Objekt
             eade: Ob die EnergyADE gewählt wurde als Boolean
         """
+        super().__init__(parent, task, ifc, name, trans, eade)
 
         # Initialisierung von Attributen
-        self.parent, self.task = parent, task
-        self.ifc = ifc
-        self.name = name
-        self.trans = trans
-        self.eade = eade
-        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
-        self.progress, self.bldgCount = 5, 1
+        self.progress = 5
 
     @staticmethod
     def tr(msg):
@@ -107,7 +102,7 @@ class LoD3Converter:
 
             # Gebäudeattribute
             self.task.logging.emit(self.tr(u'Building attributes are extracted'))
-            GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            self.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)
@@ -121,7 +116,7 @@ class LoD3Converter:
 
             # Gebäudekörper
             self.task.logging.emit(self.tr(u'Building solid is calculated'))
-            GenConverter.convertSolid(chBldg, links, 3)
+            self.convertSolid(chBldg, links, 3)
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)
@@ -129,7 +124,7 @@ class LoD3Converter:
 
             # Adresse
             self.task.logging.emit(self.tr(u'Building address is extracted'))
-            GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
+            self.convertAddress(ifcBuilding, ifcSite, chBldg)
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)
@@ -137,7 +132,7 @@ class LoD3Converter:
 
             # Bounding Box
             self.task.logging.emit(self.tr(u'Building bound is calculated'))
-            bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
+            bbox = self.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)

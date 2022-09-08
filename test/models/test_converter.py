@@ -25,7 +25,7 @@ from lxml import etree
 # Plugin
 sys.path.insert(0, '..')
 from test.mock_model import Model
-from models.converter import Converter
+from models.convert_starter import ConvertStarter
 
 #####
 
@@ -47,7 +47,7 @@ ifc2 = ifcopenshell.open(r"data/IFC_test3.ifc")
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        result = Converter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
+        result = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
         self.assertIsNone(result.exception)
         self.assertIsNone(result.parent)
         self.assertEqual(inPath1, result.inPath)
@@ -59,7 +59,7 @@ class TestConstructor(unittest.TestCase):
 
     def test_2(self):
         model = Model()
-        result = Converter("IFC-to-CityGML Conversion", model, inPath2, outPath2, 3, True, True)
+        result = ConvertStarter("IFC-to-CityGML Conversion", model, inPath2, outPath2, 3, True, True)
         self.assertIsNone(result.exception)
         self.assertEqual(model, result.parent)
         self.assertEqual(inPath2, result.inPath)
@@ -73,12 +73,12 @@ class TestConstructor(unittest.TestCase):
 class TestRun(unittest.TestCase):
 
     def test_1(self):
-        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, False, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, False, False)
         result = conv.run()
         self.assertTrue(result)
 
     def test_2(self):
-        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 1, True, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 1, True, False)
         result = conv.run()
         self.assertTrue(result)
 
@@ -86,12 +86,12 @@ class TestRun(unittest.TestCase):
 class TestReadIfc(unittest.TestCase):
 
     def test_1(self):
-        result = Converter.readIfc(inPath1)
+        result = ConvertStarter.readIfc(inPath1)
         corr = str(ifc1.by_type('IfcProject')[0])
         self.assertEqual(corr, str(result.by_type('IfcProject')[0]))
 
     def test_2(self):
-        result = Converter.readIfc(inPath2)
+        result = ConvertStarter.readIfc(inPath2)
         corr = str(ifc2.by_type('IfcProject')[0])
         self.assertEqual(corr, str(result.by_type('IfcProject')[0]))
 
@@ -99,7 +99,7 @@ class TestReadIfc(unittest.TestCase):
 class TestCreateSchema(unittest.TestCase):
 
     def test_1(self):
-        result = Converter.createSchema()
+        result = ConvertStarter.createSchema()
         corr = b'<core:CityModel xmlns:core="http://www.opengis.net/citygml/2.0" xmlns=' + \
                b'"http://www.opengis.net/citygml/profiles/base/2.0" xmlns:bldg=' + \
                b'"http://www.opengis.net/citygml/building/2.0" xmlns:gen=' + \
@@ -115,8 +115,8 @@ class TestCreateSchema(unittest.TestCase):
 class TestWriteCGML(unittest.TestCase):
 
     def test_1(self):
-        conv = Converter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
-        conv.writeCGML(Converter.createSchema())
+        conv = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
+        conv.writeCGML(ConvertStarter.createSchema())
         f = open(outPath1, "r")
         result = ""
         for x in f:
@@ -135,7 +135,7 @@ class TestWriteCGML(unittest.TestCase):
 
     def test_2(self):
         root = etree.Element("root")
-        conv = Converter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
         conv.writeCGML(root)
         f = open(outPath1, "r")
         result = ""
@@ -149,12 +149,12 @@ class TestWriteCGML(unittest.TestCase):
 class TestFinished(unittest.TestCase):
 
     def test_1(self):
-        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 0, False, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 0, False, False)
         conv.finished(True)
         self.assertTrue(conv.parent.completedTest)
 
     def test_2(self):
-        conv = Converter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, True, True)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, True, True)
         conv.finished(False)
         self.assertTrue(conv.parent.completedTest)
 

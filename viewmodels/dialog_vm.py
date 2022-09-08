@@ -87,7 +87,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         """ Aktiviert die QGIS-Integration-Option nach Auswahl eines dazu geeigneten Level of Detail (LoD0/1)
 
         Args:
-            event: Das Clicked-Event
+            event: boolean, ob aktiviert oder deaktiviert wurde
         """
         self.checkBox_integr.setDisabled(False)
 
@@ -96,7 +96,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         """ Deaktiviert die QGIS-Integration-Option nach Auswahl eines dazu ungeeigneten Level of Detail (LoD2/3/4)
 
         Args:
-            event: Das Clicked-Event
+            event: boolean, ob aktiviert oder deaktiviert wurde
         """
         self.checkBox_integr.setDisabled(True)
         self.checkBox_integr.setChecked(False)

@@ -16,7 +16,7 @@ from qgis.core import QgsApplication, Qgis
 
 # Plugin
 from .models.ifc_analyzer import IfcAnalyzer
-from .models.converter import Converter
+from .models.convert_starter import ConvertStarter
 
 
 #####
@@ -102,16 +102,22 @@ class Model:
                      ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
-        self.task = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
+        self.task = ConvertStarter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade,
+                                   integr)
         QgsApplication.taskManager().addTask(self.task)
         self.task.progressChanged.connect(self.progressChanged)
         self.task.logging.connect(lambda t: self.dlg.log(t))
 
         # Falls die Konvertierung zu Testzwecken auf dem Mainthread ausgeführt werden soll
-        # conv = Converter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade, integr)
+        # conv = ConvertStarter(self.tr(u"IFC-to-CityGML"), self, self.inPath, self.outPath, lod, eade, integr)
         # conv.run()
 
     def progressChanged(self, result):
+        """ Aktualisiert den aktuellen Fortschritt
+
+            Args:
+                result: Prozentualer Fortschritt, als Integer
+        """
         self.dlg.setProgress(result)
 
     def completed(self, result):
@@ -122,7 +128,6 @@ class Model:
         """
         # Logging
         if result:
-            self.dlg.setProgress(100)
             self.dlg.log(self.tr(u'Conversion completed'))
         else:
             self.dlg.log(self.tr(u'Conversion crashed'))
@@ -131,5 +136,6 @@ class Model:
         self.task = None
 
     def cancel(self):
+        """ Bricht die Konvertierung ab """
         if self.task is not None:
             self.task.cancel()

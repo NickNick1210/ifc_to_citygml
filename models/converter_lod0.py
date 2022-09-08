@@ -18,21 +18,18 @@ from lxml.etree import QName
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QCoreApplication
 
-# Geo-Bibliotheken
-from osgeo import ogr
-
 # Plugin
 from .xmlns import XmlNs
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
-from .converter_gen import GenConverter
+from .converter import Converter
 from .converter_eade import EADEConverter
 
 
 #####
 
 
-class LoD0Converter:
+class LoD0Converter(Converter):
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD0 """
 
     def __init__(self, parent, task, ifc, name, trans, eade):
@@ -46,14 +43,9 @@ class LoD0Converter:
             trans: Transformer-Klasse
             eade: Ob die EnergyADE gewählt wurde, als Boolean
         """
+        super().__init__(parent, task, ifc, name, trans, eade)
 
         # Initialisierung von Attributen
-        self.parent, self.task = parent, task
-        self.ifc = ifc
-        self.name = name
-        self.trans = trans
-        self.eade = eade
-        self.geom, self.bldgGeom = ogr.Geometry(ogr.wkbGeometryCollection), ogr.Geometry(ogr.wkbGeometryCollection)
         self.progress = 10
 
     @staticmethod
@@ -95,7 +87,7 @@ class LoD0Converter:
 
             # Gebäudeattribute
             self.task.logging.emit(self.tr(u'Building attributes are extracted'))
-            GenConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
+            self.convertBldgAttr(self.ifc, ifcBuilding, chBldg)
             if self.task.isCanceled():
                 return False
             self.progress += (10 / bldgCount)
@@ -119,7 +111,7 @@ class LoD0Converter:
 
             # Adresse
             self.task.logging.emit(self.tr(u'Building address is extracted'))
-            addressSuccess = GenConverter.convertAddress(ifcBuilding, ifcSite, chBldg)
+            addressSuccess = self.convertAddress(ifcBuilding, ifcSite, chBldg)
             if not addressSuccess:
                 self.task.logging.emit(self.tr(u'No address details existing'))
             if self.task.isCanceled():
@@ -129,7 +121,7 @@ class LoD0Converter:
 
             # Bounding Box
             self.task.logging.emit(self.tr(u'Building bound is calculated'))
-            bbox = GenConverter.convertBound(self.geom, chBound, self.trans)
+            bbox = self.convertBound(self.geom, chBound, self.trans)
             if self.task.isCanceled():
                 return False
             self.progress += (10 / bldgCount)
@@ -161,6 +153,9 @@ class LoD0Converter:
         Args:
             ifcBuilding: Das Gebäude, aus dem die Grundfläche entnommen werden soll
             chBldg: XML-Element, an dem die Grundfläche angefügt werden soll
+
+        Returns:
+            Geometrie der Grundfläche
         """
         # IFC-Elemente
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -172,7 +167,7 @@ class LoD0Converter:
                 return
 
         # Geometrie
-        geometry = GenConverter.calcPlane(ifcSlabs, self.trans)[1]
+        geometry = self.calcPlane(ifcSlabs, self.trans)[1]
         if geometry is not None:
             self.geom.AddGeometry(geometry)
             self.bldgGeom.AddGeometry(geometry)
@@ -203,7 +198,7 @@ class LoD0Converter:
                 return
 
         # Geometrie
-        geometry = GenConverter.calcPlane(ifcRoofs, self.trans)[1]
+        geometry = self.calcPlane(ifcRoofs, self.trans)[1]
         self.geom.AddGeometry(geometry)
         self.bldgGeom.AddGeometry(geometry)
         geomXML = UtilitiesGeom.geomToGml(geometry)

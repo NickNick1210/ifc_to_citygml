@@ -26,7 +26,7 @@ from osgeo import ogr
 
 # Plugin
 sys.path.insert(0, '..')
-from models.converter_gen import GenConverter
+from models.converter import GenConverter
 from models.transformer import Transformer
 from models.utilitiesIfc import UtilitiesIfc
 

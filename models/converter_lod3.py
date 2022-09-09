@@ -48,18 +48,17 @@ from .objects.surface import Surface
 class LoD3Converter(Converter):
     """ Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD3 """
 
-    def __init__(self, parent, task, ifc, name, trans, eade):
+    def __init__(self, task, ifc, name, trans, eade):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD3
 
         Args:
-            parent: Die zugrunde liegende zentrale Model-Klasse
             task: Die zugrunde liegende zentrale Converter-Klasse
             ifc: IFC-Datei
             name: Name des Modells
             trans: Transformer-Objekt
             eade: Ob die EnergyADE gewählt wurde als Boolean
         """
-        super().__init__(parent, task, ifc, name, trans, eade)
+        super().__init__(task, ifc, name, trans, eade)
 
         # Initialisierung von Attributen
         self.progress = 5

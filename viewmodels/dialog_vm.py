@@ -29,18 +29,16 @@ FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), '../dialo
 class DialogVM(QtWidgets.QDialog, FORM_CLASS):
     """ ViewModel der GUI-View """
 
-    def __init__(self, parent, model):
+    def __init__(self, model):
         """ Konstruktor der GUI-ViewModel-Klasse.
 
         Args:
-            parent: Die zugrunde liegende Base-Klasse
             model: Die zugehörige Model-Klasse, die sich um die Logik kümmert
         """
         # Oberklassenkonstruktor
         super(DialogVM, self).__init__(None)
 
         # Initialisierung von Attributen
-        self.parent = parent
         self.model = model
 
         # GUI aufbauen

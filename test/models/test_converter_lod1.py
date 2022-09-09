@@ -27,7 +27,6 @@ from osgeo import ogr
 # Plugin
 from mock_converter import Converter
 sys.path.insert(0, '..')
-from test.mock_model import Model
 from models.converter_lod1 import LoD1Converter
 from models.transformer import Transformer
 from models.utilitiesIfc import UtilitiesIfc
@@ -69,9 +68,8 @@ geom6 = ogr.CreateGeometryFromWkt("Polygon((10 10 3.1415, 10 20 3.1415, 20 20 3.
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        model, conv = Model(), Converter()
-        result = LoD1Converter(model, conv, ifc1, "Test123", trans1, False)
-        self.assertEqual(model, result.parent)
+        conv = Converter()
+        result = LoD1Converter(conv, ifc1, "Test123", trans1, False)
         self.assertEqual(conv, result.task)
         self.assertEqual(ifc1, result.ifc)
         self.assertEqual("Test123", result.name)
@@ -83,9 +81,8 @@ class TestConstructor(unittest.TestCase):
         self.assertEqual(1, result.bldgCount)
 
     def test_2(self):
-        model, conv = Model(), Converter()
-        result = LoD1Converter(model, conv, ifc2, "TestABC", trans2, True)
-        self.assertEqual(model, result.parent)
+        conv = Converter()
+        result = LoD1Converter(conv, ifc2, "TestABC", trans2, True)
         self.assertEqual(conv, result.task)
         self.assertEqual(ifc2, result.ifc)
         self.assertEqual("TestABC", result.name)
@@ -128,21 +125,21 @@ class TestConvertBldgAttr(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
+        lod1Conv = LoD1Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod1Conv.convertBldgAttr(ifc1, ifcBldg1, root)
         self.assertAlmostEqual(6.51769, result, 3)
         self.assertEqual(1514, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
+        lod1Conv = LoD1Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod1Conv.convertBldgAttr(ifc2, ifcBldg2, root)
         self.assertAlmostEqual(15.34932, result, 3)
         self.assertEqual(1520, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc3, "ÄÖÜß", trans3, False)
+        lod1Conv = LoD1Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod1Conv.convertBldgAttr(ifc3, ifcBldg3, root)
         self.assertAlmostEqual(11.01, result, 3)
         self.assertEqual(918, len(etree.tostring(root)))
@@ -250,19 +247,19 @@ class TestConvert(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
+        lod1Conv = LoD1Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod1Conv.convert(root)
         self.assertEqual(11410, len(etree.tostring(result)))
 
     def test_2(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
+        lod1Conv = LoD1Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod1Conv.convert(root)
         self.assertEqual(7806, len(etree.tostring(result)))
 
     def test_3(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc3, "ÄÖÜß", trans3, False)
+        lod1Conv = LoD1Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod1Conv.convert(root)
         self.assertEqual(39529, len(etree.tostring(result)))
 
@@ -271,7 +268,7 @@ class TestConvertSolid(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
+        lod1Conv = LoD1Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod1Conv.convertSolid(ifcBldg1, root, 10)
         self.assertEqual(2425, len(etree.tostring(root)))
         corr = "POLYGON ((458870.063285681 5438773.62904949 110,458862.40284125 5438780.05692559 110," + \
@@ -281,7 +278,7 @@ class TestConvertSolid(unittest.TestCase):
 
     def test_2(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc2, "Test123", trans2, True)
+        lod1Conv = LoD1Converter(Converter(), ifc2, "Test123", trans2, True)
         result = lod1Conv.convertSolid(ifcBldg2, root, 10)
         self.assertEqual(5845, len(etree.tostring(root)))
         corr = "POLYGON ((479356.600506348 5444183.43024925 -3,479356.600506348 5444185.43024925 -3," + \
@@ -294,7 +291,7 @@ class TestConvertSolid(unittest.TestCase):
 
     def test_3(self):
         root = etree.Element("root")
-        lod1Conv = LoD1Converter(Model(), Converter(), ifc3, "Test123", trans3, True)
+        lod1Conv = LoD1Converter(Converter(), ifc3, "Test123", trans3, True)
         result = lod1Conv.convertSolid(ifcBldg3, root, 10)
         self.assertEqual(37750, len(etree.tostring(root)))
         self.assertEqual(85, result.GetGeometryRef(0).GetPointCount())

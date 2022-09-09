@@ -27,7 +27,6 @@ from osgeo import ogr
 # Plugin
 from mock_converter import Converter
 sys.path.insert(0, '..')
-from test.mock_model import Model
 from models.converter_lod3 import LoD3Converter
 from models.transformer import Transformer
 from models.utilitiesIfc import UtilitiesIfc
@@ -90,9 +89,8 @@ door2 = Surface([door2Geom], "Tür-Ext-TestABC", ifcDoors1[3], "IfcDoor")
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        model, conv = Model(), Converter()
-        result = LoD3Converter(model, conv, ifc1, "Test123", trans1, False)
-        self.assertEqual(model, result.parent)
+        conv = Converter()
+        result = LoD3Converter(conv, ifc1, "Test123", trans1, False)
         self.assertEqual(conv, result.task)
         self.assertEqual(ifc1, result.ifc)
         self.assertEqual("Test123", result.name)
@@ -104,9 +102,8 @@ class TestConstructor(unittest.TestCase):
         self.assertEqual(1, result.bldgCount)
 
     def test_2(self):
-        model, conv = Model(), Converter()
-        result = LoD3Converter(model, conv, ifc2, "TestABC", trans2, True)
-        self.assertEqual(model, result.parent)
+        conv = Converter()
+        result = LoD3Converter(conv, ifc2, "TestABC", trans2, True)
         self.assertEqual(conv, result.task)
         self.assertEqual(ifc2, result.ifc)
         self.assertEqual("TestABC", result.name)
@@ -149,21 +146,21 @@ class TestConvertBldgAttr(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result = lod3Conv.convertBldgAttr(ifc1, ifcBldg1, root)
         self.assertAlmostEqual(6.51769, result, 3)
         self.assertEqual(1514, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc2, "Test123", trans2, False)
+        lod3Conv = LoD3Converter(Converter(), ifc2, "Test123", trans2, False)
         result = lod3Conv.convertBldgAttr(ifc2, ifcBldg2, root)
         self.assertAlmostEqual(15.34932, result, 3)
         self.assertEqual(1520, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
+        lod3Conv = LoD3Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod3Conv.convertBldgAttr(ifc3, ifcBldg3, root)
         self.assertAlmostEqual(11.01, result, 3)
         self.assertEqual(918, len(etree.tostring(root)))
@@ -289,7 +286,7 @@ class TestConvertSolid(unittest.TestCase):
 class TestCalcBases(unittest.TestCase):
 
     def test_1(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result1, result2, result3 = lod3Conv.calcBases(ifcBldg1)
         self.assertEqual(1, len(result1))
         corr = "POLYGON ((458870.063285681 5438773.62904949 109.8,458862.40284125 5438780.05692559 109.8," + \
@@ -311,7 +308,7 @@ class TestCalcBases(unittest.TestCase):
         self.assertEqual(corr, result3[0].geom[0].ExportToWkt())
 
     def test_2(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc2, "Test123", trans2, False)
+        lod3Conv = LoD3Converter(Converter(), ifc2, "Test123", trans2, False)
         result1, result2, result3 = lod3Conv.calcBases(ifcBldg2)
         self.assertEqual(3, len(result1))
         corr = "POLYGON ((479338.600506348 5444171.43024925 -3.3,479338.600506348 5444183.43024925 -3.3," + \
@@ -336,7 +333,7 @@ class TestCalcBases(unittest.TestCase):
         self.assertEqual(corr, result3[0].geom[0].ExportToWkt())
 
     def test_3(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc3, "Test123", trans2, False)
+        lod3Conv = LoD3Converter(Converter(), ifc3, "Test123", trans2, False)
         result1, result2, result3 = lod3Conv.calcBases(ifcBldg3)
         self.assertEqual(40, len(result1))
         corr = "POLYGON ((479338.600506348 5444169.43024925 -3.06,479338.600506348 5444176.34024925 -3.06," + \
@@ -362,7 +359,7 @@ class TestCalcBases(unittest.TestCase):
 class TestCalcRoofs(unittest.TestCase):
 
     def test_1(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result1, result2 = lod3Conv.calcRoofs(ifcBldg1)
         self.assertEqual(2, len(result1))
         corr = "POLYGON ((458870.05466415 5438789.95387493 113.14226,458861.698425224 5438779.99529717 113.14226," + \
@@ -380,7 +377,7 @@ class TestCalcRoofs(unittest.TestCase):
         self.assertEqual(corr, result2[0][0].ExportToWkt())
 
     def test_2(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc2, "Test123", trans2, False)
+        lod3Conv = LoD3Converter(Converter(), ifc2, "Test123", trans2, False)
         result1, result2 = lod3Conv.calcRoofs(ifcBldg2)
         self.assertEqual(21, len(result1))
         corr = "POLYGON ((479356.600506348 5444182.54302925 10.09998,479337.600506348 5444182.54302925 10.09998," + \
@@ -398,7 +395,7 @@ class TestCalcRoofs(unittest.TestCase):
         self.assertEqual(corr, result2[0][0].ExportToWkt())
 
     def test_3(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc3, "Test123", trans3, False)
+        lod3Conv = LoD3Converter(Converter(), ifc3, "Test123", trans3, False)
         result1, result2 = lod3Conv.calcRoofs(ifcBldg3)
         self.assertEqual(20, len(result1))
         corr = "POLYGON ((455480.005320756 5431327.26161912 112.77785,455483.082417578 5431329.22194599 112.77785," + \
@@ -419,7 +416,7 @@ class TestCalcRoofs(unittest.TestCase):
 class TestCalcWalls(unittest.TestCase):
 
     def test_1(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc4, "Test123", trans4, False)
+        lod3Conv = LoD3Converter(Converter(), ifc4, "Test123", trans4, False)
         result = lod3Conv.calcWalls(ifcBldg4)
         self.assertEqual(4, len(result))
         self.assertEqual(18, len(result[0].geom))
@@ -437,7 +434,7 @@ class TestCalcWalls(unittest.TestCase):
 class TestCalcOpenings(unittest.TestCase):
 
     def test_1(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result = lod3Conv.calcOpenings(ifcBldg1, "ifcDoor")
         self.assertEqual(2, len(result))
         self.assertEqual(44, len(result[0].geom))
@@ -452,7 +449,7 @@ class TestCalcOpenings(unittest.TestCase):
         self.assertEqual(corr, result[1].ifcElem)
 
     def test_2(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result = lod3Conv.calcOpenings(ifcBldg1, "ifcWindow")
         self.assertEqual(11, len(result))
         self.assertEqual(12, len(result[0].geom))
@@ -467,7 +464,7 @@ class TestCalcOpenings(unittest.TestCase):
         self.assertEqual(corr, result[1].ifcElem)
 
     def test_3(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
+        lod3Conv = LoD3Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod3Conv.calcOpenings(ifcBldg2, "ifcDoor")
         self.assertEqual(1, len(result))
         self.assertEqual(70, len(result[0].geom))
@@ -480,7 +477,7 @@ class TestCalcOpenings(unittest.TestCase):
 class TestAssignOpenings(unittest.TestCase):
 
     def test_1(self):
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result = lod3Conv.assignOpenings([door1], [wall1, wall2])
         self.assertEqual(2, len(result))
         self.assertEqual(1, len(result[0].openings))
@@ -492,7 +489,7 @@ class TestSetElementGroup(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result1, result2, result3 = lod3Conv.setElementGroup(root, base.geom, "GroundSurface", base.name, base.openings)
         self.assertEqual(741, len(etree.tostring(root)))
         self.assertEqual(42, len(result1[0]))
@@ -501,7 +498,7 @@ class TestSetElementGroup(unittest.TestCase):
 
     def test_2(self):
         root = etree.Element("root")
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result1, result2, result3 = lod3Conv.setElementGroup(root, wall1.geom, "WallSurface", wall1.name, [door2])
         self.assertEqual(1360, len(etree.tostring(root)))
         self.assertEqual(42, len(result1[0]))
@@ -510,7 +507,7 @@ class TestSetElementGroup(unittest.TestCase):
 
     def test_3(self):
         root = etree.Element("root")
-        lod3Conv = LoD3Converter(Model(), Converter(), ifc1, "Test123", trans1, False)
+        lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result1, result2, result3 = lod3Conv.setElementGroup(root, wall2.geom, "WallSurface", wall2.name, [])
         self.assertEqual(749, len(etree.tostring(root)))
         self.assertEqual(42, len(result1[0]))

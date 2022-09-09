@@ -95,15 +95,15 @@ class ConvertStarter(QgsTask):
         # Eigentliche Konvertierung: Unterscheidung nach den LoD
         dedConv = None
         if self.lod == 0:
-            dedConv = LoD0Converter(self.parent, self, ifc, name, trans, self.eade)
+            dedConv = LoD0Converter(self, ifc, name, trans, self.eade)
         elif self.lod == 1:
-            dedConv = LoD1Converter(self.parent, self, ifc, name, trans, self.eade)
+            dedConv = LoD1Converter(self, ifc, name, trans, self.eade)
         elif self.lod == 2:
-            dedConv = LoD2Converter(self.parent, self, ifc, name, trans, self.eade)
+            dedConv = LoD2Converter(self, ifc, name, trans, self.eade)
         elif self.lod == 3:
-            dedConv = LoD3Converter(self.parent, self, ifc, name, trans, self.eade)
+            dedConv = LoD3Converter(self, ifc, name, trans, self.eade)
         elif self.lod == 4:
-            dedConv = LoD4Converter(self.parent, self, ifc, name, trans, self.eade)
+            dedConv = LoD4Converter(self, ifc, name, trans, self.eade)
         root = dedConv.convert(root)
 
         if self.isCanceled():

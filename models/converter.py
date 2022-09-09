@@ -46,12 +46,11 @@ from .utilitiesIfc import UtilitiesIfc
 class Converter(QgsTask):
     """ Abstrakte Model-Klasse mit Werkzeugen zum Konvertieren von IFC-Dateien zu CityGML-Dateien in allen LoD """
 
-    def __init__(self, parent, task, ifc, name, trans, eade):
+    def __init__(self, task, ifc, name, trans, eade):
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien in LoD2
 
         Args:
-            parent: Die zugrunde liegende zentrale Model-Klasse
-            parent: Die zugrunde liegende zentrale Converter-Klasse
+            task: Die zugrunde liegende zentrale Converter-Klasse
             ifc: IFC-Datei
             name: Name des Modells
             trans: Transformer-Objekt
@@ -60,7 +59,7 @@ class Converter(QgsTask):
         super().__init__()
 
         # Initialisierung von Attributen
-        self.parent, self.task = parent, task
+        self.task = task
         self.ifc = ifc
         self.name = name
         self.trans = trans

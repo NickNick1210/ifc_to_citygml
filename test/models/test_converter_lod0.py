@@ -27,7 +27,6 @@ from osgeo import ogr
 # Plugin
 from mock_converter import Converter
 sys.path.insert(0, '..')
-from test.mock_model import Model
 from models.converter_lod0 import LoD0Converter
 from models.transformer import Transformer
 from models.utilitiesIfc import UtilitiesIfc
@@ -67,9 +66,8 @@ geom4 = ogr.CreateGeometryFromWkt("GeometryCollection(Polygon((10 10 10, 10 20 1
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        model, conv = Model(), Converter()
-        result = LoD0Converter(model, conv, ifc1, "Test123", trans1, False)
-        self.assertEqual(model, result.parent)
+        conv = Converter()
+        result = LoD0Converter(conv, ifc1, "Test123", trans1, False)
         self.assertEqual(conv, result.task)
         self.assertEqual(ifc1, result.ifc)
         self.assertEqual("Test123", result.name)
@@ -80,9 +78,8 @@ class TestConstructor(unittest.TestCase):
         self.assertEqual(10, result.progress)
 
     def test_2(self):
-        model, conv = Model(), Converter()
-        result = LoD0Converter(model, conv, ifc2, "TestABC", trans2, True)
-        self.assertEqual(model, result.parent)
+        conv = Converter()
+        result = LoD0Converter(conv, ifc2, "TestABC", trans2, True)
         self.assertEqual(conv, result.task)
         self.assertEqual(ifc2, result.ifc)
         self.assertEqual("TestABC", result.name)
@@ -124,21 +121,21 @@ class TestConvertBldgAttr(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
+        lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convertBldgAttr(ifc1, ifcBldg1, root)
         self.assertAlmostEqual(6.51769, result, 3)
         self.assertEqual(1514, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
+        lod0Conv = LoD0Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convertBldgAttr(ifc2, ifcBldg2, root)
         self.assertAlmostEqual(15.34932, result, 3)
         self.assertEqual(1520, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc3, "ÄÖÜß", trans3, False)
+        lod0Conv = LoD0Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod0Conv.convertBldgAttr(ifc3, ifcBldg3, root)
         self.assertAlmostEqual(11.01, result, 3)
         self.assertEqual(918, len(etree.tostring(root)))
@@ -265,19 +262,19 @@ class TestConvert(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
+        lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convert(root)
         self.assertEqual(5028, len(etree.tostring(result)))
 
     def test_2(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
+        lod0Conv = LoD0Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convert(root)
         self.assertEqual(2882, len(etree.tostring(result)))
 
     def test_3(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc3, "ÄÖÜß", trans3, False)
+        lod0Conv = LoD0Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod0Conv.convert(root)
         self.assertEqual(6587, len(etree.tostring(result)))
 
@@ -286,7 +283,7 @@ class TestConvertFootPrint(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
+        lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convertFootPrint(ifcBldg1, root)
         corr = b'<root><ns0:lod0FootPrint xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface' + \
                b' xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:outerBoundaryIs>' + \
@@ -303,7 +300,7 @@ class TestConvertFootPrint(unittest.TestCase):
 
     def test_2(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc2, "TestABC", trans2, False)
+        lod0Conv = LoD0Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convertFootPrint(ifcBldg2, root)
         corr = b'<root><ns0:lod0FootPrint xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface' + \
                b' xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:outerBoundaryIs>' + \
@@ -325,7 +322,7 @@ class TestConvertFootPrint(unittest.TestCase):
 
     def test_3(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc3, "Test123", trans3, False)
+        lod0Conv = LoD0Converter(Converter(), ifc3, "Test123", trans3, False)
         result = lod0Conv.convertFootPrint(ifcBldg3, root)
         self.assertEqual(3584, len(etree.tostring(root)))
         self.assertEqual(85, result.GetGeometryRef(0).GetPointCount())
@@ -335,7 +332,7 @@ class TestConvertRoofEdge(unittest.TestCase):
 
     def test_1(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc1, "Test123", trans1, True)
+        lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         lod0Conv.convertRoofEdge(ifcBldg1, root)
         corr = b'<root><ns0:lod0RoofEdge xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface ' + \
                b'xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:outerBoundaryIs>' + \
@@ -347,7 +344,7 @@ class TestConvertRoofEdge(unittest.TestCase):
 
     def test_2(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc2, "Test123", trans2, True)
+        lod0Conv = LoD0Converter(Converter(), ifc2, "Test123", trans2, True)
         lod0Conv.convertRoofEdge(ifcBldg2, root)
         corr = b'<root><ns0:lod0RoofEdge xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface ' + \
                b'xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:outerBoundaryIs>' + \
@@ -361,7 +358,7 @@ class TestConvertRoofEdge(unittest.TestCase):
 
     def test_3(self):
         root = etree.Element("root")
-        lod0Conv = LoD0Converter(Model(), Converter(), ifc3, "Test123", trans3, True)
+        lod0Conv = LoD0Converter(Converter(), ifc3, "Test123", trans3, True)
         lod0Conv.convertRoofEdge(ifcBldg3, root)
         self.assertEqual(2091, len(etree.tostring(root)))
 

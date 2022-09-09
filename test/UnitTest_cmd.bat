@@ -3,7 +3,8 @@
 :: title: IFC-to-CityGML
 :: organization: Jade Hochschule Oldenburg
 :: author: Nicklas Meyer
-:: version: v1.0 (02.09.2022)
+:: version: v1.0 (09.09.2022)
+::
 :: Batch-Datei zum Ausführen von UnitTests
 
 set OSGEO4W_ROOT=D:\Business-Programme\QGIS\

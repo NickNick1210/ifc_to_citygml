@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
 
 Unit-Test für das Initialisieren des Plugins
  ***************************************************************************/
@@ -62,6 +62,7 @@ class TestInit(unittest.TestCase):
                 expectation, file_path))
 
             self.assertIn(expectation, dict(metadata), message)
+
 
 if __name__ == '__main__':
     unittest.main()

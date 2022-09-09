@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
 
 Mock-Klasse der ViewModel-Klasse DialogVM
  ***************************************************************************/
@@ -15,6 +15,7 @@ Mock-Klasse der ViewModel-Klasse DialogVM
 
 class DialogVM:
 
+    # noinspection PyUnusedLocal
     def __init__(self, parent, model):
         """ Konstruktor der GUI-ViewModel-Klasse.
 

@@ -27,10 +27,10 @@ from osgeo import ogr
 # Plugin
 from mock_converter import Converter
 sys.path.insert(0, '..')
-from models.converter_lod3 import LoD3Converter
-from models.transformer import Transformer
-from models.utilitiesIfc import UtilitiesIfc
-from models.objects.surface import Surface
+from algorithm.converter_lod3 import LoD3Converter
+from algorithm.transformer import Transformer
+from algorithm.utilitiesIfc import UtilitiesIfc
+from viewmodel.model import Surface
 
 #####
 

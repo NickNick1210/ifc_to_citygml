@@ -22,7 +22,7 @@ import ifcopenshell
 # Plugin
 sys.path.insert(0, '..')
 from test.mock_model import Model
-from models.ifc_analyzer import IfcAnalyzer
+from algorithm.ifc_analyzer import IfcAnalyzer
 
 #####
 

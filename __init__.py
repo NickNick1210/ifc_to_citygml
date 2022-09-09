@@ -18,5 +18,5 @@ def classFactory(iface):
     Returns:
         Die instanziierte Base-Klasse
     """
-    from .base import Base
+    from .viewmodel.base import Base
     return Base(iface)

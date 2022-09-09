@@ -20,7 +20,7 @@ import ifcopenshell
 
 # Plugin
 sys.path.insert(0, '..')
-from models.utilitiesIfc import UtilitiesIfc
+from algorithm.utilitiesIfc import UtilitiesIfc
 
 #####
 

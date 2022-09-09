@@ -22,7 +22,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from osgeo import ogr
 
 # Plugin
-from .xmlns import XmlNs
+from ..model.xmlns import XmlNs
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
 from .converter import Converter

@@ -23,8 +23,8 @@ from osgeo import ogr
 
 # Plugin
 sys.path.insert(0, '..')
-from models.utilitiesIfc import UtilitiesIfc
-from models.objects.surface import Surface
+from algorithm.utilitiesIfc import UtilitiesIfc
+from viewmodel.model import Surface
 
 #####
 

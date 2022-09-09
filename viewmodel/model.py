@@ -15,8 +15,8 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import QgsApplication, Qgis
 
 # Plugin
-from .models.ifc_analyzer import IfcAnalyzer
-from .models.convert_starter import ConvertStarter
+from ..algorithm.ifc_analyzer import IfcAnalyzer
+from ..algorithm.convert_starter import ConvertStarter
 
 
 #####

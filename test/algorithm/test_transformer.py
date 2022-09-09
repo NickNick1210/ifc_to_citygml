@@ -21,7 +21,7 @@ import ifcopenshell
 
 # Plugin
 sys.path.insert(0, '..')
-from models.transformer import Transformer
+from algorithm.transformer import Transformer
 
 #####
 

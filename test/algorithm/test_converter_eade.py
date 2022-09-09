@@ -26,11 +26,11 @@ from osgeo import ogr
 
 # Plugin
 sys.path.insert(0, '..')
-from models.converter_eade import EADEConverter
-from models.utilitiesIfc import UtilitiesIfc
-from models.objects.surface import Surface
-from models.objects.construction import Construction
-from models.objects.material import Material
+from algorithm.converter_eade import EADEConverter
+from algorithm.utilitiesIfc import UtilitiesIfc
+from viewmodel.model import Surface
+from viewmodel.model import Construction
+from viewmodel.model import Material
 
 #####
 

@@ -22,10 +22,10 @@ from qgis.PyQt.QtGui import QIcon
 
 # Plugin
 # noinspection PyUnresolvedReferences
-from .resources import resources
+from ..resources import resources
 from .model import Model
-from .viewmodels.dialog_vm import DialogVM
-from .viewmodels.gis_vm import GisVM
+from ..view.dialog_vm import DialogVM
+from ..view.gis_vm import GisVM
 
 #####
 
@@ -48,7 +48,7 @@ class Base:
 
         # Übersetzungen, falls vorhanden
         locale = QSettings().value('locale/userLocale')[0:2]
-        locale_path = os.path.join(self.plugin_dir, 'i18n', 'ifc_to_citygml_{}.qm'.format(locale))
+        locale_path = os.path.join(self.plugin_dir, '../i18n', 'ifc_to_citygml_{}.qm'.format(locale))
         if os.path.exists(locale_path):
             self.translator = QTranslator()
             self.translator.load(locale_path)
@@ -72,12 +72,12 @@ class Base:
         try:
             import pip
         except ImportError:
-            exec(open(str(pathlib.Path(self.plugin_dir, 'scripts', 'get_pip.py'))).read())
+            exec(open(str(pathlib.Path(self.plugin_dir, '../scripts', 'get_pip.py'))).read())
             import pip
 
         # Requirements öffnen und installieren
         sys.path.append(self.plugin_dir)
-        with open(os.path.join(self.plugin_dir, 'requirements.txt'), "r") as requirements:
+        with open(os.path.join(self.plugin_dir, '../requirements.txt'), "r") as requirements:
             for dep in requirements.readlines():
                 dep = dep.strip().split("==")[0]
                 try:

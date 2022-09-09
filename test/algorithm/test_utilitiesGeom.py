@@ -24,7 +24,7 @@ from sympy import Plane, Point3D
 
 # Plugin
 sys.path.insert(0, '..')
-from models.utilitiesGeom import UtilitiesGeom
+from algorithm.utilitiesGeom import UtilitiesGeom
 
 #####
 

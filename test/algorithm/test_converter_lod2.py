@@ -28,10 +28,10 @@ from osgeo import ogr
 from mock_converter import Converter
 
 sys.path.insert(0, '..')
-from models.converter_lod2 import LoD2Converter
-from models.transformer import Transformer
-from models.utilitiesIfc import UtilitiesIfc
-from models.objects.surface import Surface
+from algorithm.converter_lod2 import LoD2Converter
+from algorithm.transformer import Transformer
+from algorithm.utilitiesIfc import UtilitiesIfc
+from viewmodel.model import Surface
 
 #####
 

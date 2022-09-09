@@ -30,12 +30,12 @@ from qgis.core import QgsTask
 from osgeo import ogr
 
 # Plugin
-from .xmlns import XmlNs
-from .mapper import Mapper
+from ..model.xmlns import XmlNs
+from ..model.mapper import Mapper
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
-from .objects.construction import Construction
-from .objects.material import Material
+from ..model.construction import Construction
+from ..model.material import Material
 
 #####
 

@@ -20,7 +20,7 @@ import ifcopenshell
 
 # Plugin
 sys.path.insert(0, '..')
-from models.objects.material import Material
+from viewmodel.model import Material
 
 #####
 

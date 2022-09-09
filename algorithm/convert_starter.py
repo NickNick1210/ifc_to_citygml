@@ -24,7 +24,7 @@ from qgis.core import QgsTask
 from qgis.PyQt.QtCore import QCoreApplication, pyqtSignal
 
 # Plugin
-from .xmlns import XmlNs
+from ..model.xmlns import XmlNs
 from .transformer import Transformer
 from .converter_lod0 import LoD0Converter
 from .converter_lod1 import LoD1Converter

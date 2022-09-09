@@ -4,9 +4,9 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
 
-Unit-Tests für die Modelklasse Converter
+Unit-Tests für die Modelklasse ConvertStarter
  ***************************************************************************/
 """
 
@@ -48,26 +48,22 @@ class TestConstructor(unittest.TestCase):
 
     def test_1(self):
         result = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
-        self.assertIsNone(result.exception)
         self.assertIsNone(result.parent)
         self.assertEqual(inPath1, result.inPath)
         self.assertEqual(outPath1, result.outPath)
         self.assertEqual(0, result.lod)
         self.assertFalse(result.eade)
         self.assertFalse(result.integr)
-        self.assertIsNone(result.dedConv)
 
     def test_2(self):
         model = Model()
         result = ConvertStarter("IFC-to-CityGML Conversion", model, inPath2, outPath2, 3, True, True)
-        self.assertIsNone(result.exception)
         self.assertEqual(model, result.parent)
         self.assertEqual(inPath2, result.inPath)
         self.assertEqual(outPath2, result.outPath)
         self.assertEqual(3, result.lod)
         self.assertTrue(result.eade)
         self.assertTrue(result.integr)
-        self.assertIsNone(result.dedConv)
 
 
 class TestRun(unittest.TestCase):

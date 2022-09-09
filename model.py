@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
  ***************************************************************************/
 """
 
@@ -102,15 +102,15 @@ class Model:
                      ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
-        #self.task = ConvertStarter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade,
-        #                           integr)
-        #QgsApplication.taskManager().addTask(self.task)
-        #self.task.progressChanged.connect(self.progressChanged)
-        #self.task.logging.connect(lambda t: self.dlg.log(t))
+        self.task = ConvertStarter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade,
+                                   integr)
+        QgsApplication.taskManager().addTask(self.task)
+        self.task.progressChanged.connect(self.progressChanged)
+        self.task.logging.connect(lambda t: self.dlg.log(t))
 
         # Falls die Konvertierung zu Testzwecken auf dem Mainthread ausgeführt werden soll
-        conv = ConvertStarter(self.tr(u"IFC-to-CityGML"), self, self.inPath, self.outPath, lod, eade, integr)
-        conv.run()
+        # conv = ConvertStarter(self.tr(u"IFC-to-CityGML"), self, self.inPath, self.outPath, lod, eade, integr)
+        # conv.run()
 
     def progressChanged(self, result):
         """ Aktualisiert den aktuellen Fortschritt

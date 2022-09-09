@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
  ***************************************************************************/
 """
 
@@ -248,18 +248,18 @@ class LoD3Converter(Converter):
         # Geometrie
         links, surfaces = [], []
         for base in bases:
-            linksBase, base.gmlId, openSurf = self.setElementGroup(chBldg, base.geom, "GroundSurface", 3, base.name,
-                                                              base.openings)
+            linksBase, base.gmlId, openSurf = self.setElementGroup(chBldg, base.geom, "GroundSurface", base.name,
+                                                                   base.openings)
             links += linksBase
             surfaces += openSurf
         for roof in roofs:
-            linksRoof, roof.gmlId, openSurf = self.setElementGroup(chBldg, roof.geom, "RoofSurface", 3, roof.name,
-                                                              roof.openings)
+            linksRoof, roof.gmlId, openSurf = self.setElementGroup(chBldg, roof.geom, "RoofSurface", roof.name,
+                                                                   roof.openings)
             links += linksRoof
             surfaces += openSurf
         for wall in walls:
-            linksWall, wall.gmlId, openSurf = self.setElementGroup(chBldg, wall.geom, "WallSurface", 3, wall.name,
-                                                              wall.openings)
+            linksWall, wall.gmlId, openSurf = self.setElementGroup(chBldg, wall.geom, "WallSurface", wall.name,
+                                                                   wall.openings)
             links += linksWall
             surfaces += openSurf
         surfaces += bases + roofs + walls
@@ -272,9 +272,9 @@ class LoD3Converter(Converter):
             ifcBuilding: Das Gebäude, aus dem die Grundflächen entnommen werden sollen
 
         Returns:
-            Die berechneten Grundflächen-Geometrien, als Liste
+            Die berechneten Grundflächen, als Liste
             Alle Grundflächen-Geometrien ohne Aussortierung, als Liste
-            Alle Geschossflächen-Geometrien, als Liste
+            Alle Geschossflächen, als Liste
         """
         bases, basesOrig, finalBases = [], [], []
 
@@ -625,7 +625,7 @@ class LoD3Converter(Converter):
             type: Öffnungs-Typ (ifcDoor oder IfcWindow)
 
         Returns:
-            Die berechneten Öffnungen mit Geometrie, Name, Typ und Ifc-Element, als Liste
+            Die berechneten Öffnungen, als Liste
         """
         openings, openingNames = [], []
 
@@ -1278,14 +1278,13 @@ class LoD3Converter(Converter):
 
         return walls
 
-    def setElementGroup(self, chBldg, geometries, type, lod, name, openings):
+    def setElementGroup(self, chBldg, geometries, type, name, openings):
         """ Setzt ein CityGML-Objekt, bestehend aus mehreren Geometrien
 
         Args:
             chBldg: XML-Element, an dem das Objekt angefügt werden soll
             geometries: Die Geometrien des Objekts, als Liste
             type: Der Typ des Objekts
-            lod: Level of Detail (LoD)
             name: Name der Oberfläche
             openings: Öffnungen des Objektes
 
@@ -1309,7 +1308,7 @@ class LoD3Converter(Converter):
             chBldgSName.text = name
 
         # MultiSurface
-        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
+        chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod3MultiSurface"))
         chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.gml, "MultiSurface"))
         chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.gml, "surfaceMember"))
         chBldgCS = etree.SubElement(chBldgSM, QName(XmlNs.gml, "CompositeSurface"))
@@ -1339,7 +1338,7 @@ class LoD3Converter(Converter):
             if opening.name is not None:
                 chBldgSurfSOName = etree.SubElement(chBldgSurfSOE, QName(XmlNs.gml, "name"))
                 chBldgSurfSOName.text = opening.name
-            chBldgSurfSOMS = etree.SubElement(chBldgSurfSOE, QName(XmlNs.bldg, "lod" + str(lod) + "MultiSurface"))
+            chBldgSurfSOMS = etree.SubElement(chBldgSurfSOE, QName(XmlNs.bldg, "lod3MultiSurface"))
             chBldgOMS = etree.SubElement(chBldgSurfSOMS, QName(XmlNs.gml, "MultiSurface"))
             chBldgOSM = etree.SubElement(chBldgOMS, QName(XmlNs.gml, "surfaceMember"))
             chBldgOCS = etree.SubElement(chBldgOSM, QName(XmlNs.gml, "CompositeSurface"))

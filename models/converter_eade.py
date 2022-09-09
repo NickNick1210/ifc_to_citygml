@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
  ***************************************************************************/
 """
 
@@ -534,7 +534,7 @@ class EADEConverter(QgsTask):
             ifcBuilding: IFC-Gebäude, aus dem die thermische Zone berechnet werden soll
             chBldg: XML-Objekt, an das die thermische Zone angehängt werden soll
             root: XML-Objekt, aus dem die BoundingBox entnommen werden soll
-            surfaces: Die GML-IDs und zugehörigen GML-IDs der Oberflächen
+            surfaces: Die Oberflächen, als Liste
             lod: Level of Detail, als Zahl
 
         Returns

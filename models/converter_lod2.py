@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
  ***************************************************************************/
 """
 
@@ -444,8 +444,8 @@ class LoD2Converter(Converter):
         """ Berechnt die Grundwände in Level of Detail (LoD) 2
 
         Args:
-            base: Die Geometrie der Grundfläche mit den zugehörigen IFC-Elementen, als Liste
-            roofs: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen ,als Liste
+            base: Die Grundfläche
+            roofs: Die Dächer, als Liste
             height: Die Gebäudehöhe, als float
 
         Returns:
@@ -723,7 +723,7 @@ class LoD2Converter(Converter):
         """ Berechnet die Wände zwischen zwei Dächern, die nicht bereits über die Grundfläche erstellt wurden
 
         Args:
-            roofs: Die Geometrien der Dächer, als Liste
+            roofs: Die Dächer, als Liste
 
         Returns:
             Die berechneten neuen Wände, als Liste
@@ -1020,8 +1020,8 @@ class LoD2Converter(Converter):
         """ Passt die Dächer, u.a. auf die Grundfläche und überschneidende Dächer, in Level of Detail (LoD) 2 an
 
         Args:
-            roofsIn: Die Geometrien der Dächer mit den zugehörigen IFC-Elementen, als Liste
-            base: Die Geometrie der Grundfläche mit dem zugehörigen IFC-Element
+            roofsIn: Die Dächer, als Liste
+            base: Die Grundfläche
 
         Returns:
             Die berechneten Dächer, als Liste
@@ -1080,8 +1080,8 @@ class LoD2Converter(Converter):
         """ Überprüft die neu erstellten Wand-Geometrien und sortiert sie ggf. aus
 
         Args:
-            wallsIn: Die Wand-Geometrien, die überprüft werden sollen, als Liste
-            roofs: Die Dach-Geometrien mit den zugehörigen IFC-Elementen, als Liste
+            wallsIn: Die Wände, die überprüft werden sollen, als Liste
+            roofs: Die Dächer, als Liste
 
         Returns:
             Die überprüften Wand-Geometrien, als Liste

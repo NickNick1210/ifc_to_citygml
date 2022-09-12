@@ -70,7 +70,7 @@ class ConvertStarter(QgsTask):
         Returns:
             Übersetzter Text
         """
-        return QCoreApplication.translate('Converter', msg)
+        return QCoreApplication.translate('ConvertStarter', msg)
 
     def run(self):
         """ Führt die Konvertierung aus """

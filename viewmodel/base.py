@@ -62,6 +62,7 @@ class Base:
         # noinspection PyBroadException
         try:
             import ifcopenshell
+            import sympy
         except Exception:
             self.install()
 

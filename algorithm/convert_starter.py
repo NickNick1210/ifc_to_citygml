@@ -4,7 +4,7 @@
 @title: IFC-to-CityGML
 @organization: Jade Hochschule Oldenburg
 @author: Nicklas Meyer
-@version: v1.0 (02.09.2022)
+@version: v1.0 (09.09.2022)
  ***************************************************************************/
 """
 
@@ -12,7 +12,6 @@
 
 # IFC-Bibliotheken
 import ifcopenshell
-import ifcopenshell.util.pset
 
 # XML-Bibliotheken
 from lxml import etree

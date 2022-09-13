@@ -78,7 +78,6 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
             event: Das Close-Event
         """
         self.model.cancel()
-        super()
 
     # noinspection PyUnusedLocal
     def activateIntegr(self, event):

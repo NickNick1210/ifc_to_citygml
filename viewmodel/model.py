@@ -105,20 +105,12 @@ class Model:
         self.task = ConvertStarter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade,
                                    integr)
         QgsApplication.taskManager().addTask(self.task)
-        self.task.progressChanged.connect(self.progressChanged)
+        self.task.progressChanged.connect(lambda t: self.dlg.setProgress(t))
         self.task.logging.connect(lambda t: self.dlg.log(t))
 
         # Falls die Konvertierung zu Testzwecken auf dem Mainthread ausgeführt werden soll
         # conv = ConvertStarter(self.tr(u"IFC-to-CityGML"), self, self.inPath, self.outPath, lod, eade, integr)
         # conv.run()
-
-    def progressChanged(self, result):
-        """ Aktualisiert den aktuellen Fortschritt
-
-            Args:
-                result: Prozentualer Fortschritt, als Integer
-        """
-        self.dlg.setProgress(result)
 
     def completed(self, result):
         """ Beendet die Konvertierung

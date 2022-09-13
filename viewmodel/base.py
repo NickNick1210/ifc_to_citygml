@@ -153,7 +153,7 @@ class Base:
         self.model = Model(self.iface)
 
         # Views und Viewmodels starten
+        self.gis = GisVM(self.model)
         self.dlg = DialogVM(self.model)
         self.dlg.show()
-        self.gis = GisVM(self.model)
         self.model.setVM(self.dlg, self.gis)

@@ -21,7 +21,7 @@ import ifcopenshell
 
 # Plugin
 sys.path.insert(0, '..')
-from test.mock_model import Model
+from test.viewmodel.mock_model import Model
 from algorithm.ifc_analyzer import IfcAnalyzer
 
 #####

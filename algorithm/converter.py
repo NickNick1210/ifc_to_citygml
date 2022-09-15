@@ -34,10 +34,15 @@ from qgis.core import QgsTask
 from osgeo import ogr
 
 # Plugin
-from ..model.xmlns import XmlNs
-from ..model.mapper import Mapper
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
+try:
+    from ..model.xmlns import XmlNs
+    from ..model.mapper import Mapper
+except ImportError:
+    sys.path.insert(0, '..')
+    from model.xmlns import XmlNs
+    from model.mapper import Mapper
 
 
 #####

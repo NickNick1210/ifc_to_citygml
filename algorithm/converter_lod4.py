@@ -33,12 +33,17 @@ import sympy
 from sympy import Point3D, Line
 
 # Plugin
-from ..model.xmlns import XmlNs
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
 from .converter import Converter
 from .converter_eade import EADEConverter
-from ..model.surface import Surface
+try:
+    from ..model.xmlns import XmlNs
+    from ..model.surface import Surface
+except ImportError:
+    sys.path.insert(0, '..')
+    from model.xmlns import XmlNs
+    from model.surface import Surface
 
 
 #####

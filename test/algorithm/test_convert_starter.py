@@ -24,7 +24,7 @@ from lxml import etree
 
 # Plugin
 sys.path.insert(0, '..')
-from test.mock_model import Model
+from test.viewmodel.mock_model import Model
 from algorithm.convert_starter import ConvertStarter
 
 #####

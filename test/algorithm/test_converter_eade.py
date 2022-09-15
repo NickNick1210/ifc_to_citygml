@@ -28,9 +28,9 @@ from osgeo import ogr
 sys.path.insert(0, '..')
 from algorithm.converter_eade import EADEConverter
 from algorithm.utilitiesIfc import UtilitiesIfc
-from viewmodel.model import Surface
-from viewmodel.model import Construction
-from viewmodel.model import Material
+from model.surface import Surface
+from model.construction import Construction
+from model.material import Material
 
 #####
 

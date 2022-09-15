@@ -10,6 +10,9 @@
 
 #####
 
+# Standard-Bibliotheken
+import sys
+
 # XML-Bibliotheken
 from lxml import etree
 # noinspection PyUnresolvedReferences
@@ -19,11 +22,15 @@ from lxml.etree import QName
 from qgis.PyQt.QtCore import QCoreApplication
 
 # Plugin
-from ..model.xmlns import XmlNs
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
 from .converter import Converter
 from .converter_eade import EADEConverter
+try:
+    from ..model.xmlns import XmlNs
+except ImportError:
+    sys.path.insert(0, '..')
+    from model.xmlns import XmlNs
 
 
 #####

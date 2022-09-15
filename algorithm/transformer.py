@@ -46,8 +46,6 @@ class Transformer:
         # Geographische Koordinaten
         site = self.ifc.by_type("IfcSite")[0]
         a, b = self.mergeDegrees(site.RefLatitude), self.mergeDegrees(site.RefLongitude)
-        source = osr.SpatialReference()
-        source.ImportFromEPSG(4326)
 
         # Einordnung in die UTM-Zonen und Berechnung des EPSG-Codes
         zone = math.ceil((b + 180) / 6)

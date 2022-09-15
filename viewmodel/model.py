@@ -10,13 +10,21 @@
 
 #####
 
+# Standard-Bibliotheken
+import sys
+
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QCoreApplication
 from qgis.core import QgsApplication, Qgis
 
 # Plugin
-from ..algorithm.ifc_analyzer import IfcAnalyzer
-from ..algorithm.convert_starter import ConvertStarter
+try:
+    from ..algorithm.ifc_analyzer import IfcAnalyzer
+    from ..algorithm.convert_starter import ConvertStarter
+except ImportError:
+    sys.path.insert(0, '..')
+    from algorithm.ifc_analyzer import IfcAnalyzer
+    from algorithm.convert_starter import ConvertStarter
 
 
 #####

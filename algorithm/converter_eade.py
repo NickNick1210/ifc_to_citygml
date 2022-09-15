@@ -14,6 +14,7 @@
 import math
 import uuid
 from copy import deepcopy
+import sys
 
 # IFC-Bibliotheken
 from ifcopenshell.util import element
@@ -30,12 +31,20 @@ from qgis.core import QgsTask
 from osgeo import ogr
 
 # Plugin
-from ..model.xmlns import XmlNs
-from ..model.mapper import Mapper
 from .utilitiesGeom import UtilitiesGeom
 from .utilitiesIfc import UtilitiesIfc
-from ..model.construction import Construction
-from ..model.material import Material
+try:
+    from ..model.xmlns import XmlNs
+    from ..model.mapper import Mapper
+    from ..model.construction import Construction
+    from ..model.material import Material
+except ImportError:
+    sys.path.insert(0, '..')
+    from model.xmlns import XmlNs
+    from model.mapper import Mapper
+    from model.construction import Construction
+    from model.material import Material
+
 
 #####
 

@@ -30,7 +30,7 @@ sys.path.insert(0, '..')
 from algorithm.converter_lod3 import LoD3Converter
 from algorithm.transformer import Transformer
 from algorithm.utilitiesIfc import UtilitiesIfc
-from viewmodel.model import Surface
+from model.surface import Surface
 
 #####
 

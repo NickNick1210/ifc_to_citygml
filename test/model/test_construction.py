@@ -24,7 +24,7 @@ from osgeo import ogr
 # Plugin
 sys.path.insert(0, '..')
 from algorithm.utilitiesIfc import UtilitiesIfc
-from viewmodel.model import Construction
+from model.construction import Construction
 
 #####
 

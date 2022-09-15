@@ -14,8 +14,8 @@ Mock-Klasse der Modelklasse Model
 import sys
 
 # Plugin
-sys.path.insert(0, '..')
-from test.viewmodels.mock_dialog_vm import DialogVM
+sys.path.insert(0, '../..')
+from test.view.mock_dialog_vm import DialogVM
 
 
 #####

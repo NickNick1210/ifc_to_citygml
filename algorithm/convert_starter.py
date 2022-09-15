@@ -10,6 +10,9 @@
 
 #####
 
+# Standard-Bibliotheken
+import sys
+
 # IFC-Bibliotheken
 import ifcopenshell
 
@@ -23,13 +26,18 @@ from qgis.core import QgsTask
 from qgis.PyQt.QtCore import QCoreApplication, pyqtSignal
 
 # Plugin
-from ..model.xmlns import XmlNs
 from .transformer import Transformer
 from .converter_lod0 import LoD0Converter
 from .converter_lod1 import LoD1Converter
 from .converter_lod2 import LoD2Converter
 from .converter_lod3 import LoD3Converter
 from .converter_lod4 import LoD4Converter
+
+try:
+    from ..model.xmlns import XmlNs
+except ImportError:
+    sys.path.insert(0, '..')
+    from model.xmlns import XmlNs
 
 
 #####

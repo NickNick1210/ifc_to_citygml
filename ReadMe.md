@@ -22,6 +22,12 @@ Geoinformation Gesundheitstechnologie (BGG) der
 - Notwendige Bibliotheken: [IfcOpenShell](https://pypi.org/project/python-ifcopenshell/)
   , [SymPy](https://pypi.org/project/sympy/)
 
+### Installation
+- Nur für Linux: Im Terminal `sudo apt install python3-pip` ausführen und mit Passwort bestätigen
+- Die Zip-Datei herunterladen
+- In QGIS den Erweiterungs-Manager öffnen
+- "Aus ZIP installieren" wählen, die heruntergeladene Datei auswählen und "Erweiterung installieren" wählen
+
 ### Bedienung
 
 Nach Start des Plugins über eine Schaltfläche in QGIS kann eine lokale IFC-Datei gewählt werden.
@@ -59,6 +65,12 @@ Wilhelmshaven/Oldenburg/Elsfleth](https://www.jade-hs.de/en/) in Oldenburg, Germ
 - Needed QGIS version: 3.X
 - Needed libaries: [IfcOpenShell](https://pypi.org/project/python-ifcopenshell/)
   , [SymPy](https://pypi.org/project/sympy/)
+
+### Installation
+- Only for Linux: In the terminal run `sudo apt install python3-pip` and confirm with password
+- Download the zip file
+- Open the plugin manager in QGIS
+- Select 'Install from ZIP', choose the downloaded zip file and select 'Install Plugin'
 
 ### Operation
 

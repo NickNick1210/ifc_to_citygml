@@ -58,35 +58,6 @@ class Base:
         self.actions = []
         self.menu = 'IFC-to-CityGML'
 
-        # Überprüfung, ob IfcOpenShell installiert ist
-        # noinspection PyBroadException
-        try:
-            import ifcopenshell
-            import sympy
-        except Exception:
-            self.install()
-
-    def install(self):
-        """ Installiert IfcOpenShell """
-
-        # Überprüfung, ob pip installiert ist. Ansonsten über Skript installieren
-        try:
-            import pip
-        except ImportError:
-            exec(open(str(pathlib.Path(self.plugin_dir, '../scripts', 'get_pip.py'))).read())
-            import pip
-
-        # Requirements öffnen und installieren
-        sys.path.append(self.plugin_dir)
-        with open(os.path.join(self.plugin_dir, '../requirements.txt'), "r") as requirements:
-            for dep in requirements.readlines():
-                dep = dep.strip().split("==")[0]
-                try:
-                    __import__(dep)
-                except ImportError:
-                    print("{} not available, installing".format(dep))
-                    pip.main(['install', dep])
-
     def initGui(self):
         """ Erstellt die Menü-Einträge und Tools in der QGIS-GUI. """
         icon_path = ':/plugins/ifc_to_citygml/resources/logo.png'

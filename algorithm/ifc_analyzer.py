@@ -10,9 +10,17 @@
 
 #####
 
+# Standard-Bibliotheken
+import os
+
 # IFC-Bibliotheken
-import ifcopenshell
-import ifcopenshell.validate
+try:
+    import ifcopenshell
+    import ifcopenshell.validate
+except ImportError:
+    os.system('pip install python-ifcopenshell')
+    import ifcopenshell
+    import ifcopenshell.validate
 
 # QGIS-Bibliotheken
 from qgis.core import QgsTask, QgsApplication

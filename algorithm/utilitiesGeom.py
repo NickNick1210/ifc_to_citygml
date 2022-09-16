@@ -14,7 +14,7 @@
 import sys
 import numpy as np
 import math
-import mpmath
+import os
 
 # XML-Bibliotheken
 from lxml import etree
@@ -23,7 +23,13 @@ from lxml.etree import QName
 
 # Geo-Bibliotheken
 from osgeo import ogr
-from sympy import Point3D, Plane, Line
+try:
+    import mpmath
+    from sympy import Point3D, Plane, Line
+except ImportError:
+    os.system('pip install sympy')
+    import mpmath
+    from sympy import Point3D, Plane, Line
 
 
 #####

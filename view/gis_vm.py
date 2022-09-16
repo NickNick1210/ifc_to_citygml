@@ -80,7 +80,8 @@ class GisVM:
 
         # Stilvorlage einlesen
         filePath = os.path.dirname(__file__)
-        stylePath = filePath[0:filePath.rfind('\\')] + '/resources/3D.qml'
+        slash = "/" if platform.system() == "Linux" else "\\"
+        stylePath = filePath[0:filePath.rfind(slash)] + '/resources/3D.qml'
         qml = etree.parse(stylePath)
         minV, maxV = qml.xpath("//Option[@name='minValue']")[0], qml.xpath("//Option[@name='maxValue']")[0]
 

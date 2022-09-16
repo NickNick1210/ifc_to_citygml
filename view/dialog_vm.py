@@ -196,7 +196,7 @@ class DialogVM(QtWidgets.QDialog, FORM_CLASS):
         Args:
             progr: Prozentualer Wert, auf den der Fortschritt gesetzt werden soll
         """
-        self.progressBar.setValue(progr)
+        self.progressBar.setValue(int(progr))
 
     def enableRun(self, enable):
         """ Aktiviert oder deaktiviert den Ausführen-Button.

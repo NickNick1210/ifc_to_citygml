@@ -13,6 +13,7 @@
 # Standard-Bibliotheken
 import sys
 import os.path
+import platform
 
 # QGIS-Bibliotheken
 from qgis.core import QgsProject, QgsVectorLayer
@@ -56,7 +57,8 @@ class GisVM:
         """
 
         # Erstellen des Vektorlayers
-        name = path[path.rindex("\\") + 1:-4]
+        slash = "/" if platform.system() == "Linux" else "\\"
+        name = path[path.rindex(slash) + 1:-4]
         layer = QgsVectorLayer(path, name, "ogr")
 
         # Wenn Layer valide ist: Hinzufügen

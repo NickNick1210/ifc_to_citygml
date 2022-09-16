@@ -12,6 +12,7 @@
 
 # Standard-Bibliotheken
 import sys
+import platform
 
 # QGIS-Bibliotheken
 from qgis.PyQt.QtCore import QCoreApplication
@@ -105,8 +106,9 @@ class Model:
         lod = self.dlg.getLod()
         eade = self.dlg.getOptionEade()
         integr = self.dlg.getOptionIntegr()
-        self.dlg.log(self.tr(u'Input') + ": " + self.inPath[self.inPath.rindex("\\") + 1:] + ", " + self.tr(
-            u'Output') + ": " + self.outPath[self.outPath.rindex("\\") + 1:] + ", LoD: " + str(lod) +
+        slash = "/" if platform.system() == "Linux" else "\\"
+        self.dlg.log(self.tr(u'Input') + ": " + self.inPath[self.inPath.rindex(slash) + 1:] + ", " + self.tr(
+            u'Output') + ": " + self.outPath[self.outPath.rindex(slash) + 1:] + ", LoD: " + str(lod) +
                      ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten

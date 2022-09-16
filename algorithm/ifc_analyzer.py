@@ -12,6 +12,7 @@
 
 # Standard-Bibliotheken
 import os
+import platform
 
 # IFC-Bibliotheken
 try:
@@ -46,7 +47,8 @@ class IfcAnalyzer:
 
         # IFC-Datei
         self.ifc = self.read(path)
-        self.fileName = path[path.rindex("\\") + 1:-4]
+        slash = "/" if platform.system() == "Linux" else "\\"
+        self.fileName = path[path.rindex(slash) + 1:-4]
 
     @staticmethod
     def tr(msg):

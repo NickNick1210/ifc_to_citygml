@@ -12,6 +12,7 @@
 
 # Standard-Bibliotheken
 import sys
+import platform
 
 # IFC-Bibliotheken
 import ifcopenshell
@@ -90,7 +91,8 @@ class ConvertStarter(QgsTask):
 
         root = self.createSchema()
         trans = Transformer(ifc)
-        name = self.outPath[self.outPath.rindex("\\") + 1:-4]
+        slash = "/" if platform.system() == "Linux" else "\\"
+        name = self.outPath[self.outPath.rindex(slash) + 1:-4]
         if self.lod >= 3 or (self.lod == 2 and self.eade):
             self.setProgress(5)
         else:

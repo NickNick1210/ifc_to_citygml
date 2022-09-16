@@ -149,21 +149,21 @@ class TestConvertBldgAttr(unittest.TestCase):
         lod3Conv = LoD3Converter(Converter(), ifc1, "Test123", trans1, False)
         result = lod3Conv.convertBldgAttr(ifc1, ifcBldg1, root)
         self.assertAlmostEqual(6.51769, result, 3)
-        self.assertEqual(1514, len(etree.tostring(root)))
+        self.assertEqual(1512, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         lod3Conv = LoD3Converter(Converter(), ifc2, "Test123", trans2, False)
         result = lod3Conv.convertBldgAttr(ifc2, ifcBldg2, root)
         self.assertAlmostEqual(15.34932, result, 3)
-        self.assertEqual(1520, len(etree.tostring(root)))
+        self.assertEqual(1516, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         lod3Conv = LoD3Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod3Conv.convertBldgAttr(ifc3, ifcBldg3, root)
         self.assertAlmostEqual(11.01, result, 3)
-        self.assertEqual(918, len(etree.tostring(root)))
+        self.assertEqual(914, len(etree.tostring(root)))
 
 
 class TestConvertFunctionUsage(unittest.TestCase):

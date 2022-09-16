@@ -128,21 +128,21 @@ class TestConvertBldgAttr(unittest.TestCase):
         lod1Conv = LoD1Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod1Conv.convertBldgAttr(ifc1, ifcBldg1, root)
         self.assertAlmostEqual(6.51769, result, 3)
-        self.assertEqual(1514, len(etree.tostring(root)))
+        self.assertEqual(1512, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod1Conv.convertBldgAttr(ifc2, ifcBldg2, root)
         self.assertAlmostEqual(15.34932, result, 3)
-        self.assertEqual(1520, len(etree.tostring(root)))
+        self.assertEqual(1516, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod1Conv.convertBldgAttr(ifc3, ifcBldg3, root)
         self.assertAlmostEqual(11.01, result, 3)
-        self.assertEqual(918, len(etree.tostring(root)))
+        self.assertEqual(914, len(etree.tostring(root)))
 
 
 class TestConvertFunctionUsage(unittest.TestCase):
@@ -249,19 +249,19 @@ class TestConvert(unittest.TestCase):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod1Conv.convert(root)
-        self.assertEqual(11410, len(etree.tostring(result)))
+        self.assertEqual(11408, len(etree.tostring(result)))
 
     def test_2(self):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod1Conv.convert(root)
-        self.assertEqual(7806, len(etree.tostring(result)))
+        self.assertEqual(7802, len(etree.tostring(result)))
 
     def test_3(self):
         root = etree.Element("root")
         lod1Conv = LoD1Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod1Conv.convert(root)
-        self.assertEqual(39529, len(etree.tostring(result)))
+        self.assertEqual(39525, len(etree.tostring(result)))
 
 
 class TestConvertSolid(unittest.TestCase):

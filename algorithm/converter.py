@@ -306,10 +306,10 @@ class Converter(QgsTask):
         chBldgStoreysBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysBelowGround"))
         chBldgStoreysBG.text = str(storeysBG)
         if (storeysAG - missingAG) > 0:
-            chBldgStoreysHeightAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsAboveGround"))
+            chBldgStoreysHeightAG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeyHeightsAboveGround"))
             chBldgStoreysHeightAG.text = str(round(storeysHeightsAG / (storeysAG - missingAG), 5))
         if (storeysBG - missingBG) > 0:
-            chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeysHeightsBelowGround"))
+            chBldgStoreysHeightBG = etree.SubElement(chBldg, QName(XmlNs.bldg, "storeyHeightsBelowGround"))
             chBldgStoreysHeightBG.text = str(round(storeysHeightsBG / (storeysBG - missingBG), 5))
 
         return height

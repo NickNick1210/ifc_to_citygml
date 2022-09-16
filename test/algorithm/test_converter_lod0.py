@@ -124,21 +124,21 @@ class TestConvertBldgAttr(unittest.TestCase):
         lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convertBldgAttr(ifc1, ifcBldg1, root)
         self.assertAlmostEqual(6.51769, result, 3)
-        self.assertEqual(1514, len(etree.tostring(root)))
+        self.assertEqual(1512, len(etree.tostring(root)))
 
     def test_2(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convertBldgAttr(ifc2, ifcBldg2, root)
         self.assertAlmostEqual(15.34932, result, 3)
-        self.assertEqual(1520, len(etree.tostring(root)))
+        self.assertEqual(1516, len(etree.tostring(root)))
 
     def test_3(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod0Conv.convertBldgAttr(ifc3, ifcBldg3, root)
         self.assertAlmostEqual(11.01, result, 3)
-        self.assertEqual(918, len(etree.tostring(root)))
+        self.assertEqual(914, len(etree.tostring(root)))
 
 
 class TestConvertFunctionUsage(unittest.TestCase):
@@ -264,19 +264,19 @@ class TestConvert(unittest.TestCase):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convert(root)
-        self.assertEqual(5028, len(etree.tostring(result)))
+        self.assertEqual(5026, len(etree.tostring(result)))
 
     def test_2(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convert(root)
-        self.assertEqual(2882, len(etree.tostring(result)))
+        self.assertEqual(2878, len(etree.tostring(result)))
 
     def test_3(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod0Conv.convert(root)
-        self.assertEqual(6587, len(etree.tostring(result)))
+        self.assertEqual(6583, len(etree.tostring(result)))
 
 
 class TestConvertFootPrint(unittest.TestCase):

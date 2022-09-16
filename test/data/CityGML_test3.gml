@@ -8,10 +8,10 @@
     </gml:Envelope>
   </gml:boundedBy>
   <core:cityObjectMember>
-    <bldg:Building gml:id="UUID_e49752b2-fb68-474b-a1de-ac831fe523d0">
+    <bldg:Building gml:id="UUID_d767e0b9-ce94-4b52-9b62-7946f317efbf">
       <gml:name>Buerogebaeude</gml:name>
       <gml:description>No real Building</gml:description>
-      <core:creationDate>2022-09-15</core:creationDate>
+      <core:creationDate>2022-09-16</core:creationDate>
       <bldg:class codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml">1030</bldg:class>
       <bldg:function codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml">1120</bldg:function>
       <bldg:usage codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml">1120</bldg:usage>
@@ -19,8 +19,8 @@
       <bldg:measuredHeight uom="m">15.34932</bldg:measuredHeight>
       <bldg:storeysAboveGround>4</bldg:storeysAboveGround>
       <bldg:storeysBelowGround>1</bldg:storeysBelowGround>
-      <bldg:storeysHeightsAboveGround>3.0</bldg:storeysHeightsAboveGround>
-      <bldg:storeysHeightsBelowGround>3.0</bldg:storeysHeightsBelowGround>
+      <bldg:storeyHeightsAboveGround>3.0</bldg:storeyHeightsAboveGround>
+      <bldg:storeyHeightsBelowGround>3.0</bldg:storeyHeightsBelowGround>
       <bldg:lod0FootPrint>
         <gml:MultiSurface>
           <gml:surfaceMember>

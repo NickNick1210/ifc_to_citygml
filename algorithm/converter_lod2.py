@@ -1172,8 +1172,8 @@ class LoD2Converter(Converter):
 
         # MultiSurface
         chBldgSurfSMS = etree.SubElement(chBldgS, QName(XmlNs.bldg, "lod2MultiSurface"))
-        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.bldg, "MultiSurface"))
-        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.bldg, "surfaceMember"))
+        chBldgMS = etree.SubElement(chBldgSurfSMS, QName(XmlNs.gml, "MultiSurface"))
+        chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.gml, "surfaceMember"))
 
         # Geometrie
         geomXML = UtilitiesGeom.geomToGml(geometry)

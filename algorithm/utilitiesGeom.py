@@ -48,8 +48,31 @@ class UtilitiesGeom:
         Returns:
             Das daraus erzeugte XML-Objekt
         """
+
+        # GML erzeugen lassen
         gmlGeom = geom.ExportToGML()
         gmlGeom = gmlGeom[0:gmlGeom.find(">")] + " xmlns:gml='http://www.opengis.net/gml'" + gmlGeom[gmlGeom.find(">"):]
+
+        # Anpassen auf GML3 (outer/innerBoundaryIs und coordinates depreacated
+        gmlGeom = gmlGeom.replace("gml:outerBoundaryIs", "gml:exterior")
+        gmlGeom = gmlGeom.replace("gml:innerBoundaryIs", "gml:interior")
+        start = 0
+        while gmlGeom.find("<gml:coordinates>", start) != -1:
+            leftIx, rightIx = gmlGeom.find("<gml:coordinates>", start), gmlGeom.find("</gml:coordinates>", start)
+            coords = gmlGeom[leftIx+17:rightIx]
+            stop, posList = False, ""
+            while not stop:
+                if coords.find(" ") == -1:
+                    coord = coords
+                    stop = True
+                else:
+                    coord = coords[0:coords.find(" ")]
+                    coords = coords[coords.find(" ") + 1:]
+                posList = posList + "<gml:pos>" + coord.replace(",", " ") + "</gml:pos>"
+            gmlGeom = gmlGeom[0:leftIx] + posList + gmlGeom[rightIx+18:]
+            start = rightIx+18
+
+        # In XML-Objekt umwandeln
         xml = etree.XML(gmlGeom)
         return xml
 

@@ -8,10 +8,10 @@
     </gml:Envelope>
   </gml:boundedBy>
   <core:cityObjectMember>
-    <bldg:Building gml:id="UUID_06bc4ee7-29ab-4baf-8ec5-56e7ff32c63c">
+    <bldg:Building gml:id="UUID_6c764637-1045-40b0-92f8-3206eb81f0af">
       <gml:name>Buerogebaeude</gml:name>
       <gml:description>No real Building</gml:description>
-      <core:creationDate>2022-09-16</core:creationDate>
+      <core:creationDate>2022-09-26</core:creationDate>
       <bldg:class codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_class.xml">1030</bldg:class>
       <bldg:function codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_function.xml">1120</bldg:function>
       <bldg:usage codeSpace="http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_usage.xml">1120</bldg:usage>
@@ -25,11 +25,23 @@
         <gml:MultiSurface>
           <gml:surfaceMember>
             <gml:Polygon>
-              <gml:outerBoundaryIs>
+              <gml:exterior>
                 <gml:LinearRing>
-                  <gml:coordinates>479356.600506348,5444183.43024925,-3 479356.600506348,5444185.43024925,-3 479362.600506348,5444185.43024925,-3 479362.600506348,5444183.43024925,-3 479380.600506348,5444183.43024925,-3 479380.600506348,5444171.43024925,-3 479363.100506348,5444171.43024925,-3 479363.100506348,5444167.43024925,-3 479356.100506348,5444167.43024925,-3 479356.100506348,5444171.43024925,-3 479338.600506348,5444171.43024925,-3 479338.600506348,5444183.43024925,-3 479356.600506348,5444183.43024925,-3</gml:coordinates>
+                  <gml:pos>479356.600506348 5444183.43024925 -3</gml:pos>
+                  <gml:pos>479356.600506348 5444185.43024925 -3</gml:pos>
+                  <gml:pos>479362.600506348 5444185.43024925 -3</gml:pos>
+                  <gml:pos>479362.600506348 5444183.43024925 -3</gml:pos>
+                  <gml:pos>479380.600506348 5444183.43024925 -3</gml:pos>
+                  <gml:pos>479380.600506348 5444171.43024925 -3</gml:pos>
+                  <gml:pos>479363.100506348 5444171.43024925 -3</gml:pos>
+                  <gml:pos>479363.100506348 5444167.43024925 -3</gml:pos>
+                  <gml:pos>479356.100506348 5444167.43024925 -3</gml:pos>
+                  <gml:pos>479356.100506348 5444171.43024925 -3</gml:pos>
+                  <gml:pos>479338.600506348 5444171.43024925 -3</gml:pos>
+                  <gml:pos>479338.600506348 5444183.43024925 -3</gml:pos>
+                  <gml:pos>479356.600506348 5444183.43024925 -3</gml:pos>
                 </gml:LinearRing>
-              </gml:outerBoundaryIs>
+              </gml:exterior>
             </gml:Polygon>
           </gml:surfaceMember>
         </gml:MultiSurface>
@@ -38,11 +50,20 @@
         <gml:MultiSurface>
           <gml:surfaceMember>
             <gml:Polygon>
-              <gml:outerBoundaryIs>
+              <gml:exterior>
                 <gml:LinearRing>
-                  <gml:coordinates>479337.600506348,5444176.43024925,9 479337.600506348,5444184.43024925,9 479355.600506348,5444184.43024925,9 479355.600506348,5444186.43024925,9 479363.600506348,5444186.43024925,9 479363.600506348,5444184.43024925,9 479381.600506348,5444184.43024925,9 479381.600506348,5444170.43024925,9 479337.600506348,5444170.43024925,9 479337.600506348,5444176.43024925,9</gml:coordinates>
+                  <gml:pos>479337.600506348 5444176.43024925 9</gml:pos>
+                  <gml:pos>479337.600506348 5444184.43024925 9</gml:pos>
+                  <gml:pos>479355.600506348 5444184.43024925 9</gml:pos>
+                  <gml:pos>479355.600506348 5444186.43024925 9</gml:pos>
+                  <gml:pos>479363.600506348 5444186.43024925 9</gml:pos>
+                  <gml:pos>479363.600506348 5444184.43024925 9</gml:pos>
+                  <gml:pos>479381.600506348 5444184.43024925 9</gml:pos>
+                  <gml:pos>479381.600506348 5444170.43024925 9</gml:pos>
+                  <gml:pos>479337.600506348 5444170.43024925 9</gml:pos>
+                  <gml:pos>479337.600506348 5444176.43024925 9</gml:pos>
                 </gml:LinearRing>
-              </gml:outerBoundaryIs>
+              </gml:exterior>
             </gml:Polygon>
           </gml:surfaceMember>
         </gml:MultiSurface>

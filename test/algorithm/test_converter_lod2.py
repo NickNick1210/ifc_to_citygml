@@ -292,7 +292,7 @@ class TestConvert(unittest.TestCase):
         root = etree.Element("root")
         lod2Conv = LoD2Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod2Conv.convert(root)
-        self.assertEqual(24431, len(etree.tostring(result)))
+        self.assertEqual(25163, len(etree.tostring(result)))
 
 
 class TestConvertBldgBound(unittest.TestCase):
@@ -301,7 +301,7 @@ class TestConvertBldgBound(unittest.TestCase):
         root = etree.Element("root")
         lod2Conv = LoD2Converter(Converter(), ifc1, "Test123", trans1, True)
         result1, result2, result3 = lod2Conv.convertBldgBound(ifcBldg1, root, 10)
-        self.assertEqual(5555, len(etree.tostring(root)))
+        self.assertEqual(5941, len(etree.tostring(root)))
         self.assertEqual(7, len(result1))
         corr = "POLYGON ((458870.063285681 5438773.62904949 110,458862.40284125 5438780.05692559 110," + \
                "458870.116292566 5438789.24945891 110,458877.776736998 5438782.82158281 110,458870.063285681 " + \
@@ -413,7 +413,7 @@ class TestSetElement(unittest.TestCase):
         root = etree.Element("root")
         lod2Conv = LoD2Converter(Converter(), ifc1, "Test123", trans1, False)
         result1, result2 = lod2Conv.setElement(root, base.geom, "GroundSurface", base.name)
-        self.assertEqual(612, len(etree.tostring(root)))
+        self.assertEqual(654, len(etree.tostring(root)))
         self.assertEqual(42, len(result1))
         self.assertEqual(40, len(result2))
 
@@ -421,7 +421,7 @@ class TestSetElement(unittest.TestCase):
         root = etree.Element("root")
         lod2Conv = LoD2Converter(Converter(), ifc2, "Test123", trans2, False)
         result1, result2 = lod2Conv.setElement(root, roof1.geom, "RoofSurface", roof1.name)
-        self.assertEqual(602, len(etree.tostring(root)))
+        self.assertEqual(644, len(etree.tostring(root)))
         self.assertEqual(42, len(result1))
         self.assertEqual(40, len(result2))
 
@@ -429,7 +429,7 @@ class TestSetElement(unittest.TestCase):
         root = etree.Element("root")
         lod2Conv = LoD2Converter(Converter(), ifc3, "Test123", trans3, False)
         result1, result2 = lod2Conv.setElement(root, wall1.geom, "WallSurface", wall1.name)
-        self.assertEqual(645, len(etree.tostring(root)))
+        self.assertEqual(705, len(etree.tostring(root)))
         self.assertEqual(42, len(result1))
         self.assertEqual(40, len(result2))
 

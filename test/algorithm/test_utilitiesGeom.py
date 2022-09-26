@@ -71,50 +71,54 @@ class TestGeomToGML(unittest.TestCase):
 
     def test_1(self):
         result = UtilitiesGeom.geomToGml(geom1)
-        corr = b'<gml:Point xmlns:gml="http://www.opengis.net/gml"><gml:coordinates>10,10,10</gml:coordinates>' + \
-               b'</gml:Point>'
+        corr = b'<gml:Point xmlns:gml="http://www.opengis.net/gml"><gml:pos>10 10 10</gml:pos></gml:Point>'
         self.assertEqual(corr, etree.tostring(result))
 
     def test_2(self):
         result = UtilitiesGeom.geomToGml(geom2)
-        corr = b'<gml:LineString xmlns:gml="http://www.opengis.net/gml"><gml:coordinates>10,10,10 20,20,20 30,40,50' + \
-               b'</gml:coordinates></gml:LineString>'
+        corr = b'<gml:LineString xmlns:gml="http://www.opengis.net/gml"><gml:pos>10 10 10</gml:pos>' + \
+               b'<gml:pos>20 20 20</gml:pos><gml:pos>30 40 50</gml:pos></gml:LineString>'
         self.assertEqual(corr, etree.tostring(result))
 
     def test_3(self):
         result = UtilitiesGeom.geomToGml(geom3)
-        corr = b'<gml:Polygon xmlns:gml="http://www.opengis.net/gml"><gml:outerBoundaryIs><gml:LinearRing>' + \
-               b'<gml:coordinates>10,10,10 10,20,10 20,20,10 20,15,10 10,10,10</gml:coordinates></gml:LinearRing>' + \
-               b'</gml:outerBoundaryIs></gml:Polygon>'
+        corr = b'<gml:Polygon xmlns:gml="http://www.opengis.net/gml"><gml:exterior><gml:LinearRing>' + \
+               b'<gml:pos>10 10 10</gml:pos><gml:pos>10 20 10</gml:pos><gml:pos>20 20 10</gml:pos>' + \
+               b'<gml:pos>20 15 10</gml:pos><gml:pos>10 10 10</gml:pos></gml:LinearRing></gml:exterior>' + \
+               b'</gml:Polygon>'
         self.assertEqual(corr, etree.tostring(result))
 
     def test_4(self):
         result = UtilitiesGeom.geomToGml(geom4)
-        corr = b'<gml:Polygon xmlns:gml="http://www.opengis.net/gml"><gml:outerBoundaryIs><gml:LinearRing>' + \
-               b'<gml:coordinates>0,0 0,20 20,20 20,0 0,0</gml:coordinates></gml:LinearRing></gml:outerBoundaryIs>' + \
-               b'<gml:innerBoundaryIs><gml:LinearRing><gml:coordinates>5,5 5,15 15,15 15,5 5,5</gml:coordinates>' + \
-               b'</gml:LinearRing></gml:innerBoundaryIs></gml:Polygon>'
+        corr = b'<gml:Polygon xmlns:gml="http://www.opengis.net/gml"><gml:exterior><gml:LinearRing>' + \
+               b'<gml:pos>0 0</gml:pos><gml:pos>0 20</gml:pos><gml:pos>20 20</gml:pos>' + \
+               b'<gml:pos>20 0</gml:pos><gml:pos>0 0</gml:pos></gml:LinearRing></gml:exterior><gml:interior>' + \
+               b'<gml:LinearRing><gml:pos>5 5</gml:pos><gml:pos>5 15</gml:pos><gml:pos>15 15</gml:pos>' + \
+               b'<gml:pos>15 5</gml:pos><gml:pos>5 5</gml:pos></gml:LinearRing></gml:interior></gml:Polygon>'
         self.assertEqual(corr, etree.tostring(result))
 
     def test_5(self):
         result = UtilitiesGeom.geomToGml(geom5)
         corr = b'<gml:MultiPolygon xmlns:gml="http://www.opengis.net/gml"><gml:polygonMember><gml:Polygon>' + \
-               b'<gml:outerBoundaryIs><gml:LinearRing><gml:coordinates>10,10 10,20 20,20 20,15 10,10' + \
-               b'</gml:coordinates></gml:LinearRing></gml:outerBoundaryIs></gml:Polygon></gml:polygonMember>' + \
-               b'<gml:polygonMember><gml:Polygon><gml:outerBoundaryIs><gml:LinearRing><gml:coordinates>' + \
-               b'60,60 70,70 80,60 60,60</gml:coordinates></gml:LinearRing></gml:outerBoundaryIs></gml:Polygon>' + \
-               b'</gml:polygonMember></gml:MultiPolygon>'
+               b'<gml:exterior><gml:LinearRing><gml:pos>10 10</gml:pos><gml:pos>10 20</gml:pos>' + \
+               b'<gml:pos>20 20</gml:pos><gml:pos>20 15</gml:pos><gml:pos>10 10</gml:pos></gml:LinearRing>' + \
+               b'</gml:exterior></gml:Polygon></gml:polygonMember><gml:polygonMember><gml:Polygon><gml:exterior>' + \
+               b'<gml:LinearRing><gml:pos>60 60</gml:pos><gml:pos>70 70</gml:pos><gml:pos>80 60</gml:pos>' + \
+               b'<gml:pos>60 60</gml:pos></gml:LinearRing></gml:exterior></gml:Polygon></gml:polygonMember>' + \
+               b'</gml:MultiPolygon>'
         self.assertEqual(corr, etree.tostring(result))
 
     def test_6(self):
         result = UtilitiesGeom.geomToGml(geom6)
         corr = b'<gml:MultiPolygon xmlns:gml="http://www.opengis.net/gml"><gml:polygonMember><gml:Polygon>' + \
-               b'<gml:outerBoundaryIs><gml:LinearRing><gml:coordinates>0,0 0,20 20,20 20,0 0,0</gml:coordinates>' + \
-               b'</gml:LinearRing></gml:outerBoundaryIs><gml:innerBoundaryIs><gml:LinearRing><gml:coordinates>' + \
-               b'5,5 5,15 15,15 15,5 5,5</gml:coordinates></gml:LinearRing></gml:innerBoundaryIs></gml:Polygon>' + \
-               b'</gml:polygonMember><gml:polygonMember><gml:Polygon><gml:outerBoundaryIs><gml:LinearRing>' + \
-               b'<gml:coordinates>30,30 30,40 40,40 40,30 30,30</gml:coordinates></gml:LinearRing>' + \
-               b'</gml:outerBoundaryIs></gml:Polygon></gml:polygonMember></gml:MultiPolygon>'
+               b'<gml:exterior><gml:LinearRing><gml:pos>0 0</gml:pos><gml:pos>0 20</gml:pos>' + \
+               b'<gml:pos>20 20</gml:pos><gml:pos>20 0</gml:pos><gml:pos>0 0</gml:pos></gml:LinearRing>' + \
+               b'</gml:exterior><gml:interior><gml:LinearRing><gml:pos>5 5</gml:pos><gml:pos>5 15</gml:pos>' + \
+               b'<gml:pos>15 15</gml:pos><gml:pos>15 5</gml:pos><gml:pos>5 5</gml:pos></gml:LinearRing>' + \
+               b'</gml:interior></gml:Polygon></gml:polygonMember><gml:polygonMember><gml:Polygon><gml:exterior>' + \
+               b'<gml:LinearRing><gml:pos>30 30</gml:pos><gml:pos>30 40</gml:pos><gml:pos>40 40</gml:pos>' + \
+               b'<gml:pos>40 30</gml:pos><gml:pos>30 30</gml:pos></gml:LinearRing></gml:exterior></gml:Polygon>' + \
+               b'</gml:polygonMember></gml:MultiPolygon>'
         self.assertEqual(corr, etree.tostring(result))
 
 

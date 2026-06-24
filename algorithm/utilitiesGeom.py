@@ -39,7 +39,7 @@ class UtilitiesGeom:
     """ Model-Klasse mit nützlichen Geometrie-Tools """
 
     @staticmethod
-    def geomToGml(geom):
+    def geomToGml(geom, trans=None):
         """ Umwandeln von Geometrien in ein XML-Objekt
 
         Args:
@@ -49,8 +49,15 @@ class UtilitiesGeom:
             Das daraus erzeugte XML-Objekt
         """
 
+        if geom is None:
+            return None
+
+        geom_to_export = geom
+        if trans is not None and getattr(trans, "_needsReproject", False):
+            geom_to_export = trans.reproject_geometry(geom)
+
         # GML erzeugen lassen
-        gmlGeom = geom.ExportToGML()
+        gmlGeom = geom_to_export.ExportToGML()
         gmlGeom = gmlGeom[0:gmlGeom.find(">")] + " xmlns:gml='http://www.opengis.net/gml'" + gmlGeom[gmlGeom.find(">"):]
 
         # Anpassen auf GML3 (outer/innerBoundaryIs und coordinates depreacated
@@ -331,16 +338,22 @@ class UtilitiesGeom:
                         ringNew.AddPoint(ptLineEnd[0], ptLineEnd[1], ptLineEnd[2])
                         geomNew = ringNew
                 ringTest = geomNew.GetGeometryRef(0) if geom.GetGeometryName() == "POLYGON" else geomNew
+                if ringTest is None:
+                    continue
+                ptCount = ringTest.GetPointCount()
 
                 # Wenn Polygon weniger als vier Eckpunkte hat: Eigentlich ein LineString
-                if ringTest.GetPointCount() < 4 and geom.GetGeometryName() == "POLYGON":
+                if ptCount < 4 and geom.GetGeometryName() == "POLYGON":
+                    if ptCount < 2:
+                        # Degenerierter Ring: Keine Punkte fuer LineString
+                        continue
                     geomNewLine = ogr.Geometry(ogr.wkbLineString)
                     geomNewLine.AddPoint(ringTest.GetPoint(0)[0], ringTest.GetPoint(0)[1], ringTest.GetPoint(0)[2])
                     geomNewLine.AddPoint(ringTest.GetPoint(1)[0], ringTest.GetPoint(1)[1], ringTest.GetPoint(1)[2])
                     simpList.append(geomNewLine)
 
                 # Wenn es noch weiter vereinfacht werden kann: Iterativer Vorgang über rekursive Aufrufe
-                elif ringTest.GetPointCount() < count:
+                elif ptCount < count:
                     if task is not None and task.isCanceled():
                         return False
                     simpList.append(UtilitiesGeom.simplify(geomNew, distTol, angTol, task=task))
@@ -438,6 +451,12 @@ class UtilitiesGeom:
                 # Auf Parallität prüfen
                 geom1Simp = UtilitiesGeom.simplify(geom1, 0.001, 0.0001)
                 geom2Simp = UtilitiesGeom.simplify(geom2, 0.001, 0.0001)
+                if geom1Simp is None:
+                    done.append(i)
+                    break
+                if geom2Simp is None:
+                    done.append(j)
+                    break
                 ring1Simp, ring2Simp = geom1Simp.GetGeometryRef(0), geom2Simp.GetGeometryRef(0)
                 if ring1Simp is None:
                     done.append(i)
@@ -831,14 +850,19 @@ class UtilitiesGeom:
                     ptMidB1 = [ptMid[0] + vStartBDist[0], ptMid[1] + vStartBDist[1], ptMid[2]]
                     ptMidB2 = [ptMid[0] + vEndBDist[0], ptMid[1] + vEndBDist[1], ptMid[2]]
                     b1Line = Line(Point3D(ptMidB1[0], ptMidB1[1], ptMidB1[2]),
-                                  Point3D(ptMidB1[0] + (ptMid[0] - ptSt[0]), ptMidB1[1] + (ptMid[1] - ptSt[1]),
-                                          ptMidB1[2]))
+                                Point3D(ptMidB1[0] + (ptMid[0] - ptSt[0]), ptMidB1[1] + (ptMid[1] - ptSt[1]),
+                                        ptMidB1[2]))
                     b2Line = Line(Point3D(ptMidB2[0], ptMidB2[1], ptMidB2[2]),
-                                  Point3D(ptMidB2[0] + (ptEnd[0] - ptMid[0]), ptMidB2[1] + (ptEnd[1] - ptMid[1]),
-                                          ptMidB2[2]))
+                                Point3D(ptMidB2[0] + (ptEnd[0] - ptMid[0]), ptMidB2[1] + (ptEnd[1] - ptMid[1]),
+                                        ptMidB2[2]))
 
-                    # Schnittpunkt: Neuer Mittelpunkt
-                    sPoint = b1Line.intersection(b2Line)[0]
+                    # Parallel edges produce a Line3D instead of a Point3D — fall back to offset midpoint
+                    sIntersect = b1Line.intersection(b2Line)
+                    if not sIntersect or not isinstance(sIntersect[0], Point3D):
+                        sPoint = ptMidB1
+                    else:
+                        sPoint = sIntersect[0]
+
                     ringBuffer.AddPoint(float(sPoint[0]), float(sPoint[1]), ptMidB1[2])
 
                 # Abschließen der Geometrie

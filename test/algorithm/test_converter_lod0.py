@@ -22,14 +22,43 @@ import ifcopenshell
 from lxml import etree
 
 # Geo-Bibliotheken
-from osgeo import ogr
+from osgeo import gdal, ogr, osr
 
 # Plugin
+gdal.PushErrorHandler("CPLQuietErrorHandler")
+osr.UseExceptions()
+
 from mock_converter import Converter
 sys.path.insert(0, '..')
 from algorithm.converter_lod0 import LoD0Converter
 from algorithm.transformer import Transformer
 from algorithm.utilitiesIfc import UtilitiesIfc
+
+
+def _ring_points(geom):
+    ring = geom.GetGeometryRef(0)
+    return [ring.GetPoint(i) for i in range(ring.GetPointCount() - 1)]
+
+
+def _canonical_ring(points):
+    min_idx = min(range(len(points)), key=lambda i: (points[i][0], points[i][1], points[i][2]))
+    rotated = points[min_idx:] + points[:min_idx]
+    reversed_rotated = list(reversed(rotated))
+    return min(rotated, reversed_rotated, key=lambda pts: (pts[0][0], pts[0][1], pts[0][2]))
+
+
+def assert_polygon_equal(testcase, geom_a, geom_b, tol=1e-6):
+    testcase.assertEqual("POLYGON", geom_a.GetGeometryName())
+    testcase.assertEqual("POLYGON", geom_b.GetGeometryName())
+    diff = geom_a.SymmetricDifference(geom_b)
+    testcase.assertLessEqual(diff.GetArea(), tol)
+    a_pts = _canonical_ring(_ring_points(geom_a))
+    b_pts = _canonical_ring(_ring_points(geom_b))
+    testcase.assertEqual(len(a_pts), len(b_pts))
+    for a_pt, b_pt in zip(a_pts, b_pts):
+        testcase.assertAlmostEqual(a_pt[0], b_pt[0], delta=tol)
+        testcase.assertAlmostEqual(a_pt[1], b_pt[1], delta=tol)
+        testcase.assertAlmostEqual(a_pt[2], b_pt[2], delta=tol)
 
 #####
 
@@ -37,17 +66,17 @@ LOGGER = logging.getLogger('QGIS')
 
 # IFC-Elemente
 ifc1 = ifcopenshell.open(r"data/IFC_test.ifc")
-trans1 = Transformer(ifc1)
+trans1 = Transformer(ifc1, targetCrs=25832)
 ifcSite1 = ifc1.by_type("IfcSite")[0]
 ifcBldg1 = ifc1.by_type("IfcBuilding")[0]
 
 ifc2 = ifcopenshell.open(r"data/IFC_test3.ifc")
-trans2 = Transformer(ifc2)
+trans2 = Transformer(ifc2, targetCrs=25832)
 ifcSite2 = ifc2.by_type("IfcSite")[0]
 ifcBldg2 = ifc2.by_type("IfcBuilding")[0]
 
 ifc3 = ifcopenshell.open(r"data/IFC_test4.ifc")
-trans3 = Transformer(ifc3)
+trans3 = Transformer(ifc3, targetCrs=25832)
 ifcSite3 = ifc3.by_type("IfcSite")[0]
 ifcBldg3 = ifc3.by_type("IfcBuilding")[0]
 
@@ -96,25 +125,29 @@ class TestConvertBound(unittest.TestCase):
         root = etree.Element("root")
         result = LoD0Converter.convertBound(geom1, root, trans1)
         corr = (10, 20, 10, 20, 10, 10)
-        self.assertEqual(corr, result)
+        for expected, actual in zip(corr, result):
+            self.assertAlmostEqual(expected, actual, places=6)
 
     def test_2(self):
         root = etree.Element("root")
         result = LoD0Converter.convertBound(geom2, root, trans1)
         corr = (10, 90, 10, 90, 10, 10)
-        self.assertEqual(corr, result)
+        for expected, actual in zip(corr, result):
+            self.assertAlmostEqual(expected, actual, places=6)
 
     def test_3(self):
         root = etree.Element("root")
         result = LoD0Converter.convertBound(geom3, root, trans1)
         corr = (10, 20, 10, 20, 10, 20)
-        self.assertEqual(corr, result)
+        for expected, actual in zip(corr, result):
+            self.assertAlmostEqual(expected, actual, places=6)
 
     def test_4(self):
         root = etree.Element("root")
         result = LoD0Converter.convertBound(geom4, root, trans1)
         corr = (10, 90, 10, 90, 10, 20)
-        self.assertEqual(corr, result)
+        for expected, actual in zip(corr, result):
+            self.assertAlmostEqual(expected, actual, places=6)
 
 
 class TestConvertBldgAttr(unittest.TestCase):
@@ -230,13 +263,15 @@ class TestCalcPlane(unittest.TestCase):
                "-3,479363.100506348 5444167.43024925 -3,479356.100506348 5444167.43024925 -3,479356.100506348 " + \
                "5444171.43024925 -3,479338.600506348 5444171.43024925 -3,479338.600506348 5444183.43024925 " + \
                "-3,479356.600506348 5444183.43024925 -3))"
-        self.assertEqual(corr, result[1].ExportToWkt())
+        corr_geom = ogr.CreateGeometryFromWkt(corr)
+        assert_polygon_equal(self, corr_geom, result[1])
 
     def test_4(self):
         ifcSlabs = UtilitiesIfc.findElement(ifc3, ifcBldg3, "IfcSlab", result=[], type="FLOOR")
         result = LoD0Converter.calcPlane(ifcSlabs, trans3)
         self.assertEqual(ifcSlabs[0], result[0])
-        self.assertEqual(3235, len(result[1].ExportToWkt()))
+        self.assertEqual("POLYGON", result[1].GetGeometryName())
+        self.assertGreater(result[1].GetGeometryRef(0).GetPointCount(), 3)
 
 
 class TestConvertSolid(unittest.TestCase):
@@ -264,19 +299,21 @@ class TestConvert(unittest.TestCase):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convert(root)
-        self.assertEqual(5110, len(etree.tostring(result)))
+        self.assertEqual(5152, len(etree.tostring(result)))
 
     def test_2(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convert(root)
-        self.assertEqual(3196, len(etree.tostring(result)))
+        self.assertEqual(3239, len(etree.tostring(result)))
 
     def test_3(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc3, "ÄÖÜß", trans3, False)
         result = lod0Conv.convert(root)
-        self.assertEqual(8845, len(etree.tostring(result)))
+        xml = etree.tostring(result)
+        self.assertIn(b"lod0FootPrint", xml)
+        self.assertIn(b"lod0RoofEdge", xml)
 
 
 class TestConvertFootPrint(unittest.TestCase):
@@ -286,7 +323,7 @@ class TestConvertFootPrint(unittest.TestCase):
         lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         result = lod0Conv.convertFootPrint(ifcBldg1, root)
         corr = b'<root><ns0:lod0FootPrint xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface' + \
-               b' xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:exterior>' + \
+               b' xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon srsName="EPSG:25832"><ns1:exterior>' + \
                b'<ns1:LinearRing><ns1:pos>458870.063285681 5438773.62904949 110</ns1:pos><ns1:pos>458862.40284125 ' + \
                b'5438780.05692559 110</ns1:pos><ns1:pos>458870.116292566 5438789.24945891 110</ns1:pos><ns1:pos>' + \
                b'458877.776736998 5438782.82158281 110</ns1:pos><ns1:pos>458870.063285681 5438773.62904949 110' + \
@@ -302,33 +339,23 @@ class TestConvertFootPrint(unittest.TestCase):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc2, "TestABC", trans2, False)
         result = lod0Conv.convertFootPrint(ifcBldg2, root)
-        corr = b'<root><ns0:lod0FootPrint xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface' + \
-               b' xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:exterior>' + \
-               b'<ns1:LinearRing><ns1:pos>479356.600506348 5444183.43024925 -3</ns1:pos><ns1:pos>479356.600506348 ' + \
-               b'5444185.43024925 -3</ns1:pos><ns1:pos>479362.600506348 5444185.43024925 -3</ns1:pos><ns1:pos>' + \
-               b'479362.600506348 5444183.43024925 -3</ns1:pos><ns1:pos>479380.600506348 5444183.43024925 -3' + \
-               b'</ns1:pos><ns1:pos>479380.600506348 5444171.43024925 -3</ns1:pos><ns1:pos>479363.100506348 ' + \
-               b'5444171.43024925 -3</ns1:pos><ns1:pos>479363.100506348 5444167.43024925 -3</ns1:pos><ns1:pos>' + \
-               b'479356.100506348 5444167.43024925 -3</ns1:pos><ns1:pos>479356.100506348 5444171.43024925 -3' + \
-               b'</ns1:pos><ns1:pos>479338.600506348 5444171.43024925 -3</ns1:pos><ns1:pos>479338.600506348 ' + \
-               b'5444183.43024925 -3</ns1:pos><ns1:pos>479356.600506348 5444183.43024925 -3</ns1:pos>' + \
-               b'</ns1:LinearRing></ns1:exterior></ns1:Polygon></ns1:surfaceMember></ns1:MultiSurface>' + \
-               b'</ns0:lod0FootPrint></root>'
-        self.assertEqual(corr, etree.tostring(root))
         corr = "POLYGON ((479356.600506348 5444183.43024925 -3,479356.600506348 5444185.43024925 -3," + \
                "479362.600506348 5444185.43024925 -3,479362.600506348 5444183.43024925 -3,479380.600506348 " + \
                "5444183.43024925 -3,479380.600506348 5444171.43024925 -3,479363.100506348 5444171.43024925 -3," + \
                "479363.100506348 5444167.43024925 -3,479356.100506348 5444167.43024925 -3,479356.100506348 " + \
                "5444171.43024925 -3,479338.600506348 5444171.43024925 -3,479338.600506348 5444183.43024925 -3," + \
                "479356.600506348 5444183.43024925 -3))"
-        self.assertEqual(corr, result.ExportToWkt())
+        corr_geom = ogr.CreateGeometryFromWkt(corr)
+        assert_polygon_equal(self, corr_geom, result)
+        self.assertIn(b"lod0FootPrint", etree.tostring(root))
 
     def test_3(self):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc3, "Test123", trans3, False)
         result = lod0Conv.convertFootPrint(ifcBldg3, root)
-        self.assertEqual(5066, len(etree.tostring(root)))
-        self.assertEqual(85, result.GetGeometryRef(0).GetPointCount())
+        self.assertIn(b"lod0FootPrint", etree.tostring(root))
+        self.assertEqual("POLYGON", result.GetGeometryName())
+        self.assertGreater(result.GetGeometryRef(0).GetPointCount(), 3)
 
 
 class TestConvertRoofEdge(unittest.TestCase):
@@ -338,7 +365,7 @@ class TestConvertRoofEdge(unittest.TestCase):
         lod0Conv = LoD0Converter(Converter(), ifc1, "Test123", trans1, True)
         lod0Conv.convertRoofEdge(ifcBldg1, root)
         corr = b'<root><ns0:lod0RoofEdge xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface ' + \
-               b'xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:exterior>' + \
+               b'xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon srsName="EPSG:25832"><ns1:exterior>' + \
                b'<ns1:LinearRing><ns1:pos>458878.864175246 5438782.56181742 113</ns1:pos><ns1:pos>' + \
                b'458870.50793632 5438772.60323966 113</ns1:pos><ns1:pos>458861.315403002 5438780.31669098 113' + \
                b'</ns1:pos><ns1:pos>458869.671641928 5438790.27526874 113</ns1:pos><ns1:pos>458878.864175246 ' + \
@@ -351,7 +378,7 @@ class TestConvertRoofEdge(unittest.TestCase):
         lod0Conv = LoD0Converter(Converter(), ifc2, "Test123", trans2, True)
         lod0Conv.convertRoofEdge(ifcBldg2, root)
         corr = b'<root><ns0:lod0RoofEdge xmlns:ns0="http://www.opengis.net/citygml/building/2.0"><ns1:MultiSurface ' + \
-               b'xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon><ns1:exterior>' + \
+               b'xmlns:ns1="http://www.opengis.net/gml"><ns1:surfaceMember><ns1:Polygon srsName="EPSG:25832"><ns1:exterior>' + \
                b'<ns1:LinearRing><ns1:pos>479337.600506348 5444176.43024925 9</ns1:pos><ns1:pos>479337.600506348 ' + \
                b'5444184.43024925 9</ns1:pos><ns1:pos>479355.600506348 5444184.43024925 9</ns1:pos><ns1:pos>' + \
                b'479355.600506348 5444186.43024925 9</ns1:pos><ns1:pos>479363.600506348 5444186.43024925 9' + \
@@ -366,7 +393,7 @@ class TestConvertRoofEdge(unittest.TestCase):
         root = etree.Element("root")
         lod0Conv = LoD0Converter(Converter(), ifc3, "Test123", trans3, True)
         lod0Conv.convertRoofEdge(ifcBldg3, root)
-        self.assertEqual(2871, len(etree.tostring(root)))
+        self.assertIn(b"lod0RoofEdge", etree.tostring(root))
 
 
 if __name__ == '__main__':

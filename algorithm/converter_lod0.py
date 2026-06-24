@@ -73,8 +73,16 @@ class LoD0Converter(Converter):
             root: Das vorbereitete XML-Schema
         """
         # IFC-Grundelemente
-        ifcProject = self.ifc.by_type("IfcProject")[0]
-        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcProjects = self.ifc.by_type("IfcProject")
+        if not ifcProjects:
+            return False
+        ifcProject = ifcProjects[0]
+
+        ifcSites = self.ifc.by_type("IfcSite")
+        if not ifcSites:
+            return False
+        ifcSite = ifcSites[0]
+
         ifcBuildings = self.ifc.by_type("IfcBuilding")
 
         # XML-Struktur
@@ -97,7 +105,7 @@ class LoD0Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (10 / bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Grundfläche
             self.task.logging.emit(self.tr(u'Building footprint is calculated'))
@@ -105,7 +113,7 @@ class LoD0Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (25 / bldgCount) if not self.eade else (15 / bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Dachkantenfläche
             self.task.logging.emit(self.tr(u'Building roofedge is calculated'))
@@ -113,7 +121,7 @@ class LoD0Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (25 / bldgCount) if not self.eade else (15 / bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Adresse
             self.task.logging.emit(self.tr(u'Building address is extracted'))
@@ -123,7 +131,7 @@ class LoD0Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (10 / bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Bounding Box
             self.task.logging.emit(self.tr(u'Building bound is calculated'))
@@ -131,7 +139,7 @@ class LoD0Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (10 / bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # EnergyADE
             if self.eade:
@@ -141,15 +149,16 @@ class LoD0Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (10 / bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Gebäudeattribute
                 self.task.logging.emit(self.tr(u'Energy ADE: building attributes are extracted'))
-                EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                if footPrint is not None:
+                    EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
                 self.progress += (10 / bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
         return root
 
@@ -170,14 +179,17 @@ class LoD0Converter(Converter):
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
                 self.task.logging.emit(self.tr(u"Due to the missing baseslab, no FootPrint geometry can be calculated"))
-                return
+                return None
 
         # Geometrie
-        geometry = self.calcPlane(ifcSlabs, self.trans)[1]
+        calcResult = self.calcPlane(ifcSlabs, self.trans)
+        if calcResult is None:
+            return None
+        geometry = calcResult[1]
         if geometry is not None:
             self.geom.AddGeometry(geometry)
             self.bldgGeom.AddGeometry(geometry)
-            geomXML = UtilitiesGeom.geomToGml(geometry)
+            geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
             if geomXML is not None:
                 # XML-Struktur
                 chBldgFootPrint = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0FootPrint"))
@@ -204,13 +216,17 @@ class LoD0Converter(Converter):
                 return
 
         # Geometrie
-        geometry = self.calcPlane(ifcRoofs, self.trans)[1]
-        self.geom.AddGeometry(geometry)
-        self.bldgGeom.AddGeometry(geometry)
-        geomXML = UtilitiesGeom.geomToGml(geometry)
-        if geomXML is not None:
-            # XML-Struktur
-            chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
-            chBldgRoofEdgeMS = etree.SubElement(chBldgRoofEdge, QName(XmlNs.gml, "MultiSurface"))
-            chBldgRoofEdgeSM = etree.SubElement(chBldgRoofEdgeMS, QName(XmlNs.gml, "surfaceMember"))
-            chBldgRoofEdgeSM.append(geomXML)
+        calcResult = self.calcPlane(ifcRoofs, self.trans)
+        if calcResult is None:
+            return
+        geometry = calcResult[1]
+        if geometry is not None:
+            self.geom.AddGeometry(geometry)
+            self.bldgGeom.AddGeometry(geometry)
+            geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
+            if geomXML is not None:
+                # XML-Struktur
+                chBldgRoofEdge = etree.SubElement(chBldg, QName(XmlNs.bldg, "lod0RoofEdge"))
+                chBldgRoofEdgeMS = etree.SubElement(chBldgRoofEdge, QName(XmlNs.gml, "MultiSurface"))
+                chBldgRoofEdgeSM = etree.SubElement(chBldgRoofEdgeMS, QName(XmlNs.gml, "surfaceMember"))
+                chBldgRoofEdgeSM.append(geomXML)

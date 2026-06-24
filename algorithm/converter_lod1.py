@@ -76,8 +76,16 @@ class LoD1Converter(Converter):
             root: Das vorbereitete XML-Schema
         """
         # IFC-Grundelemente
-        ifcProject = self.ifc.by_type("IfcProject")[0]
-        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcProjects = self.ifc.by_type("IfcProject")
+        if not ifcProjects:
+            return False
+        ifcProject = ifcProjects[0]
+
+        ifcSites = self.ifc.by_type("IfcSite")
+        if not ifcSites:
+            return False
+        ifcSite = ifcSites[0]
+
         ifcBuildings = self.ifc.by_type("IfcBuilding")
 
         # XML-Struktur
@@ -101,7 +109,7 @@ class LoD1Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (10 / self.bldgCount) if not self.eade else (5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Gebäudekörper
             self.task.logging.emit(self.tr(u'Building solid is calculated'))
@@ -115,7 +123,7 @@ class LoD1Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (10 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Bounding Box
             self.task.logging.emit(self.tr(u'Building bound is calculated'))
@@ -123,7 +131,7 @@ class LoD1Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (10 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # EnergyADE
             if self.eade:
@@ -133,15 +141,16 @@ class LoD1Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Gebäudeattribute
                 self.task.logging.emit(self.tr(u'Energy ADE: building attributes are extracted'))
-                EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                if footPrint is not None:
+                    EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
                 self.progress += (5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Thermale Zone
                 self.task.logging.emit(self.tr(u'Energy ADE: thermal zone is calculated'))
@@ -150,7 +159,7 @@ class LoD1Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (10 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Nutzungszone
                 self.task.logging.emit(self.tr(u'Energy ADE: usage zone is calculated'))
@@ -158,7 +167,7 @@ class LoD1Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
         return root
 
@@ -177,6 +186,7 @@ class LoD1Converter(Converter):
         if height is None or height == 0:
             self.task.logging.emit(self.tr(
                 u'Due to the missing height and roof, no building geometry can be calculated'))
+            return None
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -185,16 +195,24 @@ class LoD1Converter(Converter):
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
                 self.task.logging.emit(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
-                return
+                return None
 
         geometries = []
         # Berechnung der Grundfläche
         self.task.logging.emit(self.tr(u'Building geometry: base surface is calculated'))
-        geometries.append(self.calcPlane(ifcSlabs, self.trans)[1])
+        calcResult = self.calcPlane(ifcSlabs, self.trans)
+        if calcResult is None:
+            self.task.logging.emit(self.tr(u'Due to the missing baseslab, no building geometry can be calculated'))
+            return None
+        baseGeom = calcResult[1]
+        if baseGeom is None:
+            self.task.logging.emit(self.tr(u'Due to the missing baseslab, no building geometry can be calculated'))
+            return None
+        geometries.append(baseGeom)
         if self.task.isCanceled():
             return False
         self.progress += (15 / self.bldgCount) if not self.eade else (10 / self.bldgCount)
-        self.task.setProgress(self.progress)
+        self.task.setProgress(min(self.progress, 100))
 
         # Berechnung des Daches
         self.task.logging.emit(self.tr(u'Building geometry: roof surface is calculated'))
@@ -202,7 +220,7 @@ class LoD1Converter(Converter):
         if self.task.isCanceled():
             return False
         self.progress += (15 / self.bldgCount) if not self.eade else (10 / self.bldgCount)
-        self.task.setProgress(self.progress)
+        self.task.setProgress(min(self.progress, 100))
 
         # Berechnung der Wände
         self.task.logging.emit(self.tr(u'Building geometry: wall surfaces are calculated'))
@@ -210,7 +228,7 @@ class LoD1Converter(Converter):
         if self.task.isCanceled():
             return False
         self.progress += (20 / self.bldgCount) if not self.eade else (10 / self.bldgCount)
-        self.task.setProgress(self.progress)
+        self.task.setProgress(min(self.progress, 100))
 
         # Geometrie
         if geometries is not None and len(geometries) > 0:
@@ -220,12 +238,15 @@ class LoD1Converter(Converter):
             chBldgSolidExt = etree.SubElement(chBldgSolidSol, QName(XmlNs.gml, "exterior"))
             chBldgSolidCS = etree.SubElement(chBldgSolidExt, QName(XmlNs.gml, "CompositeSurface"))
             for geometry in geometries:
+                if geometry is None:
+                    continue
                 self.geom.AddGeometry(geometry)
                 self.bldgGeom.AddGeometry(geometry)
                 chBldgSolidSM = etree.SubElement(chBldgSolidCS, QName(XmlNs.gml, "surfaceMember"))
-                geomXML = UtilitiesGeom.geomToGml(geometry)
-                chBldgSolidSM.append(geomXML)
-        return geometries[0]
+                geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
+                if geomXML is not None:
+                    chBldgSolidSM.append(geomXML)
+        return geometries[0] if geometries else None
 
     @staticmethod
     def calcRoof(geomBase, height):

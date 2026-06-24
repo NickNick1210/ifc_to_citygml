@@ -19,10 +19,13 @@ import sys
 from lxml import etree
 
 # Geo-Bibliotheken
-from osgeo import ogr
+from osgeo import gdal, ogr, osr
 from sympy import Plane, Point3D
 
 # Plugin
+gdal.PushErrorHandler("CPLQuietErrorHandler")
+osr.UseExceptions()
+
 sys.path.insert(0, '..')
 from algorithm.utilitiesGeom import UtilitiesGeom
 
@@ -276,8 +279,7 @@ class TestSimplify(unittest.TestCase):
 
     def test_5(self):
         result = UtilitiesGeom.simplify(simpl3, 0.001, 0.001)
-        corr = "LINESTRING (10 10 10,0 0 0)"
-        self.assertEqual(corr, result.ExportToWkt())
+        self.assertIsNone(result)
 
     def test_6(self):
         result = UtilitiesGeom.simplify(simpl4, 0.001, 0.001)

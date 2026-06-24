@@ -11,212 +11,265 @@
 #####
 
 # Standard-Bibliotheken
-import os
 from datetime import datetime
 
 # QGIS-Bibliotheken
-from qgis.PyQt import uic
-from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import Qt, QCoreApplication
+from qgis.core import QgsMessageLog, Qgis, QgsProject
 
-# GUI-Datei
-FORM_CLASS, _ = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'dialog.ui'))
+# Lokale Importe
+from .dialog import IfcToCityGmlDockWidget
 
-
-#####
+TAG = "IFC-to-CityGML"
 
 
-class DialogVM(QtWidgets.QDialog, FORM_CLASS):
-    """ ViewModel der GUI-View """
+class DialogVM:
+    """ViewModel der GUI-View."""
 
-    def __init__(self, model):
-        """ Konstruktor der GUI-ViewModel-Klasse.
+    def __init__(self, model, iface):
+        """Konstruktor der GUI-ViewModel-Klasse.
 
         Args:
-            model: Die zugehörige Model-Klasse, die sich um die Logik kümmert
+            model: Die zugehörige Model-Klasse, die sich um die Logik kümmert.
+            iface: QGIS-Interface für Docking und Logging.
         """
-        # Oberklassenkonstruktor
-        super(DialogVM, self).__init__(None)
-
         # Initialisierung von Attributen
         self.model = model
+        self.iface = iface
+        self.dock = IfcToCityGmlDockWidget(iface.mainWindow())
 
-        # GUI aufbauen
-        self.setupUi(self)
+        self._connect_signals()
+        self._log_info(
+            QCoreApplication.translate("DialogVM", u"Tool started")
+        )
 
-        # Datei-Format-Filter für die Dateiauswahlen und ReadOnly für die Textfelder setzen
-        self.fileWidget_ifc.setFilter("Industry Foundation Classes (*.ifc)")
-        self.fileWidget_ifc.lineEdit().setReadOnly(True)
-        self.fileWidget_cgml.setFilter("Geography Markup Language (*.gml)")
-        self.fileWidget_cgml.lineEdit().setReadOnly(True)
+    def _connect_signals(self) -> None:
+        """Verknüpft UI-Signale mit Model/VM-Handlern."""
+        d = self.dock
 
         # EventListener für die Knöpfe
-        self.button_run.clicked.connect(model.run)
-        self.button_close.clicked.connect(self.close)
-
+        d.button_run.clicked.connect(self.model.run)
+        d.button_close.clicked.connect(self._close)
         # EventListener für die Dateiangaben
-        self.fileWidget_ifc.fileChanged.connect(model.ifcFileChanged)
-        self.fileWidget_cgml.fileChanged.connect(model.cgmlFileChanged)
+        d.fileWidget_ifc.fileChanged.connect(
+            self.model.ifcFileChanged
+        )
+        d.fileWidget_cgml.fileChanged.connect(
+            self.model.cgmlFileChanged
+        )
 
         # EventListener für die Einstellungen
-        self.radioButton_lod0.clicked.connect(self.activateIntegr)
-        self.radioButton_lod1.clicked.connect(self.activateIntegr)
-        self.radioButton_lod2.clicked.connect(self.deactivateIntegr)
-        self.radioButton_lod3.clicked.connect(self.deactivateIntegr)
-        self.radioButton_lod4.clicked.connect(self.deactivateIntegr)
+        d.radioButton_lod0.clicked.connect(self._activate_integr)
+        d.radioButton_lod1.clicked.connect(self._activate_integr)
+        d.radioButton_lod2.clicked.connect(self._deactivate_integr)
+        d.radioButton_lod3.clicked.connect(self._deactivate_integr)
+        d.radioButton_lod4.clicked.connect(self._deactivate_integr)
 
-        self.log(QCoreApplication.translate('DialogVM', u'Tool started'))
+    def show(self) -> None:
+        """Zeigt das Dock-Widget und öffnet das Log-Panel."""
+        self.iface.addDockWidget(
+            Qt.RightDockWidgetArea, self.dock
+        )
+        self.dock.show()
+        self._open_log_panel()
 
-        # Deaktivieren von Funktionalität
-        self.radioButton_lod4.setDisabled(True)
+    def close(self) -> None:
+        """Schließt das Dock-Widget."""
+        self._close()
 
-    # noinspection PyUnusedLocal
-    def closeEvent(self, event):
-        """ Behandelt das Schließen des Fensters
+    def getInputPath(self) -> str:
+        """Gibt den Eingabepfad zurück.
+
+        Returns:
+            Eingabepfad als String.
+        """
+        return self.dock.fileWidget_ifc.filePath()
+
+    def getOutputPath(self) -> str:
+        """Gibt den Ausgabepfad zurück.
+
+        Returns:
+            Ausgabepfad als String.
+        """
+        return self.dock.fileWidget_cgml.filePath()
+
+    def getOptionVal(self) -> bool:
+        """Gibt zurück, ob die Validierung ausgewählt ist.
+
+        Returns:
+            Auswahl als Boolean.
+        """
+        return self.dock.checkBox_val.isChecked()
+
+    def getOptionEade(self) -> bool:
+        """Gibt zurück, ob die EnergyADE ausgewählt ist.
+
+        Returns:
+            Auswahl als Boolean.
+        """
+        return self.dock.checkBox_eade.isChecked()
+
+    def getOptionIntegr(self) -> bool:
+        """Gibt zurück, ob die QGIS-Integration ausgewählt ist.
+
+        Returns:
+            Auswahl als Boolean.
+        """
+        return self.dock.checkBox_integr.isChecked()
+
+    def getLod(self) -> int:
+        """Gibt die gewählte Level of Detail (LoD)-Stufe zurück.
+
+        Returns:
+            Auswahl als Integer.
+        """
+        return self.dock.lod_button_group.checkedId()
+
+    def setIfcInfo(self, text: str) -> None:
+        """Setzt das IFC-Beschreibungsfeld auf einen übergebenen Text.
 
         Args:
-            event: Das Close-Event
+            text: Der einzutragende Text.
         """
+        self.dock.label_ifc_info.setText(text)
+
+    def setIfcMsg(self, msg: str) -> None:
+        """Setzt das IFC-Informationsfeld auf einen übergebenen Text.
+
+        Args:
+            msg: Der einzutragende Text.
+        """
+        self.dock.label_ifc_msg.setText(msg)
+
+    def setIfcStatus(self, text: str, color: str = "black") -> None:
+        """Setzt den Status-Text der IFC-Validierung.
+
+        Args:
+            text: Status-Text (z.B. "valid", "not valid").
+            color: Textfarbe als CSS-Name oder Hex-Wert.
+        """
+        self.dock.label_ifc_status.setText(text)
+        self.dock.label_ifc_status.setStyleSheet(
+            f"color: {color};"
+        )
+
+    def log(self, msg: str) -> None:
+        """Fügt einen Text als weitere Zeile unter Zugabe der Uhrzeit in das Logging-Feld hinzu.
+
+        Args:
+            msg: Der zu loggende Text.
+        """
+        curr_time = datetime.now().strftime("%H:%M:%S")
+        self._log_info(f"{curr_time}   {msg}")
+
+    def logWarning(self, msg: str) -> None:
+        """Loggt eine Warnmeldung.
+
+        Args:
+            msg: Warnmeldung.
+        """
+        self._log_warning(msg)
+
+    def logError(self, msg: str) -> None:
+        """Loggt eine Fehlermeldung.
+
+        Args:
+            msg: Fehlermeldung.
+        """
+        self._log_error(msg)
+
+    def enableProgress(self, enable: bool) -> None:
+        """Aktiviert oder deaktiviert den Fortschrittsbalken.
+
+        Args:
+            enable: Ob aktiviert oder deaktiviert werden soll.
+        """
+        self.dock.progressBar.setEnabled(enable)
+
+    def setProgress(self, progr: float) -> None:
+        """Setzt den Fortschrittsbalken auf einen bestimmten prozentualen Wert.
+
+        Args:
+            progr: Prozentualer Wert, auf den der Fortschritt gesetzt werden soll.
+        """
+        self.dock.progressBar.setValue(int(progr))
+
+    def enableRun(self, enable: bool) -> None:
+        """Aktiviert oder deaktiviert den Ausführen-Button.
+
+        Args:
+            enable: Ob aktiviert werden soll, als Boolean.
+        """
+        self.dock.button_run.setEnabled(enable)
+
+    def enableDef(self, enable: bool) -> None:
+        """Aktiviert oder deaktiviert die Einstellungsmöglichkeiten.
+
+        Args:
+            enable: Ob aktiviert werden soll, als Boolean.
+        """
+        self.dock.groupBox_ifc.setEnabled(enable)
+        self.dock.groupBox_cgml.setEnabled(enable)
+
+    def _close(self) -> None:
+        """Behandelt das Schließen des Dock-Widgets."""
         self.model.cancel()
+        self.iface.removeDockWidget(self.dock)
 
-    # noinspection PyUnusedLocal
-    def activateIntegr(self, event):
-        """ Aktiviert die QGIS-Integration-Option nach Auswahl eines dazu geeigneten Level of Detail (LoD0/1)
+    def _activate_integr(self, _: bool) -> None:
+        """Aktiviert die QGIS-Integration-Option (LoD 0/1)."""
+        self.dock.checkBox_integr.setDisabled(False)
 
-        Args:
-            event: boolean, ob aktiviert oder deaktiviert wurde
-        """
-        self.checkBox_integr.setDisabled(False)
+    def _deactivate_integr(self, _: bool) -> None:
+        """Deaktiviert die QGIS-Integration-Option (LoD 2/3/4)."""
+        self.dock.checkBox_integr.setDisabled(True)
+        self.dock.checkBox_integr.setChecked(False)
 
-    # noinspection PyUnusedLocal
-    def deactivateIntegr(self, event):
-        """ Deaktiviert die QGIS-Integration-Option nach Auswahl eines dazu ungeeigneten Level of Detail (LoD2/3/4)
+    def _open_log_panel(self) -> None:
+        """Zeigt das QGIS-Log-Panel, falls vorhanden."""
+        log_dock = self.iface.mainWindow().findChild(
+            type(self.dock), "MessageLog"
+        )
+        if log_dock is not None:
+            log_dock.setVisible(True)
 
-        Args:
-            event: boolean, ob aktiviert oder deaktiviert wurde
-        """
-        self.checkBox_integr.setDisabled(True)
-        self.checkBox_integr.setChecked(False)
+    @staticmethod
+    def _log_info(msg: str) -> None:
+        """Schreibt eine Info in das QGIS-Log."""
+        QgsMessageLog.logMessage(msg, TAG, Qgis.Info)
 
-    def getInputPath(self):
-        """ Gibt den Eingabepfad zurück.
+    @staticmethod
+    def _log_warning(msg: str) -> None:
+        """Schreibt eine Warnung in das QGIS-Log."""
+        QgsMessageLog.logMessage(msg, TAG, Qgis.Warning)
 
-        Returns:
-            Eingabepfad als String
-        """
-        return self.fileWidget_ifc.filePath()
+    @staticmethod
+    def _log_error(msg: str) -> None:
+        """Schreibt einen Fehler in das QGIS-Log."""
+        QgsMessageLog.logMessage(msg, TAG, Qgis.Critical)
 
-    def getOutputPath(self):
-        """ Gibt den Ausgabepfad zurück.
-
-        Returns:
-            Ausgabepfad als String
-        """
-        return self.fileWidget_cgml.filePath()
-
-    def getOptionVal(self):
-        """ Gibt zurück, ob die Validierung ausgewählt wurde.
+    def getTargetCrs(self) -> int | None:
+        """Gibt den ausgewählten CRS EPSG-SRID oder das Projekt-KBS zurück.
 
         Returns:
-            Auswahl als Boolean
+            EPSG-SRID als int, oder None wenn nicht verfügbar.
         """
-        return self.checkBox_val.isChecked()
-
-    def getOptionEade(self):
-        """ Gibt zurück, ob die EnergyADE ausgewählt wurde.
-
-        Returns:
-            Auswahl als Boolean
+        crs = self.dock.get_selected_crs()
+        if crs is None:
+            crs = QgsProject.instance().crs()
+        return crs.postgisSrid()
+    
+    def getSourceCrs(self) -> int | None:
         """
-        return self.checkBox_eade.isChecked()
-
-    def getOptionIntegr(self):
-        """ Gibt zurück, ob die QGIS-Integration ausgewählt wurde.
-
-        Returns:
-            Auswahl als Boolean
+        Returns the selected source CRS EPSG SRID, or None if 'automatic'.
         """
-        return self.checkBox_integr.isChecked()
-
-    def getLod(self):
-        """ Gibt die gewählte Level of Detail (LoD)-Stufe zurück.
-
-        Returns:
-            Auswahl als Integer
+        crs = self.dock.get_selected_source_crs()
+        if crs is None:
+            return None
+        return crs.postgisSrid()
+    
+    def prefillSourceCrs(self, epsg: int | None) -> None:
         """
-        if self.radioButton_lod0.isChecked():
-            return 0
-        elif self.radioButton_lod1.isChecked():
-            return 1
-        elif self.radioButton_lod2.isChecked():
-            return 2
-        elif self.radioButton_lod3.isChecked():
-            return 3
-        elif self.radioButton_lod4.isChecked():
-            return 4
-        else:
-            return -1
-
-    def setIfcInfo(self, text):
-        """ Setzt das IFC-Beschreibungsfeld auf einen übergebenen Text.
-
-        Args:
-            text: Der einzutragende Text
+        Prefills the source CRS UI using an EPSG code detected from IFC analysis.
         """
-        self.label_ifc_info.setText(text)
-
-    def setIfcMsg(self, msg):
-        """ Setzt das IFC-Warnungsfeld auf einen übergebenen Text im HTML-Format.
-
-        Args:
-            msg: Der einzutragende Text im HTML-Format
-        """
-        self.label_ifc_msg.setText(msg)
-
-    def log(self, msg):
-        """ Fügt einen Text als weitere Zeile unter Zugabe der Uhrzeit in das Logging-Feld hinzu.
-
-        Args:
-            msg: Der zu loggende Text
-        """
-        currTime = datetime.now().strftime("%H:%M:%S")
-        self.textBrowser_log.append(currTime + "   " + msg)
-
-    def enableProgress(self, enable):
-        """ Aktiviert oder deaktiviert den Forschrittsbalken.
-
-        Args:
-            enable: Ob aktiviert oder deaktiviert werden soll
-        """
-        self.progressBar.setEnabled(enable)
-
-    def setProgress(self, progr):
-        """ Setzt den Fortschrittbalken auf einen bestimmten prozentualen Wert.
-
-        Args:
-            progr: Prozentualer Wert, auf den der Fortschritt gesetzt werden soll
-        """
-        self.progressBar.setValue(int(progr))
-
-    def enableRun(self, enable):
-        """ Aktiviert oder deaktiviert den Ausführen-Button.
-
-        Args:
-            enable: Ob aktiviert werden soll, als Boolean
-        """
-        self.button_run.setEnabled(enable)
-
-    def enableDef(self, enable):
-        """ Aktiviert oder deaktiviert die Einstellungsmöglichkeiten.
-
-        Args:
-            enable: Ob aktiviert werden soll, als Boolean
-        """
-        # GroupBoxen
-        self.groupBox_ifc.setEnabled(enable)
-        self.groupBox_cgml.setEnabled(enable)
-
-        # Farbe des IFC-Warnungsfeldes
-        if self.label_ifc_msg.text() != "":
-            txt = self.label_ifc_msg.text()[self.label_ifc_msg.text().index(">") + 1:-4]
-            self.label_ifc_msg.setText("<p style='color:dimgrey'>" + txt + "</p>")
+        self.dock.set_source_epsg_prefill(epsg)

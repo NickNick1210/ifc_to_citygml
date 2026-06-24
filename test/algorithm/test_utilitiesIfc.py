@@ -38,7 +38,7 @@ class TestFindPset(unittest.TestCase):
 
     def test_1(self):
         result = UtilitiesIfc.findPset(ifcSite, "Pset_SiteCommon")
-        self.assertEqual("{'BuildingHeightLimit': 9.0, 'GrossAreaPlanned': 0.0}", str(result))
+        self.assertEqual("{'BuildingHeightLimit': 9.0, 'GrossAreaPlanned': 0.0, 'id': 408}", str(result))
 
     def test_2(self):
         result = UtilitiesIfc.findPset(ifcSite, "Pset_ABC123")

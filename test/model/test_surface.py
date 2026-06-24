@@ -19,9 +19,12 @@ import sys
 import ifcopenshell
 
 # Geo-Bibliotheken
-from osgeo import ogr
+from osgeo import gdal, ogr, osr
 
 # Plugin
+gdal.PushErrorHandler("CPLQuietErrorHandler")
+osr.UseExceptions()
+
 sys.path.insert(0, '..')
 from algorithm.utilitiesIfc import UtilitiesIfc
 from model.surface import Surface

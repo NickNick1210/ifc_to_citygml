@@ -49,7 +49,8 @@ class ConvertStarter(QgsTask):
 
     logging = pyqtSignal(str)
 
-    def __init__(self, description, parent, inPath, outPath, lod, eade, integr):
+    def __init__(self, description, parent, inPath, outPath, lod, eade, integr, target_crs):
+        super().__init__(description, QgsTask.CanCancel)
         """ Konstruktor der Model-Klasse zum Konvertieren von IFC-Dateien zu CityGML-Dateien
 
         Args:
@@ -67,6 +68,7 @@ class ConvertStarter(QgsTask):
         self.parent = parent
         self.inPath, self.outPath = inPath, outPath
         self.lod, self.eade, self.integr = lod, eade, integr
+        self.target_crs = target_crs
 
     @staticmethod
     def tr(msg):
@@ -90,7 +92,13 @@ class ConvertStarter(QgsTask):
             self.setProgress(5)
 
         root = self.createSchema()
-        trans = Transformer(ifc)
+        
+        source_epsg = None
+        if hasattr(self.parent, "dlg") and hasattr(self.parent.dlg, "getSourceCrs"):
+            source_epsg = self.parent.dlg.getSourceCrs()
+
+        trans = Transformer(ifc, targetCrs=self.target_crs, sourceEpsgOverride=source_epsg, task=self)
+
         slash = "/" if platform.system() == "Linux" else "\\"
         name = self.outPath[self.outPath.rindex(slash) + 1:-4]
         if self.lod >= 3 or (self.lod == 2 and self.eade):
@@ -134,7 +142,6 @@ class ConvertStarter(QgsTask):
             self.parent.gis.loadIntoGIS(self.outPath)
 
         # Abschließen
-        self.finished(True)
         return True
 
     @staticmethod

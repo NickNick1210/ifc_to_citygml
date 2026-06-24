@@ -313,10 +313,7 @@ class LoD4Converter(Converter):
             grVertsList = []
             for face in grFacesCurr:
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
-                points = []
-                for facePoint in facePoints:
-                    point = self.trans.georeferencePoint(facePoint)
-                    points.append(point)
+                points = list(self.trans.georeferencePoint(facePoints, reproject=False))
                 grVertsList.append(points)
 
             # Geometrien erstellen
@@ -474,10 +471,7 @@ class LoD4Converter(Converter):
             grVertsList = []
             for face in grFacesCurr:
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
-                points = []
-                for facePoint in facePoints:
-                    point = self.trans.georeferencePoint(facePoint)
-                    points.append(point)
+                points = list(self.trans.georeferencePoint(facePoints, reproject=False))
                 grVertsList.append(points)
 
             # Geometrien erstellen
@@ -588,10 +582,7 @@ class LoD4Converter(Converter):
             grVertsList = []
             for face in grFacesCurr:
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
-                points = []
-                for facePoint in facePoints:
-                    point = self.trans.georeferencePoint(facePoint)
-                    points.append(point)
+                points = list(self.trans.georeferencePoint(facePoints, reproject=False))
                 grVertsList.append(points)
 
                 if self.task.isCanceled():
@@ -674,8 +665,7 @@ class LoD4Converter(Converter):
             minHeight, maxHeight = sys.maxsize, -sys.maxsize
 
             # Nur wichtige Vertizes hinzufügen
-            for grVertCurr in grVertsCurr:
-                point = self.trans.georeferencePoint(grVertCurr)
+            for point in self.trans.georeferencePoint(grVertsCurr, reproject=False):
                 if point[2] <= minHeight:
                     minHeight = point[2]
                     grVertsList.append(point)
@@ -747,8 +737,17 @@ class LoD4Converter(Converter):
             # Maximale Durchmesser der einzelnen Oberflächen heraussuchen
             dists = []
             for wallGeom in wall.geom:
+                # Guard: skip degenerate geometries that are not polygons
+                if wallGeom is None or wallGeom.IsEmpty() or wallGeom.GetGeometryName() != "POLYGON":
+                    dists.append(0)
+                    continue
+
                 maxDist = -sys.maxsize
                 ring = wallGeom.GetGeometryRef(0)
+                if ring is None:
+                    dists.append(0)
+                    continue
+
                 heightDiff = False
                 for k in range(0, ring.GetPointCount()):
                     pt1 = ring.GetPoint(k)
@@ -764,6 +763,19 @@ class LoD4Converter(Converter):
                 else:
                     dists.append(0)
 
+            # Filter out non-polygon geometries before computing finalWall
+            validGeoms = [
+                g for g in wall.geom
+                if g is not None and not g.IsEmpty() and g.GetGeometryName() == "POLYGON"
+            ]
+
+            if not validGeoms or max(dists) == 0:
+                wallMainCounts.append(1)
+                wall.geom = validGeoms
+                self.progress += (10 / self.bldgCount / len(walls))
+                self.task.setProgress(self.progress)
+                continue
+            
             # Größte Fläche als Außenfläche
             lastMaxDist, bigDists = None, []
             for k in range(0, len(dists)):
@@ -800,8 +812,15 @@ class LoD4Converter(Converter):
                     wallGeom = wall.geom[h]
                     if wallGeom in finalWall:
                         continue
+
+                    # Guard: only process valid polygons as opening bounds
+                    if wallGeom is None or wallGeom.IsEmpty() or wallGeom.GetGeometryName() != "POLYGON":
+                        continue
+
                     same = False
                     wallRing = wallGeom.GetGeometryRef(0)
+                    if wallRing is None:
+                        continue
 
                     # Auf Nähe mit den Öffnungen (Türen und Fenster) prüfen
                     for i in range(0, len(wall.openings)):
@@ -1002,18 +1021,16 @@ class LoD4Converter(Converter):
                                         ptEnd[0] - ptMid[0])
                                     if gradYSt - tol < gradYEnd < gradYSt + tol:
                                         # Z-Steigung in Bezug auf X-Verlauf
-                                        gradZSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[2] - ptSt[
-                                            2]) / abs(
+                                        gradZSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[2] - ptSt[2]) / abs(
                                             ptMid[0] - ptSt[0])
-                                        gradZEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[2] - ptMid[
-                                            2]) / abs(
+                                        gradZEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[2] - ptMid[2]) / abs(
                                             ptEnd[0] - ptMid[0])
                                         if gradZSt - tol < gradZEnd < gradZSt + tol:
-                                            # Z-Steigung in Bezug auf Y-Verlauf
-                                            gradYZSt = -1 if abs(ptMid[1] - ptSt[1]) < 0.0001 else (ptMid[2] - ptSt[
-                                                2]) / abs(ptMid[1] - ptSt[1])
-                                            gradYZEnd = -1 if abs(ptEnd[1] - ptMid[1]) < 0.0001 else (ptEnd[2] - ptMid[
-                                                2]) / abs(ptEnd[1] - ptMid[1])
+                                            # YZ-Steigung in Bezug auf X-Verlauf
+                                            gradYZSt = -1 if abs(ptMid[1] - ptSt[1]) < 0.0001 else (ptMid[2] - ptSt[2]) / abs(
+                                                ptMid[1] - ptSt[1])
+                                            gradYZEnd = -1 if abs(ptEnd[1] - ptMid[1]) < 0.0001 else (ptEnd[2] - ptMid[2]) / abs(
+                                                ptEnd[1] - ptMid[1])
                                             if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
                                                 newRingWall1.AddPoint(ptMid[0], ptMid[1], ptMid[2])
                                                 newRingWall2.AddPoint(ptMid[0], ptMid[1], ptMid[2])
@@ -1328,7 +1345,7 @@ class LoD4Converter(Converter):
         # Geometrie
         for geometry in geometries:
             chBldgCSSM = etree.SubElement(chBldgCS, QName(XmlNs.gml, "surfaceMember"))
-            geomXML = UtilitiesGeom.geomToGml(geometry)
+            geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
             chBldgCSSM.append(geomXML)
 
             # GML-ID
@@ -1356,7 +1373,7 @@ class LoD4Converter(Converter):
             polyIds.append(polyId)
             for geometry in opening.geom:
                 chBldgOCSSM = etree.SubElement(chBldgOCS, QName(XmlNs.gml, "surfaceMember"))
-                geomXML = UtilitiesGeom.geomToGml(geometry)
+                geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
                 chBldgOCSSM.append(geomXML)
 
                 # GML-ID

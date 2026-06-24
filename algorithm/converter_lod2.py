@@ -88,8 +88,16 @@ class LoD2Converter(Converter):
             root: Das vorbereitete XML-Schema
         """
         # IFC-Grundelemente
-        ifcProject = self.ifc.by_type("IfcProject")[0]
-        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcProjects = self.ifc.by_type("IfcProject")
+        if not ifcProjects:
+            return False
+        ifcProject = ifcProjects[0]
+
+        ifcSites = self.ifc.by_type("IfcSite")
+        if not ifcSites:
+            return False
+        ifcSite = ifcSites[0]
+
         ifcBuildings = self.ifc.by_type("IfcBuilding")
 
         # XML-Struktur
@@ -112,13 +120,18 @@ class LoD2Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (5 / self.bldgCount) if not self.eade else (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Gebäudebestandteile
             self.task.logging.emit(self.tr(u'Building bounds are calculated'))
-            links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg, height)
+            bldgBoundResult = self.convertBldgBound(ifcBuilding, chBldg, height)
+            if bldgBoundResult is False:
+                return False
             if self.task.isCanceled():
                 return False
+            if not bldgBoundResult or not isinstance(bldgBoundResult, tuple):
+                continue
+            links, footPrint, surfaces = bldgBoundResult
 
             # Gebäudekörper
             self.task.logging.emit(self.tr(u'Building solid is calculated'))
@@ -126,7 +139,7 @@ class LoD2Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (5 / self.bldgCount) if not self.eade else (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Adresse
             self.task.logging.emit(self.tr(u'Building address is extracted'))
@@ -134,7 +147,7 @@ class LoD2Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (5 / self.bldgCount) if not self.eade else (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Bounding Box
             self.task.logging.emit(self.tr(u'Building bound is calculated'))
@@ -142,7 +155,7 @@ class LoD2Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (5 / self.bldgCount) if not self.eade else (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # EnergyADE
             if self.eade:
@@ -152,15 +165,16 @@ class LoD2Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Gebäudeattribute
                 self.task.logging.emit(self.tr(u'Energy ADE: building attributes are extracted'))
-                EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                if footPrint is not None:
+                    EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
                 self.progress += (5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Thermale Zone
                 self.task.logging.emit(self.tr(u'Energy ADE: thermal zone is calculated'))
@@ -169,7 +183,7 @@ class LoD2Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Nutzungszone
                 self.task.logging.emit(self.tr(u'Energy ADE: usage zone is calculated'))
@@ -177,7 +191,7 @@ class LoD2Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Konstruktionen
                 self.task.logging.emit(self.tr(u'Energy ADE: construction is calculated'))
@@ -185,7 +199,7 @@ class LoD2Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Materialien
                 self.task.logging.emit(self.tr(u'Energy ADE: material is calculated'))
@@ -193,7 +207,7 @@ class LoD2Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
         return root
 
@@ -214,6 +228,7 @@ class LoD2Converter(Converter):
         if height is None or height == 0:
             self.task.logging.emit(
                 self.tr(u'Due to the missing height and roof, no building geometry can be calculated'))
+            return None, None, []
 
         # IFC-Elemente der Grundfläche
         ifcSlabs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="BASESLAB")
@@ -222,16 +237,16 @@ class LoD2Converter(Converter):
             # Wenn keine Grundfläche vorhanden
             if len(ifcSlabs) == 0:
                 self.task.logging.emit(self.tr(u"Due to the missing baseslab, no building geometry can be calculated"))
-                return
+                return None, None, []
 
         # Berechnung Grundfläche
         self.task.logging.emit(self.tr(u'Building geometry: base surface is calculated'))
         baseList = self.calcPlane(ifcSlabs, self.trans)
         if baseList is None:
-            return []
+            return None, None, []
         base = Surface(baseList[1], baseList[0].Name, baseList[0], "Base")
         self.progress += (10 / self.bldgCount)
-        self.task.setProgress(self.progress)
+        self.task.setProgress(min(self.progress, 100))
 
         # IFC-Elemente des Daches
         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
@@ -239,7 +254,7 @@ class LoD2Converter(Converter):
         if len(ifcRoofs) == 0:
             self.task.logging.emit(self.tr(
                 u"Due to the missing roof, no building geometry can be calculated"))
-            return None
+            return None, None, []
 
         if self.task.isCanceled():
             return False
@@ -270,13 +285,13 @@ class LoD2Converter(Converter):
         for roof in roofs:
             roof.geom = UtilitiesGeom.simplify(roof.geom, 0.01, 0.05)
             self.progress += (2 / self.bldgCount / len(roofs))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
         if self.task.isCanceled():
             return False
 
         # Geometrie
         links, surfaces = [], []
-        if walls is not None and len(walls) > 0 and roofs[1] is not None and len(roofs) > 0:
+        if walls is not None and len(walls) > 0 and len(roofs) > 0 and roofs[0].geom is not None:
 
             # Base
             link, base.gmlId = self.setElement(chBldg, base.geom, "GroundSurface", base.name)
@@ -292,7 +307,7 @@ class LoD2Converter(Converter):
                     if roof.ifcElem is None:
                         ifcRoofs = UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcRoof", result=[])
                         ifcRoofs += UtilitiesIfc.findElement(self.ifc, ifcBuilding, "IfcSlab", result=[], type="ROOF")
-                        roof.ifcElem = ifcRoofs[0]
+                        roof.ifcElem = ifcRoofs[0] if ifcRoofs else None
                     surfaces.append(roof)
 
             # Walls
@@ -331,9 +346,16 @@ class LoD2Converter(Converter):
         """
         roofs = []
         for ifcRoof in ifcRoofs:
+            if not getattr(ifcRoof, "Representation", None):
+                self.task.logging.emit(self.tr(u"Roof geometry skipped: missing representation"))
+                continue
             settings = ifcopenshell.geom.settings()
             settings.set(settings.USE_WORLD_COORDS, True)
-            shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
+            try:
+                shape = ifcopenshell.geom.create_shape(settings, ifcRoof)
+            except RuntimeError:
+                self.task.logging.emit(self.tr(u"Roof geometry skipped: invalid representation"))
+                continue
             # Vertizes
             verts = shape.geometry.verts
             grVertsCurr = [[round(verts[i], 5), round(verts[i + 1], 5), round(verts[i + 2], 5)] for i in
@@ -348,10 +370,7 @@ class LoD2Converter(Converter):
                 if not ((facePoints[0][0] == facePoints[1][0] and facePoints[0][1] == facePoints[1][1]) or (
                         facePoints[0][0] == facePoints[2][0] and facePoints[0][1] == facePoints[2][1]) or (
                                 facePoints[1][0] == facePoints[2][0] and facePoints[1][1] == facePoints[2][1])):
-                    points = []
-                    for facePoint in facePoints:
-                        point = self.trans.georeferencePoint(facePoint)
-                        points.append(point)
+                    points = list(self.trans.georeferencePoint(facePoints, reproject=False))
                     grVertsList.append(points)
 
             # Geometrien erstellen
@@ -373,7 +392,11 @@ class LoD2Converter(Converter):
                 if i not in checkList:
                     # Geometrie
                     geometry = geometries.GetGeometryRef(i)
+                    if geometry is None or geometry.GetGeometryName() != "POLYGON":
+                        continue
                     ring = geometry.GetGeometryRef(0)
+                    if ring is None or ring.GetPointCount() < 3:
+                        continue
 
                     # Multipolygon
                     geometriesRef = ogr.Geometry(ogr.wkbMultiPolygon)
@@ -384,12 +407,20 @@ class LoD2Converter(Converter):
                     r1 = np.array(ring.GetPoint(1)) - np.array(ring.GetPoint(0))
                     r2 = np.array(ring.GetPoint(2)) - np.array(ring.GetPoint(0))
                     nv = np.cross(r1, r2)
+                    nv_norm = np.linalg.norm(nv)
                     checkList.append(i)
+
+                    if nv_norm < 1e-12:
+                        continue
 
                     for j in range(i + 1, geometries.GetGeometryCount()):
                         # Geometrie
                         ogeometry = geometries.GetGeometryRef(j)
+                        if ogeometry is None or ogeometry.GetGeometryName() != "POLYGON":
+                            continue
                         oring = ogeometry.GetGeometryRef(0)
+                        if oring is None or oring.GetPointCount() < 3:
+                            continue
 
                         # Ebeneneigenschaften
                         oapv = np.array(oring.GetPoint(0))
@@ -397,19 +428,42 @@ class LoD2Converter(Converter):
                         or2 = np.array(oring.GetPoint(2)) - np.array(oring.GetPoint(0))
                         onv = np.cross(or1, or2)
 
+                        onv_norm = np.linalg.norm(onv)
+                        if onv_norm < 1e-12:
+                            continue
+
                         # Schnittwinkel
-                        angle = np.arccos(np.linalg.norm(np.dot(nv, onv)) / (np.linalg.norm(nv) * np.linalg.norm(onv)))
+                        cosang = abs(np.dot(nv, onv)) / (nv_norm * onv_norm)
+                        cosang = np.clip(cosang, -1.0, 1.0)
+                        angle = np.arccos(cosang)
                         if math.isnan(angle) or angle < 0.001:
 
                             # Distanz zwischen den Ebenen
-                            dist = (np.linalg.norm(np.dot(oapv - apv, nv))) / (np.linalg.norm(nv))
+                            dist = (np.linalg.norm(np.dot(oapv - apv, nv))) / nv_norm
                             if dist < 0.001:
                                 geometriesRef.AddGeometry(ogeometry)
                                 checkList.append(j)
 
                     # Vereinigen
                     geometriesRefUnion = geometriesRef.UnionCascaded()
-                    ring = geometriesRefUnion.GetGeometryRef(0)
+                    if geometriesRefUnion is None or geometriesRefUnion.IsEmpty():
+                        continue
+                    ring = None
+                    if geometriesRefUnion.GetGeometryName() == "POLYGON":
+                        ring = geometriesRefUnion.GetGeometryRef(0)
+                    elif geometriesRefUnion.GetGeometryName() == "MULTIPOLYGON":
+                        firstPoly = geometriesRefUnion.GetGeometryRef(0)
+                        if firstPoly is not None and firstPoly.GetGeometryName() == "POLYGON":
+                            ring = firstPoly.GetGeometryRef(0)
+                    elif geometriesRefUnion.GetGeometryName() == "GEOMETRYCOLLECTION":
+                        for p in range(0, geometriesRefUnion.GetGeometryCount()):
+                            geomPart = geometriesRefUnion.GetGeometryRef(p)
+                            if geomPart is not None and geomPart.GetGeometryName() == "POLYGON":
+                                ring = geomPart.GetGeometryRef(0)
+                                break
+                    if ring is None or ring.GetPointCount() < 3:
+                        self.task.logging.emit(self.tr(u"Roof geometry skipped: invalid union geometry"))
+                        continue
 
                     # Höhe herausfinden
                     minHeight, maxHeight = sys.maxsize, -sys.maxsize
@@ -434,13 +488,16 @@ class LoD2Converter(Converter):
             for i in range(0, len(areas)):
                 if areas[i] > 0.9 * max(areas) and round(heights[i], 2) >= round(max(heights) - 0.01, 2):
                     finalRoof = geometriesRefUnionList[i]
+            if finalRoof is None or finalRoof.IsEmpty():
+                self.task.logging.emit(self.tr(u"Roof geometry skipped: empty geometry"))
+                continue
             roofs.append(Surface(finalRoof, ifcRoof.Name, ifcRoof, "Roof"))
 
             if self.task.isCanceled():
                 return False
 
             self.progress += (10 / self.bldgCount / len(ifcRoofs))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return roofs
 
@@ -642,7 +699,7 @@ class LoD2Converter(Converter):
                 return False
 
             self.progress += (8 / self.bldgCount / (ringBase.GetPointCount() - 1))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         # Wenn über keinem Teil der Wand ein Dach ist
         for wall in wallsWORoof:
@@ -679,7 +736,7 @@ class LoD2Converter(Converter):
                 return False
 
         self.progress += (1 / self.bldgCount)
-        self.task.setProgress(self.progress)
+        self.task.setProgress(min(self.progress, 100))
 
         # Neue Dächer, falls keine vorhanden
         roofsNew, done = [], []
@@ -719,7 +776,7 @@ class LoD2Converter(Converter):
                 return False
 
         self.progress += (1 / self.bldgCount)
-        self.task.setProgress(self.progress)
+        self.task.setProgress(min(self.progress, 100))
 
         return walls, roofsNew
 
@@ -735,6 +792,22 @@ class LoD2Converter(Converter):
         """
         roofsOut = roofs.copy()
         walls, wallsLine = [], []
+
+        def make_valid_geometry(geom):
+            """Return a valid geometry to avoid topology exceptions."""
+            if geom is None or geom.IsEmpty():
+                return geom
+            if geom.IsValid():
+                return geom
+            if hasattr(geom, "MakeValid"):
+                valid = geom.MakeValid()
+                if valid is not None and not valid.IsEmpty():
+                    return valid
+            try:
+                buffered = geom.Buffer(0)
+            except RuntimeError:
+                return geom
+            return buffered if buffered is not None and not buffered.IsEmpty() else geom
 
         # Alle Dächer miteinander auf Schnitt prüfen
         ptz1, ptz2 = None, None
@@ -752,9 +825,9 @@ class LoD2Converter(Converter):
                         r1Plane = UtilitiesGeom.getPlane(ringR1.GetPoint(0), ringR1.GetPoint(1), ringR1.GetPoint(2))
                         r2Plane = UtilitiesGeom.getPlane(ringR2.GetPoint(0), ringR2.GetPoint(1), ringR2.GetPoint(2))
                         w1Line = Line(Point3D(intersect.GetPoint(0)[0], intersect.GetPoint(0)[1], 0),
-                                      Point3D(intersect.GetPoint(0)[0], intersect.GetPoint(0)[1], 100))
+                                    Point3D(intersect.GetPoint(0)[0], intersect.GetPoint(0)[1], 100))
                         w2Line = Line(Point3D(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], 0),
-                                      Point3D(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], 100))
+                                    Point3D(intersect.GetPoint(1)[0], intersect.GetPoint(1)[1], 100))
                         z11, z12 = float(r1Plane.intersection(w1Line)[0][2]), float(r2Plane.intersection(w1Line)[0][2])
                         z21, z22 = float(r1Plane.intersection(w2Line)[0][2]), float(r2Plane.intersection(w2Line)[0][2])
 
@@ -814,7 +887,7 @@ class LoD2Converter(Converter):
                                 # Geraden
                                 wLineLast = Line(Point3D(last[0], last[1], 0), Point3D(last[0], last[1], 100))
                                 wLineCurr = Line(Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 0),
-                                                 Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
+                                                Point3D(ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1], 100))
 
                                 # Schnittpunkte
                                 sPoint1Last = r1Plane.intersection(wLineLast)[0]
@@ -844,7 +917,16 @@ class LoD2Converter(Converter):
                                 ringWall.AddPoint(p4[0], p4[1], p4[2])
                                 ringWall.CloseRings()
                                 geomWall.AddGeometry(ringWall)
-                                wallsInt.append(Surface(geomWall, None, None, "Wall"))
+
+                                # Guard against degenerate geometries before appending
+                                ring = geomWall.GetGeometryRef(0)
+                                if (
+                                    not geomWall.IsEmpty()
+                                    and geomWall.IsValid()
+                                    and ring is not None
+                                    and ring.GetPointCount() >= 4
+                                ):
+                                    wallsInt.append(Surface(geomWall, None, None, "Wall"))
 
                                 # Letzten Schnittpunkt für folgenden Durchlauf speichern
                                 last = [ringInt.GetPoint(n)[0], ringInt.GetPoint(n)[1]]
@@ -864,9 +946,31 @@ class LoD2Converter(Converter):
                         else:
                             geomRoof = roofsOut[i].geom
 
-                        roofInt = geomRoof.Difference(intersect).Simplify(0.0)
-                        ringInt = roofInt.GetGeometryRef(0)
-                        ringRoof = geomRoof.GetGeometryRef(0)
+                        geomRoofBase = geomRoof
+                        geomRoofDiff = make_valid_geometry(geomRoof)
+                        intersectDiff = make_valid_geometry(intersect)
+                        if geomRoofDiff is None or intersectDiff is None:
+                            continue
+                        try:
+                            roofInt = geomRoofDiff.Difference(intersectDiff)
+                        except RuntimeError:
+                            self.task.logging.emit(self.tr(u"Roof adjustment skipped: invalid overlap geometry"))
+                            continue
+                        if roofInt is None or roofInt.IsEmpty():
+                            continue
+                        roofInt = roofInt.Simplify(0.0)
+
+                        ringInt = None
+                        if roofInt.GetGeometryName() == "POLYGON":
+                            ringInt = roofInt.GetGeometryRef(0)
+                        elif roofInt.GetGeometryName() == "MULTIPOLYGON" and roofInt.GetGeometryCount() > 0:
+                            ringInt = roofInt.GetGeometryRef(0).GetGeometryRef(0)
+                        if ringInt is None:
+                            continue
+
+                        ringRoof = geomRoofBase.GetGeometryRef(0)
+                        if ringRoof is None:
+                            continue
                         rPlane = UtilitiesGeom.getPlane(ringRoof.GetPoint(0), ringRoof.GetPoint(1),
                                                         ringRoof.GetPoint(2))
 
@@ -877,7 +981,7 @@ class LoD2Converter(Converter):
                         # Punkte
                         for o in range(0, ringInt.GetPointCount()):
                             rLine = Line(Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 0),
-                                         Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 100))
+                                        Point3D(ringInt.GetPoint(o)[0], ringInt.GetPoint(o)[1], 100))
                             z = None
                             for p in range(0, ringRoof.GetPointCount() - 1):
                                 if ringInt.GetPoint(o)[0] == ringRoof.GetPoint(p)[0] and ringInt.GetPoint(o)[1] == \
@@ -901,7 +1005,7 @@ class LoD2Converter(Converter):
                     return False
 
             self.progress += (5 / self.bldgCount / len(roofs))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         # ÜBERPRÜFUNG DER WÄNDE #
         walls += wallsLine
@@ -1016,7 +1120,7 @@ class LoD2Converter(Converter):
                     return False
 
             self.progress += (5 / self.bldgCount / len(wallsCheck))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return walls, roofsOut
 
@@ -1040,13 +1144,77 @@ class LoD2Converter(Converter):
 
             # Mit Grundfläche verschneiden
             intersection = roofIn.Intersection(base.geom)
-            for intGeometry in intersection:
-                if intersection.GetGeometryCount() == 1:
-                    ringInt = intersection.GetGeometryRef(0)
-                else:
-                    ringInt = intGeometry.GetGeometryRef(0)
-                    if ringInt is None:
+            intPolys = []
+            if intersection is None or intersection.IsEmpty():
+                self.progress += (10 / self.bldgCount / len(roofsIn))
+                self.task.setProgress(min(self.progress, 100))
+                continue
+            intersectionName = intersection.GetGeometryName()
+            if intersectionName == "POLYGON":
+                intPolys = [intersection]
+            elif intersectionName == "MULTIPOLYGON":
+                for i in range(intersection.GetGeometryCount()):
+                    intPoly = intersection.GetGeometryRef(i)
+                    if intPoly is not None and intPoly.GetGeometryName() == "POLYGON":
+                        intPolys.append(intPoly)
+            elif intersectionName == "GEOMETRYCOLLECTION":
+                for i in range(intersection.GetGeometryCount()):
+                    intGeom = intersection.GetGeometryRef(i)
+                    if intGeom is None:
                         continue
+                    intGeomName = intGeom.GetGeometryName()
+                    if intGeomName == "POLYGON":
+                        intPolys.append(intGeom)
+                    elif intGeomName == "MULTIPOLYGON":
+                        for j in range(intGeom.GetGeometryCount()):
+                            intPoly = intGeom.GetGeometryRef(j)
+                            if intPoly is not None and intPoly.GetGeometryName() == "POLYGON":
+                                intPolys.append(intPoly)
+
+            for intPoly in intPolys:
+                ringInt = intPoly.GetGeometryRef(0)
+                if ringInt is None or ringInt.GetPointCount() == 0:
+                    continue
+
+                # Ebenenpunkte fuer die Dach-Geometrie bestimmen
+                ringIn = roofIn.GetGeometryRef(0)
+                if ringIn is None:
+                    self.task.logging.emit(self.tr(u"Roof geometry skipped: missing roof ring"))
+                    continue
+                ptCount = ringIn.GetPointCount()
+                if ptCount < 3:
+                    self.task.logging.emit(self.tr(u"Roof geometry skipped: invalid roof ring"))
+                    continue
+                if ringIn.GetPoint(0) == ringIn.GetPoint(ptCount - 1):
+                    ptCount -= 1
+                if ptCount < 3:
+                    self.task.logging.emit(self.tr(u"Roof geometry skipped: invalid roof ring"))
+                    continue
+
+                planePts = None
+                for a in range(0, ptCount - 2):
+                    pt1 = ringIn.GetPoint(a)
+                    for b in range(a + 1, ptCount - 1):
+                        pt2 = ringIn.GetPoint(b)
+                        v1 = np.array([pt2[0] - pt1[0], pt2[1] - pt1[1], pt2[2] - pt1[2]])
+                        for c in range(b + 1, ptCount):
+                            pt3 = ringIn.GetPoint(c)
+                            v2 = np.array([pt3[0] - pt1[0], pt3[1] - pt1[1], pt3[2] - pt1[2]])
+                            if np.linalg.norm(np.cross(v1, v2)) > 0.000001:
+                                planePts = (pt1, pt2, pt3)
+                                break
+                        if planePts is not None:
+                            break
+                    if planePts is not None:
+                        break
+
+                if planePts is None:
+                    self.task.logging.emit(self.tr(u"Roof geometry skipped: collinear roof ring"))
+                    continue
+
+                rPlane = Plane(Point3D(planePts[0][0], planePts[0][1], planePts[0][2]),
+                               Point3D(planePts[1][0], planePts[1][1], planePts[1][2]),
+                               Point3D(planePts[2][0], planePts[2][1], planePts[2][2]))
 
                 # Neue Dach-Geometrie
                 geomRoof = ogr.Geometry(ogr.wkbPolygon)
@@ -1056,10 +1224,6 @@ class LoD2Converter(Converter):
                 for i in range(ringInt.GetPointCount() - 1, -1, -1):
                     # Z-Koordinate über Ebenenschnitt
                     ptInt = ringInt.GetPoint(i)
-                    ringIn = roofIn.GetGeometryRef(0)
-                    rPlane = Plane(Point3D(ringIn.GetPoint(0)[0], ringIn.GetPoint(0)[1], ringIn.GetPoint(0)[2]),
-                                   Point3D(ringIn.GetPoint(1)[0], ringIn.GetPoint(1)[1], ringIn.GetPoint(1)[2]),
-                                   Point3D(ringIn.GetPoint(2)[0], ringIn.GetPoint(2)[1], ringIn.GetPoint(2)[2]))
                     wLine = Line(Point3D(ptInt[0], ptInt[1], 0), Point3D(ptInt[0], ptInt[1], 100))
                     sPoint = rPlane.intersection(wLine)[0]
                     z = float(sPoint[2])
@@ -1076,7 +1240,7 @@ class LoD2Converter(Converter):
                     return False
 
             self.progress += (10 / self.bldgCount / len(roofsIn))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return roofs
 
@@ -1125,14 +1289,22 @@ class LoD2Converter(Converter):
                     return False
 
             if anyInt:
-                wall.geom = UtilitiesGeom.simplify(wall.geom, 0.01, 0.05)
-                wallsChecked.append(wall)
+                # Guard against degenerate geometries before simplification
+                ring = wall.geom.GetGeometryRef(0)
+                if (
+                    wall.geom is not None
+                    and not wall.geom.IsEmpty()
+                    and ring is not None
+                    and ring.GetPointCount() >= 4
+                ):
+                    wall.geom = UtilitiesGeom.simplify(wall.geom, 0.01, 0.05)
+                    wallsChecked.append(wall)
 
             if self.task.isCanceled():
                 return False
 
             self.progress += (8 / self.bldgCount / len(wallsIn))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         geoms = []
         for surface in wallsChecked:
@@ -1176,8 +1348,9 @@ class LoD2Converter(Converter):
         chBldgSM = etree.SubElement(chBldgMS, QName(XmlNs.gml, "surfaceMember"))
 
         # Geometrie
-        geomXML = UtilitiesGeom.geomToGml(geometry)
-        chBldgSM.append(geomXML)
+        geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
+        if geomXML is not None:
+            chBldgSM.append(geomXML)
 
         # GML-ID
         chBldgPol = chBldgSM[0]

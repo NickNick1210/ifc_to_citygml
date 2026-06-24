@@ -117,8 +117,12 @@ class Converter(QgsTask):
         chBoundEnvUC = etree.SubElement(chBoundEnv, QName(XmlNs.gml, "upperCorner"))
         chBoundEnvUC.set("srsDimension", "3")
 
+        geom_for_bound = geometry
+        if getattr(trans, "_needsReproject", False):
+            geom_for_bound = trans.reproject_geometry(geometry)
+
         # Envelope-Berechnung
-        env = geometry.GetEnvelope3D()
+        env = geom_for_bound.GetEnvelope3D()
         chBoundEnvLC.text = str(env[0]) + " " + str(env[2]) + " " + str(env[4])
         chBoundEnvUC.text = str(env[1]) + " " + str(env[3]) + " " + str(env[5])
 
@@ -197,8 +201,9 @@ class Converter(QgsTask):
         if ifcRoofs is not None:
             roofTypes = []
             for ifcRoof in ifcRoofs:
-                if ifcRoof.PredefinedType is not None and ifcRoof.PredefinedType != "NOTDEFINED":
-                    roofTypes.append(ifcRoof.PredefinedType)
+                if hasattr(ifcRoof, "PredefinedType"):
+                    if ifcRoof.PredefinedType is not None and ifcRoof.PredefinedType != "NOTDEFINED":
+                        roofTypes.append(ifcRoof.PredefinedType)
             if len(roofTypes) > 0:
                 # XML-Struktur
                 chBldgRoofType = etree.SubElement(chBldg, QName(XmlNs.bldg, "roofType"))
@@ -503,10 +508,8 @@ class Converter(QgsTask):
             # Vertizes der Flächen
             for face in grFacesCurr:
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
-                points = []
-                for facePoint in facePoints:
-                    point = trans.georeferencePoint(facePoint)
-                    points.append(point)
+                points = list(trans.georeferencePoint(facePoints, reproject=False))
+                for point in points:
                     if point[2] < height:
                         height = point[2]
                         ifcBase = ifcElement
@@ -547,7 +550,13 @@ class Converter(QgsTask):
                     geometriesBuffer = ogr.Geometry(ogr.wkbMultiPolygon)
                     for j in range(0, geometries.GetGeometryCount()):
                         g = geometries.GetGeometryRef(j)
-                        gBuffer = g.Buffer(bufferList[i], quadsecs=0)
+                        try:
+                            gBuffer = g.Buffer(bufferList[i], quadsecs=0)
+                        except TypeError:
+                            try:
+                                gBuffer = g.Buffer(bufferList[i], 0)
+                            except TypeError:
+                                gBuffer = g.Buffer(bufferList[i])
                         geometriesBuffer.AddGeometry(gBuffer)
                     geometry = geometriesBuffer.UnionCascaded()
                     if geometry.GetGeometryCount() == 1 and geometry.GetGeometryName() == "POLYGON":

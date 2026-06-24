@@ -207,6 +207,36 @@
         <source>valid</source>
         <translation>valide</translation>
     </message>
+    <message>
+        <location filename="../algorithm/ifc_analyzer.py"/>
+        <source>none</source>
+        <translation>keine</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/ifc_analyzer.py"/>
+        <source>yes</source>
+        <translation>ja</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/ifc_analyzer.py"/>
+        <source>no</source>
+        <translation>nein</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/ifc_analyzer.py"/>
+        <source>Orientation</source>
+        <translation>Orientierung</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/ifc_analyzer.py"/>
+        <source>There is no orientation in the IFC file!</source>
+        <translation>Die IFC-Datei hat keine Orientierung!</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/ifc_analyzer.py"/>
+        <source>LoGeoRef: </source>
+        <translation>Lo Georeferenzierung: </translation>
+    </message>
 </context>
 <context>
     <name>LoD0Converter</name>
@@ -734,6 +764,109 @@
         <location filename="../viewmodel/model.py" line="134"/>
         <source>IFC-to-CityGML conversion crashed</source>
         <translation>IFC-zu-CityGML-Konvertierung ist fehlgeschlagen</translation>
+    </message>
+    <message>
+        <location filename="../viewmodel/model.py"/>
+        <source>not valid</source>
+        <translation>nicht valide</translation>
+    </message>
+    <message>
+        <location filename="../viewmodel/model.py"/>
+        <source>Input file not found!</source>
+        <translation>Eingabedatei nicht gefunden!</translation>
+    </message>
+    <message>
+        <location filename="../viewmodel/model.py"/>
+        <source>Unable to open IFC file!</source>
+        <translation>IFC-Datei konnte nicht geöffnet werden!</translation>
+    </message>
+    <message>
+        <location filename="../viewmodel/model.py"/>
+        <source>Success</source>
+        <translation>Erfolgreich</translation>
+    </message>
+    <message>
+        <location filename="../viewmodel/model.py"/>
+        <source>IFC-to-CityGML conversion successfully completed</source>
+        <translation>IFC-zu-CityGML-Konvertierung erfolgreich abgeschlossen</translation>
+    </message>
+    <message>
+        <location filename="../viewmodel/model.py"/>
+        <source>IFC-to-CityGML conversion failed</source>
+        <translation>IFC-zu-CityGML-Konvertierung fehlgeschlagen</translation>
+    </message>
+    <message>
+        <location filename="../viewmodel/model.py"/>
+        <source>Open output folder</source>
+        <translation>Ausgabe-Ordner öffnen</translation>
+    </message>
+</context>
+<context>
+    <name>Transformer</name>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Georef result: Level={level}, Source CRS={src_crs}, Source={source}, Guessed CRS={guessed}</source>
+        <translation>Georef-Ergebnis: Level={level}, Quell-CRS={src_crs}, Quelle={source}, Geraten={guessed}</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Warning: No IfcSite found – origin shift is [0, 0, 0].</source>
+        <translation>Warnung: Kein IfcSite gefunden – Ursprungsverschiebung ist [0, 0, 0].</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Source coordinates: X={x}, Y={y}, Z={z} (EPSG:{epsg})</source>
+        <translation>Quell-Koordinaten: X={x}, Y={y}, Z={z} (EPSG:{epsg})</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Target CRS: {crs}</source>
+        <translation>Ziel-CRS: {crs}</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Origin shift in metric CRS (EPSG:{epsg}): E={e}, N={n}, Z={z}</source>
+        <translation>Ursprungsverschiebung im metrischen CRS (EPSG:{epsg}): E={e}, N={n}, Z={z}</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>MapConversion active: XAxisAbscissa={a}, XAxisOrdinate={b}, Scale={scale}</source>
+        <translation>MapConversion aktiv: XAxisAbscissa={a}, XAxisOrdinate={b}, Scale={scale}</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Transformation matrix (MapConversion): {matrix}</source>
+        <translation>Transformationsmatrix (MapConversion): {matrix}</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>TrueNorth active: DirectionRatios=[{a}, {b}]</source>
+        <translation>TrueNorth aktiv: DirectionRatios=[{a}, {b}]</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Transformation matrix (TrueNorth): {matrix}</source>
+        <translation>Transformationsmatrix (TrueNorth): {matrix}</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Could not read IfcMapConversion: {error}</source>
+        <translation>IfcMapConversion konnte nicht gelesen werden: {error}</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>UNKNOWN</source>
+        <translation>UNBEKANNT</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Warning: IFC length unit is {label}. This implementation expects meters.</source>
+        <translation>Warnung: IFC-Längeneinheit ist {label}. Diese Implementierung erwartet Meter.</translation>
+    </message>
+    <message>
+        <location filename="../algorithm/transformer.py"/>
+        <source>Warning: IFC length unit is not IfcSIUnit(METRE). This implementation expects meters.</source>
+        <translation>Warnung: IFC-Längeneinheit ist kein IfcSIUnit(METRE). Diese Implementierung erwartet Meter.</translation>
     </message>
 </context>
 </TS>

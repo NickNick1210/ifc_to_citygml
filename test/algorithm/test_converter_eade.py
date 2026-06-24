@@ -22,9 +22,12 @@ import ifcopenshell
 from lxml import etree
 
 # Geo-Bibliotheken
-from osgeo import ogr
+from osgeo import gdal, ogr, osr
 
 # Plugin
+gdal.PushErrorHandler("CPLQuietErrorHandler")
+osr.UseExceptions()
+
 sys.path.insert(0, '..')
 from algorithm.converter_eade import EADEConverter
 from algorithm.utilitiesIfc import UtilitiesIfc

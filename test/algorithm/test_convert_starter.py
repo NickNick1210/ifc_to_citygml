@@ -47,7 +47,7 @@ ifc2 = ifcopenshell.open(r"data/IFC_test3.ifc")
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        result = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
+        result = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False, None)
         self.assertIsNone(result.parent)
         self.assertEqual(inPath1, result.inPath)
         self.assertEqual(outPath1, result.outPath)
@@ -57,7 +57,7 @@ class TestConstructor(unittest.TestCase):
 
     def test_2(self):
         model = Model()
-        result = ConvertStarter("IFC-to-CityGML Conversion", model, inPath2, outPath2, 3, True, True)
+        result = ConvertStarter("IFC-to-CityGML Conversion", model, inPath2, outPath2, 3, True, True, None)
         self.assertEqual(model, result.parent)
         self.assertEqual(inPath2, result.inPath)
         self.assertEqual(outPath2, result.outPath)
@@ -69,12 +69,12 @@ class TestConstructor(unittest.TestCase):
 class TestRun(unittest.TestCase):
 
     def test_1(self):
-        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, False, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, False, False, 25832)
         result = conv.run()
         self.assertTrue(result)
 
     def test_2(self):
-        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 1, True, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 1, True, False, 25832)
         result = conv.run()
         self.assertTrue(result)
 
@@ -111,7 +111,7 @@ class TestCreateSchema(unittest.TestCase):
 class TestWriteCGML(unittest.TestCase):
 
     def test_1(self):
-        conv = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False, None)
         conv.writeCGML(ConvertStarter.createSchema())
         f = open(outPath1, "r")
         result = ""
@@ -131,7 +131,7 @@ class TestWriteCGML(unittest.TestCase):
 
     def test_2(self):
         root = etree.Element("root")
-        conv = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", None, inPath1, outPath1, 0, False, False, None)
         conv.writeCGML(root)
         f = open(outPath1, "r")
         result = ""
@@ -145,12 +145,12 @@ class TestWriteCGML(unittest.TestCase):
 class TestFinished(unittest.TestCase):
 
     def test_1(self):
-        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 0, False, False)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath1, outPath1, 0, False, False, None)
         conv.finished(True)
         self.assertTrue(conv.parent.completedTest)
 
     def test_2(self):
-        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, True, True)
+        conv = ConvertStarter("IFC-to-CityGML Conversion", Model(), inPath2, outPath2, 0, True, True, None)
         conv.finished(False)
         self.assertTrue(conv.parent.completedTest)
 

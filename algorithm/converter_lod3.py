@@ -87,8 +87,16 @@ class LoD3Converter(Converter):
             root: Das vorbereitete XML-Schema
         """
         # IFC-Grundelemente
-        ifcProject = self.ifc.by_type("IfcProject")[0]
-        ifcSite = self.ifc.by_type("IfcSite")[0]
+        ifcProjects = self.ifc.by_type("IfcProject")
+        if not ifcProjects:
+            return False
+        ifcProject = ifcProjects[0]
+
+        ifcSites = self.ifc.by_type("IfcSite")
+        if not ifcSites:
+            return False
+        ifcSite = ifcSites[0]
+
         ifcBuildings = self.ifc.by_type("IfcBuilding")
 
         # XML-Struktur
@@ -111,13 +119,18 @@ class LoD3Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Gebäudebestandteile
             self.task.logging.emit(self.tr(u'Building bounds are calculated'))
-            links, footPrint, surfaces = self.convertBldgBound(ifcBuilding, chBldg)
+            bldgBoundResult = self.convertBldgBound(ifcBuilding, chBldg)
+            if bldgBoundResult is False:
+                return False
             if self.task.isCanceled():
                 return False
+            if not bldgBoundResult or not isinstance(bldgBoundResult, tuple):
+                continue
+            links, footPrint, surfaces = bldgBoundResult
 
             # Gebäudekörper
             self.task.logging.emit(self.tr(u'Building solid is calculated'))
@@ -125,7 +138,7 @@ class LoD3Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Adresse
             self.task.logging.emit(self.tr(u'Building address is extracted'))
@@ -133,7 +146,7 @@ class LoD3Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # Bounding Box
             self.task.logging.emit(self.tr(u'Building bound is calculated'))
@@ -141,7 +154,7 @@ class LoD3Converter(Converter):
             if self.task.isCanceled():
                 return False
             self.progress += (2.5 / self.bldgCount)
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
             # EnergyADE
             if self.eade:
@@ -151,15 +164,16 @@ class LoD3Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Gebäudeattribute
                 self.task.logging.emit(self.tr(u'Energy ADE: building attributes are extracted'))
-                EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
+                if footPrint is not None:
+                    EADEConverter.convertBldgAttr(self.ifc, ifcBuilding, chBldg, bbox, footPrint)
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Thermale Zone
                 self.task.logging.emit(self.tr(u'Energy ADE: thermal zone is calculated'))
@@ -168,7 +182,7 @@ class LoD3Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (7.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Nutzungszone
                 self.task.logging.emit(self.tr(u'Energy ADE: usage zone is calculated'))
@@ -176,7 +190,7 @@ class LoD3Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Konstruktionen
                 self.task.logging.emit(self.tr(u'Energy ADE: construction is calculated'))
@@ -184,7 +198,7 @@ class LoD3Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
                 # Materialien
                 self.task.logging.emit(self.tr(u'Energy ADE: material is calculated'))
@@ -192,7 +206,7 @@ class LoD3Converter(Converter):
                 if self.task.isCanceled():
                     return False
                 self.progress += (2.5 / self.bldgCount)
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
         return root
 
@@ -211,6 +225,10 @@ class LoD3Converter(Converter):
         # Berechnung
         self.task.logging.emit(self.tr(u'Building geometry: base surfaces are calculated'))
         bases, basesOrig, floors = self.calcBases(ifcBuilding)
+        if bases is False:
+            return False
+        if not bases:
+            return None, None, []
         if self.task.isCanceled():
             return False
 
@@ -267,7 +285,8 @@ class LoD3Converter(Converter):
             links += linksWall
             surfaces += openSurf
         surfaces += bases + roofs + walls
-        return links, bases[0].geom[0], surfaces
+        footPrint = bases[0].geom[0] if bases and bases[0].geom else None
+        return links, footPrint, surfaces
 
     def calcBases(self, ifcBuilding):
         """ Berechnet die Grundfläche in Level of Detail (LoD) 3
@@ -309,10 +328,7 @@ class LoD3Converter(Converter):
             grVertsList = []
             for face in grFacesCurr:
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
-                points = []
-                for facePoint in facePoints:
-                    point = self.trans.georeferencePoint(facePoint)
-                    points.append(point)
+                points = list(self.trans.georeferencePoint(facePoints, reproject=False))
                 grVertsList.append(points)
 
             # Geometrien erstellen
@@ -370,13 +386,15 @@ class LoD3Converter(Converter):
 
             self.progress += (7 / self.bldgCount / len(ifcSlabs)) if not self.eade else (
                     5 / self.bldgCount / len(ifcSlabs))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         floors = bases
 
         # Benötigte ifcSlabs heraussuchen, falls nur .FLOOR
         if floor:
-            bases.sort(key=lambda elem: (elem.geom[0].GetGeometryRef(0).GetPoint(0)[2]))
+            if not bases:
+                return [], [], []
+            bases.sort(key=lambda elem: elem.geom[0].GetGeometryRef(0).GetPoint(0)[2] if elem.geom else 0)
             minHeight = bases[0].geom[0].GetGeometryRef(0).GetPoint(0)[2]
             removedBases = []
             for i in range(0, len(bases)):
@@ -426,7 +444,7 @@ class LoD3Converter(Converter):
 
                 self.progress += (3 / self.bldgCount / len(ifcSlabs)) if not self.eade else (
                         2.5 / self.bldgCount / len(ifcSlabs))
-                self.task.setProgress(self.progress)
+                self.task.setProgress(min(self.progress, 100))
 
             removedBases.sort(reverse=True)
             for removedBase in removedBases:
@@ -472,7 +490,7 @@ class LoD3Converter(Converter):
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
                 points = []
                 for facePoint in facePoints:
-                    point = self.trans.georeferencePoint(facePoint)
+                    point = self.trans.georeferencePoint(facePoint, reproject=False)
                     points.append(point)
                 grVertsList.append(points)
 
@@ -526,7 +544,7 @@ class LoD3Converter(Converter):
 
             self.progress += (10 / self.bldgCount / len(ifcRoofs)) if not self.eade else (
                     7.5 / self.bldgCount / len(ifcRoofs))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return roofs, roofsOrig
 
@@ -586,7 +604,7 @@ class LoD3Converter(Converter):
                 facePoints = [grVertsCurr[face[0]], grVertsCurr[face[1]], grVertsCurr[face[2]]]
                 points = []
                 for facePoint in facePoints:
-                    point = self.trans.georeferencePoint(facePoint)
+                    point = self.trans.georeferencePoint(facePoint, reproject=False)
                     points.append(point)
                 grVertsList.append(points)
 
@@ -617,7 +635,7 @@ class LoD3Converter(Converter):
                 return False
 
             self.progress += (10 / self.bldgCount / len(ifcWallsExt))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return walls
 
@@ -670,8 +688,7 @@ class LoD3Converter(Converter):
             minHeight, maxHeight = sys.maxsize, -sys.maxsize
 
             # Nur wichtige Vertizes hinzufügen
-            for grVertCurr in grVertsCurr:
-                point = self.trans.georeferencePoint(grVertCurr)
+            for point in self.trans.georeferencePoint(grVertsCurr, reproject=False):
                 if point[2] <= minHeight:
                     minHeight = point[2]
                     grVertsList.append(point)
@@ -685,7 +702,7 @@ class LoD3Converter(Converter):
 
             self.progress += (10 / self.bldgCount / len(ifcOpeningsExt)) if not self.eade else (
                     5 / self.bldgCount / len(ifcOpeningsExt))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return openings
 
@@ -723,7 +740,7 @@ class LoD3Converter(Converter):
 
             self.progress += (10 / self.bldgCount / len(openings)) if not self.eade else (
                     5 / self.bldgCount / len(openings))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return walls
 
@@ -743,8 +760,17 @@ class LoD3Converter(Converter):
             # Maximale Durchmesser der einzelnen Oberflächen heraussuchen
             dists = []
             for wallGeom in wall.geom:
+                # Guard: skip degenerate geometries that are not polygons
+                if wallGeom is None or wallGeom.IsEmpty() or wallGeom.GetGeometryName() != "POLYGON":
+                    dists.append(0)
+                    continue
+
                 maxDist = -sys.maxsize
                 ring = wallGeom.GetGeometryRef(0)
+                if ring is None:
+                    dists.append(0)
+                    continue
+
                 heightDiff = False
                 for k in range(0, ring.GetPointCount()):
                     pt1 = ring.GetPoint(k)
@@ -760,6 +786,18 @@ class LoD3Converter(Converter):
                 else:
                     dists.append(0)
 
+            # Filter out non-polygon geometries before computing finalWall
+            validGeoms = [
+                g for g in wall.geom
+                if g is not None and not g.IsEmpty() and g.GetGeometryName() == "POLYGON"
+            ]
+
+            if not validGeoms or max(dists) == 0:
+                wallMainCounts.append(1)
+                wall.geom = validGeoms
+                self.progress += (10 / self.bldgCount / len(walls))
+                self.task.setProgress(min(self.progress, 100))
+                continue
             # Größte Fläche als Außenfläche
             lastMaxDist, bigDists = None, []
             for k in range(0, len(dists)):
@@ -796,8 +834,15 @@ class LoD3Converter(Converter):
                     wallGeom = wall.geom[h]
                     if wallGeom in finalWall:
                         continue
+
+                    # Guard: only process valid polygons as opening bounds
+                    if wallGeom is None or wallGeom.IsEmpty() or wallGeom.GetGeometryName() != "POLYGON":
+                        continue
+
                     same = False
                     wallRing = wallGeom.GetGeometryRef(0)
+                    if wallRing is None:
+                        continue
 
                     # Auf Nähe mit den Öffnungen (Türen und Fenster) prüfen
                     for i in range(0, len(wall.openings)):
@@ -998,18 +1043,16 @@ class LoD3Converter(Converter):
                                         ptEnd[0] - ptMid[0])
                                     if gradYSt - tol < gradYEnd < gradYSt + tol:
                                         # Z-Steigung in Bezug auf X-Verlauf
-                                        gradZSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[2] - ptSt[
-                                            2]) / abs(
+                                        gradZSt = -1 if abs(ptMid[0] - ptSt[0]) < 0.0001 else (ptMid[2] - ptSt[2]) / abs(
                                             ptMid[0] - ptSt[0])
-                                        gradZEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[2] - ptMid[
-                                            2]) / abs(
+                                        gradZEnd = -1 if abs(ptEnd[0] - ptMid[0]) < 0.0001 else (ptEnd[2] - ptMid[2]) / abs(
                                             ptEnd[0] - ptMid[0])
                                         if gradZSt - tol < gradZEnd < gradZSt + tol:
                                             # Z-Steigung in Bezug auf Y-Verlauf
-                                            gradYZSt = -1 if abs(ptMid[1] - ptSt[1]) < 0.0001 else (ptMid[2] - ptSt[
-                                                2]) / abs(ptMid[1] - ptSt[1])
-                                            gradYZEnd = -1 if abs(ptEnd[1] - ptMid[1]) < 0.0001 else (ptEnd[2] - ptMid[
-                                                2]) / abs(ptEnd[1] - ptMid[1])
+                                            gradYZSt = -1 if abs(ptMid[1] - ptSt[1]) < 0.0001 else (ptMid[2] - ptSt[2]) / abs(
+                                                ptMid[1] - ptSt[1])
+                                            gradYZEnd = -1 if abs(ptEnd[1] - ptMid[1]) < 0.0001 else (ptEnd[2] - ptMid[2]) / abs(
+                                                ptEnd[1] - ptMid[1])
                                             if gradYZSt - tol < gradYZEnd < gradYZSt + tol:
                                                 newRingWall1.AddPoint(ptMid[0], ptMid[1], ptMid[2])
                                                 newRingWall2.AddPoint(ptMid[0], ptMid[1], ptMid[2])
@@ -1058,7 +1101,7 @@ class LoD3Converter(Converter):
                 return False
 
             self.progress += (10 / self.bldgCount / len(walls))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return walls, wallMainCounts
 
@@ -1278,7 +1321,7 @@ class LoD3Converter(Converter):
                     return False
 
             self.progress += (10 / self.bldgCount / len(walls))
-            self.task.setProgress(self.progress)
+            self.task.setProgress(min(self.progress, 100))
 
         return walls
 
@@ -1323,8 +1366,9 @@ class LoD3Converter(Converter):
         # Geometrie
         for geometry in geometries:
             chBldgCSSM = etree.SubElement(chBldgCS, QName(XmlNs.gml, "surfaceMember"))
-            geomXML = UtilitiesGeom.geomToGml(geometry)
-            chBldgCSSM.append(geomXML)
+            geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
+            if geomXML is not None:
+                chBldgCSSM.append(geomXML)
 
             # GML-ID
             chBldgPol = chBldgCSSM[0]
@@ -1351,8 +1395,9 @@ class LoD3Converter(Converter):
             polyIds.append(polyId)
             for geometry in opening.geom:
                 chBldgOCSSM = etree.SubElement(chBldgOCS, QName(XmlNs.gml, "surfaceMember"))
-                geomXML = UtilitiesGeom.geomToGml(geometry)
-                chBldgOCSSM.append(geomXML)
+                geomXML = UtilitiesGeom.geomToGml(geometry, self.trans)
+                if geomXML is not None:
+                    chBldgOCSSM.append(geomXML)
 
                 # GML-ID
                 chBldgPol = chBldgOCSSM[0]

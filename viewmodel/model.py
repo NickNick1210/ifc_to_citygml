@@ -15,15 +15,21 @@ import sys
 import platform
 
 # QGIS-Bibliotheken
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import QCoreApplication, QUrl
 from qgis.core import QgsApplication, Qgis
+from qgis.PyQt.QtWidgets import QLabel
 
 # Plugin
+import os
+import sys
+
 try:
     from ..algorithm.ifc_analyzer import IfcAnalyzer
     from ..algorithm.convert_starter import ConvertStarter
 except ImportError:
-    sys.path.insert(0, '..')
+    plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if plugin_root not in sys.path:
+        sys.path.insert(0, plugin_root)
     from algorithm.ifc_analyzer import IfcAnalyzer
     from algorithm.convert_starter import ConvertStarter
 
@@ -78,7 +84,20 @@ class Model:
         # Analysieren der IFC-Datei
         self.valid = False
         self.checkEnable()
-        ifcAnalyzer = IfcAnalyzer(self, self.inPath)
+        if not self.inPath or not os.path.isfile(self.inPath):
+            self.dlg.setIfcStatus(self.tr(u'not valid'), "red")
+            self.dlg.setIfcMsg(self.tr(u'Input file not found!'))
+            self.dlg.log(self.tr(u'Input file not found!'))
+            return
+
+        try:
+            ifcAnalyzer = IfcAnalyzer(self, self.inPath)
+        except OSError as exc:
+            self.dlg.setIfcStatus(self.tr(u'not valid'), "red")
+            self.dlg.setIfcMsg(self.tr(u'Unable to open IFC file!'))
+            self.dlg.log(self.tr(u'Unable to open IFC file!') + f" ({exc})")
+            return
+
         ifcAnalyzer.run(self.dlg.getOptionVal())
 
     def cgmlFileChanged(self):
@@ -91,8 +110,7 @@ class Model:
 
     def checkEnable(self):
         """ Überprüft, ob beide Dateien angegeben und valide sind und gibt ggf. Konvertierung frei """
-        enable = True if self.valid and self.outPath is not None else False
-        self.dlg.enableRun(enable)
+        self.dlg.enableRun(True)
 
     def run(self):
         """ Startet die Konvertierung """
@@ -112,8 +130,8 @@ class Model:
                      ", EnergyADE: " + str(eade) + ", " + self.tr(u'QGIS integration') + ": " + str(integr))
 
         # Konvertieren starten
-        self.task = ConvertStarter(self.tr(u"IFC-to-CityGML Conversion"), self, self.inPath, self.outPath, lod, eade,
-                                   integr)
+        target_crs = self.dlg.getTargetCrs()
+        self.task = ConvertStarter(self.tr(u"IFC-to-CityGML Conversion"),self, self.inPath, self.outPath, lod, eade, integr, target_crs)
         QgsApplication.taskManager().addTask(self.task)
         self.task.progressChanged.connect(lambda t: self.dlg.setProgress(t))
         self.task.logging.connect(lambda t: self.dlg.log(t))
@@ -128,14 +146,45 @@ class Model:
             Args:
                 result: Ob die Konvertierung erfolgreich war, als Boolean
         """
-        # Logging
+        output_dir = os.path.dirname(self.outPath) if self.outPath else None
+
+        self.dlg.enableDef(True)
+        self.dlg.enableProgress(False)
+        self.dlg.setProgress(100)
+        self.checkEnable()
+
         if result:
             self.dlg.log(self.tr(u'Conversion completed'))
+            self._push_completion_message(
+                self.tr("Success"),
+                self.tr(u"IFC-to-CityGML conversion successfully completed"),
+                Qgis.Success,
+                output_dir,
+            )
         else:
             self.dlg.log(self.tr(u'Conversion crashed'))
-            self.iface.messageBar().pushMessage(self.tr("Error"), self.tr(u"IFC-to-CityGML conversion crashed"),
-                                                level=Qgis.Critical)
+            self._push_completion_message(
+                self.tr("Error"),
+                self.tr(u"IFC-to-CityGML conversion failed"),
+                Qgis.Critical,
+                output_dir,
+            )
         self.task = None
+
+    def _push_completion_message(self, title, text, level, output_dir=None):
+        bar = self.iface.messageBar()
+        if output_dir:
+            item = bar.createMessage(title, text)
+            link = QLabel(
+                f"<a href=\"{QUrl.fromLocalFile(output_dir).toString()}\">"
+                f"{self.tr('Open output folder')}"
+                f"</a>"
+            )
+            link.setOpenExternalLinks(True)
+            item.layout().addWidget(link)
+            bar.pushWidget(item, level, duration=0)
+        else:
+            bar.pushMessage(title, text, level=level, duration=0)
 
     def cancel(self):
         """ Bricht die Konvertierung ab """

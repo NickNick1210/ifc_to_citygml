@@ -16,10 +16,16 @@ import logging
 import sys
 import numpy as np
 
+# Geo-Bibliotheken
+from osgeo import gdal, osr
+
 # IFC-Bibliotheken
 import ifcopenshell
 
 # Plugin
+gdal.PushErrorHandler("CPLQuietErrorHandler")
+osr.UseExceptions()
+
 sys.path.insert(0, '..')
 from algorithm.transformer import Transformer
 
@@ -39,7 +45,7 @@ ifc2 = ifcopenshell.open(dataPath2)
 class TestConstructor(unittest.TestCase):
 
     def test_1(self):
-        result = Transformer(ifc)
+        result = Transformer(ifc, targetCrs=32632)
         self.assertEqual(ifc, result.ifc)
         self.assertEqual(32632, result.epsg)
         corr = [458870.0632856814, 5438773.629049492, 110.0]
@@ -48,7 +54,7 @@ class TestConstructor(unittest.TestCase):
         np.testing.assert_array_almost_equal(corr, result.trans)
 
     def test_2(self):
-        result = Transformer(ifc2)
+        result = Transformer(ifc2, targetCrs=32633)
         self.assertEqual(ifc2, result.ifc)
         self.assertEqual(32633, result.epsg)
         corr = [509733.27041584934, 6096718.499613839, 210.0]
@@ -71,19 +77,19 @@ class TestMergeDegrees(unittest.TestCase):
 class TestGeoreferencePoint(unittest.TestCase):
 
     def test_1(self):
-        trans = Transformer(ifc)
+        trans = Transformer(ifc, targetCrs=32632)
         result = trans.georeferencePoint([12, 34, 23])
         corr = [458851.7312259316, 5438804.6763615385, 133]
         np.testing.assert_array_almost_equal(corr, result)
 
     def test_2(self):
-        trans = Transformer(ifc)
+        trans = Transformer(ifc, targetCrs=32632)
         result = trans.georeferencePoint([-34, 12.123456789, 17.00000001])
         corr = [458838.9214002475, 5438755.376346237, 127.00000001]
         np.testing.assert_array_almost_equal(corr, result)
 
     def test_3(self):
-        trans = Transformer(ifc2)
+        trans = Transformer(ifc2, targetCrs=32633)
         result = trans.georeferencePoint([12, 34, 23])
         corr = [509740.99656973616, 6096753.890383066, 233]
         np.testing.assert_array_almost_equal(corr, result)
